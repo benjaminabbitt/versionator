@@ -70,3 +70,6 @@ build:
 - `versionator-freebsd-amd64`
 
 All binaries are statically compiled - just download and run.
+
+## Development
+

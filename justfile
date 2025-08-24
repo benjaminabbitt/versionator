@@ -55,7 +55,7 @@ deps: fix-perms
     echo "Dependencies downloaded successfully!"
 
 # Build the application
-build:
+build: fix-git-dubious-ownership-warning
     #!/bin/zsh
     set -e
     just fix-perms
@@ -65,7 +65,7 @@ build:
     echo "Build completed: bin/versionator"
 
 # Build with verbose output for debugging
-build-verbose:
+build-verbose: fix-git-dubious-ownership-warning
     #!/bin/zsh
     set -e
     just fix-perms
@@ -75,56 +75,8 @@ build-verbose:
 
 # Run the application with arguments
 run *args:
-    @just build
+    @just buildfix-git-dubious-ownership-warning
     ./bin/versionator {{args}}
-
-# Show current version
-version:
-    @just run version
-
-# Increment major version
-major-inc:
-    @just run major inc
-
-# Decrement major version
-major-dec:
-    @just run major dec
-
-# Increment minor version
-minor-inc:
-    @just run minor inc
-
-# Decrement minor version
-minor-dec:
-    @just run minor dec
-
-# Increment patch version
-patch-inc:
-    @just run patch inc
-
-# Decrement patch version
-patch-dec:
-    @just run patch dec
-
-# Enable git hash suffix
-suffix-enable:
-    @just run suffix enable
-
-# Disable git hash suffix
-suffix-disable:
-    @just run suffix disable
-
-# Show suffix status
-suffix-status:
-    @just run suffix status
-
-# Create a git tag for the current version
-commit:
-    @just run commit
-
-# Create a git tag with custom message
-commit-with-message message:
-    @just run commit --message "{{message}}"
 
 # Install the binary to /usr/local/bin
 install:
@@ -184,7 +136,7 @@ dev-setup:
     echo "Development environment ready!"
 
 # Build for all platforms with static linking
-build-all: fix-perms
+build-all: fix-perms fix-git-dubious-ownership-warning
     #!/bin/zsh
     set -e
     echo "Building for all platforms with static linking..."
@@ -254,3 +206,4 @@ rebuild:
 
 fix-git-dubious-ownership-warning:
     git config --global --add safe.directory /workspace
+
