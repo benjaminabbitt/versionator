@@ -6,12 +6,16 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+	"versionator/internal/app"
 	"versionator/internal/config"
 	"versionator/internal/vcs"
 	"versionator/internal/vcs/mock"
+	"versionator/internal/version"
+	"versionator/internal/versionator"
 )
 
 func TestSuffixEnableCommand(t *testing.T) {
@@ -81,7 +85,7 @@ func TestSuffixEnableCommand(t *testing.T) {
 				mockVCS.EXPECT().Name().Return("git").AnyTimes()
 				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
 				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(7).Return("def5678", nil).AnyTimes()
+				mockVCS.EXPECT().GetVCSIdentifier(8).Return("def5678", nil).AnyTimes()
 				return mockVCS
 			},
 			expectError: false,
@@ -90,33 +94,40 @@ func TestSuffixEnableCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
-			defer func() {
-				os.Chdir(originalDir)
-			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
-
+			// Create in-memory filesystem
+			fs := afero.NewMemMapFs()
+			
 			// Setup gomock
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			// Setup VCS mock
 			mockVCS := tt.setupVCS(ctrl)
-			vcs.RegisterVCS(mockVCS)
-			defer vcs.UnregisterVCS("git")
+			
+			// Create test app instance with in-memory filesystem and injected VCS
+			testApp := &app.App{
+				ConfigManager:  config.NewConfigManager(fs),
+				VersionManager: version.NewVersion(fs, ".", mockVCS),
+				Versionator:    versionator.NewVersionator(fs, mockVCS),
+				VCS:            mockVCS,
+				FileSystem:     fs,
+			}
+			
+			// Replace global app instance for this test
+			originalApp := appInstance
+			appInstance = testApp
+			defer func() {
+				appInstance = originalApp
+			}()
 
 			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			err := afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
 			require.NoError(t, err)
 
 			// Create initial config file
 			configData, err := yaml.Marshal(tt.initialConfig)
 			require.NoError(t, err)
-			err = os.WriteFile(".versionator.yaml", configData, 0644)
+			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
 			require.NoError(t, err)
 
 			// Capture output
@@ -133,7 +144,7 @@ func TestSuffixEnableCommand(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Verify config was updated
-				cfg, err := config.ReadConfig()
+				cfg, err := testApp.ReadConfig()
 				require.NoError(t, err)
 				assert.True(t, cfg.Suffix.Enabled)
 				assert.Equal(t, "git", cfg.Suffix.Type)
@@ -190,24 +201,33 @@ func TestSuffixDisableCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
+			// Create in-memory filesystem
+			fs := afero.NewMemMapFs()
+			
+			// Create test app instance with in-memory filesystem
+			testApp := &app.App{
+				ConfigManager:  config.NewConfigManager(fs),
+				VersionManager: version.NewVersion(fs, ".", nil),
+				Versionator:    versionator.NewVersionator(fs, nil),
+				VCS:            nil,
+				FileSystem:     fs,
+			}
+			
+			// Replace global app instance for this test
+			originalApp := appInstance
+			appInstance = testApp
 			defer func() {
-				os.Chdir(originalDir)
+				appInstance = originalApp
 			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
 
 			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			err := afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
 			require.NoError(t, err)
 
 			// Create initial config file
 			configData, err := yaml.Marshal(tt.initialConfig)
 			require.NoError(t, err)
-			err = os.WriteFile(".versionator.yaml", configData, 0644)
+			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
 			require.NoError(t, err)
 
 			// Capture output
@@ -224,7 +244,7 @@ func TestSuffixDisableCommand(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Verify config was updated
-				cfg, err := config.ReadConfig()
+				cfg, err := testApp.ReadConfig()
 				require.NoError(t, err)
 				assert.False(t, cfg.Suffix.Enabled)
 
@@ -266,7 +286,7 @@ func TestSuffixStatusCommand(t *testing.T) {
 				mockVCS.EXPECT().Name().Return("git").AnyTimes()
 				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
 				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(7).Return("abc1234", nil).Times(1)
+				mockVCS.EXPECT().GetVCSIdentifier(7).Return("abc1234", nil).AnyTimes()
 				return mockVCS
 			},
 			expectError: false,
@@ -304,8 +324,11 @@ func TestSuffixStatusCommand(t *testing.T) {
 			},
 			initialVersion: "3.1.0",
 			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				// No VCS expectations needed when suffix is disabled
-				return nil
+				// Create mock VCS but no expectations needed when suffix is disabled
+				mockVCS := mock.NewMockVersionControlSystem(ctrl)
+				mockVCS.EXPECT().IsRepository().Return(false).AnyTimes()
+				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
+				return mockVCS
 			},
 			expectError: false,
 		},
@@ -326,7 +349,7 @@ func TestSuffixStatusCommand(t *testing.T) {
 				mockVCS.EXPECT().Name().Return("git").AnyTimes()
 				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
 				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(7).Return("", os.ErrPermission).Times(1)
+				mockVCS.EXPECT().GetVCSIdentifier(7).Return("", os.ErrPermission).AnyTimes()
 				return mockVCS
 			},
 			expectError: false,
@@ -335,37 +358,49 @@ func TestSuffixStatusCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
-			defer func() {
-				os.Chdir(originalDir)
-			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
+			// Create in-memory filesystem
+			fs := afero.NewMemMapFs()
 
 			// Setup gomock
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			// Setup VCS mock if provided
+			// Setup VCS mock if provided and create app with it
+			var testApp *app.App
 			if tt.setupVCS != nil {
 				mockVCS := tt.setupVCS(ctrl)
-				if mockVCS != nil {
-					vcs.RegisterVCS(mockVCS)
-					defer vcs.UnregisterVCS("git")
+				testApp = &app.App{
+					ConfigManager:  config.NewConfigManager(fs),
+					VersionManager: version.NewVersion(fs, ".", mockVCS),
+					Versionator:    versionator.NewVersionator(fs, mockVCS),
+					VCS:            mockVCS,
+					FileSystem:     fs,
+				}
+			} else {
+				testApp = &app.App{
+					ConfigManager:  config.NewConfigManager(fs),
+					VersionManager: version.NewVersion(fs, ".", nil),
+					Versionator:    versionator.NewVersionator(fs, nil),
+					VCS:            nil,
+					FileSystem:     fs,
 				}
 			}
 
+			// Replace global app instance for this test
+			originalApp := appInstance
+			appInstance = testApp
+			defer func() {
+				appInstance = originalApp
+			}()
+			
 			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			err := afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
 			require.NoError(t, err)
 
 			// Create initial config file
 			configData, err := yaml.Marshal(tt.initialConfig)
 			require.NoError(t, err)
-			err = os.WriteFile(".versionator.yaml", configData, 0644)
+			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
 			require.NoError(t, err)
 
 			// Capture output
@@ -435,20 +470,13 @@ func TestSuffixConfigureCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
-			defer func() {
-				os.Chdir(originalDir)
-			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
+			// Create in-memory filesystem
+			fs := afero.NewMemMapFs()
 
 			// Create initial config file
 			configData, err := yaml.Marshal(tt.initialConfig)
 			require.NoError(t, err)
-			err = os.WriteFile(".versionator.yaml", configData, 0644)
+			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
 			require.NoError(t, err)
 
 			// Capture output
@@ -530,28 +558,28 @@ func TestSuffixCommandConfigErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        []string
-		setupFunc   func(tempDir string) error
+		setupFunc   func(fs afero.Fs) error
 		expectError bool
 	}{
 		{
 			name: "missing config file",
 			args: []string{"suffix", "enable"},
-			setupFunc: func(tempDir string) error {
+			setupFunc: func(fs afero.Fs) error {
 				// Create VERSION file but no config file
-				return os.WriteFile("VERSION", []byte("1.0.0"), 0644)
+				return afero.WriteFile(fs, "VERSION", []byte("1.0.0"), 0644)
 			},
 			expectError: false, // Should create default config
 		},
 		{
 			name: "invalid config file",
 			args: []string{"suffix", "status"},
-			setupFunc: func(tempDir string) error {
+			setupFunc: func(fs afero.Fs) error {
 				// Create invalid YAML config
-				err := os.WriteFile("VERSION", []byte("1.0.0"), 0644)
+				err := afero.WriteFile(fs, "VERSION", []byte("1.0.0"), 0644)
 				if err != nil {
 					return err
 				}
-				return os.WriteFile(".versionator.yaml", []byte("invalid: yaml: content: ["), 0644)
+				return afero.WriteFile(fs, ".versionator.yaml", []byte("invalid yaml content\n  [unclosed bracket\n    bad: indentation"), 0644)
 			},
 			expectError: true,
 		},
@@ -559,18 +587,34 @@ func TestSuffixCommandConfigErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
+			// Unregister any VCS to prevent interference
+			vcs.UnregisterVCS("git")
 			defer func() {
-				os.Chdir(originalDir)
+				// Clean up any registered VCS after test
+				vcs.UnregisterVCS("git")
 			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
+
+			// Create in-memory filesystem
+			fs := afero.NewMemMapFs()
+			
+			// Create test app instance with in-memory filesystem
+			testApp := &app.App{
+				ConfigManager:  config.NewConfigManager(fs),
+				VersionManager: version.NewVersion(fs, ".", nil),
+				Versionator:    versionator.NewVersionator(fs, nil),
+				VCS:            nil,
+				FileSystem:     fs,
+			}
+			
+			// Replace global app instance for this test
+			originalApp := appInstance
+			appInstance = testApp
+			defer func() {
+				appInstance = originalApp
+			}()
 
 			// Setup test environment
-			err = tt.setupFunc(tempDir)
+			err := tt.setupFunc(fs)
 			require.NoError(t, err)
 
 			// Capture output

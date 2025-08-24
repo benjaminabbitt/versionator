@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"os"
 	"testing"
-
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/suite"
+	"versionator/internal/app"
+	"versionator/internal/config"
 	"versionator/internal/vcs"
 	"versionator/internal/vcs/mock"
+	"versionator/internal/version"
+	"versionator/internal/versionator"
+
+	"github.com/golang/mock/gomock"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/suite"
 )
 
 // CommitTestSuite defines the test suite for commit command tests
@@ -17,6 +22,8 @@ type CommitTestSuite struct {
 	ctrl    *gomock.Controller
 	tempDir string
 	origDir string
+	testApp *app.App
+	fs      afero.Fs
 }
 
 // SetupSuite runs once before all tests in the suite
@@ -41,6 +48,18 @@ func (suite *CommitTestSuite) SetupTest() {
 
 	// Initialize gomock controller
 	suite.ctrl = gomock.NewController(suite.T())
+
+	// Create in-memory filesystem for the suite
+	suite.fs = afero.NewMemMapFs()
+
+	// Create a basic app instance (will be customized per test with different VCS)
+	suite.testApp = &app.App{
+		ConfigManager:  config.NewConfigManager(suite.fs),
+		VersionManager: version.NewVersion(suite.fs, ".", nil),
+		Versionator:    versionator.NewVersionator(suite.fs, nil),
+		VCS:            nil,
+		FileSystem:     suite.fs,
+	}
 
 	// Reset command state to prevent flag pollution
 	suite.resetCommitCommand()
@@ -79,7 +98,7 @@ func (suite *CommitTestSuite) resetCommitCommand() {
 // createTestFiles creates the standard test files needed for most tests
 func (suite *CommitTestSuite) createTestFiles(version string) {
 	// Create a VERSION file
-	err := os.WriteFile("VERSION", []byte(version), 0644)
+	err := afero.WriteFile(suite.fs, "VERSION", []byte(version), 0644)
 	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Create a minimal config file
@@ -92,26 +111,48 @@ suffix:
 logging:
   output: "console"
 `
-	err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
+	err = afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
 	suite.Require().NoError(err, "Failed to create config file")
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_Success() {
-	// Create test files
-	suite.createTestFiles("1.2.3")
-
 	// Setup mock VCS
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(".", nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.2.3").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.2.3", "Release 1.2.3").Return(nil)
 	mockVCS.EXPECT().GetVCSIdentifier(7).Return("abc1234", nil)
 
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
+	// Update suite app with mock VCS for this test
+	suite.testApp.VCS = mockVCS
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", mockVCS)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, mockVCS)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create test files in memory filesystem
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+	
+	err = afero.WriteFile(suite.fs, "VERSION", []byte("1.2.3"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Capture stdout
 	var buf bytes.Buffer
@@ -119,7 +160,7 @@ func (suite *CommitTestSuite) TestCommitCommand_Success() {
 	rootCmd.SetArgs([]string{"commit", "--verbose"})
 
 	// Execute the commit command
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	suite.Require().NoError(err, "commit command should succeed")
 
 	// Check output contains success message
@@ -130,20 +171,42 @@ func (suite *CommitTestSuite) TestCommitCommand_Success() {
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_CustomPrefix() {
-	// Create test files
-	suite.createTestFiles("2.0.0")
-
 	// Setup mock VCS
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(".", nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("release-2.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("release-2.0.0", "Release 2.0.0").Return(nil)
 
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
+	// Update suite app with mock VCS for this test
+	suite.testApp.VCS = mockVCS
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", mockVCS)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, mockVCS)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create test files in memory filesystem
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+	
+	err = afero.WriteFile(suite.fs, "VERSION", []byte("2.0.0"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Capture stdout
 	var buf bytes.Buffer
@@ -151,7 +214,7 @@ func (suite *CommitTestSuite) TestCommitCommand_CustomPrefix() {
 	rootCmd.SetArgs([]string{"commit", "--prefix", "release-"})
 
 	// Execute the commit command
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	suite.Require().NoError(err, "commit command should succeed")
 
 	// Check output contains success message with custom prefix
@@ -160,20 +223,42 @@ func (suite *CommitTestSuite) TestCommitCommand_CustomPrefix() {
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_CustomMessage() {
-	// Create test files
-	suite.createTestFiles("1.5.0")
-
 	// Setup mock VCS
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(".", nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.5.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.5.0", "Custom release message").Return(nil)
 
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
+	// Update suite app with mock VCS for this test
+	suite.testApp.VCS = mockVCS
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", mockVCS)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, mockVCS)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create test files in memory filesystem
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+	
+	err = afero.WriteFile(suite.fs, "VERSION", []byte("1.5.0"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Capture stdout
 	var buf bytes.Buffer
@@ -181,7 +266,7 @@ func (suite *CommitTestSuite) TestCommitCommand_CustomMessage() {
 	rootCmd.SetArgs([]string{"commit", "--message", "Custom release message"})
 
 	// Execute the commit command
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	suite.Require().NoError(err, "commit command should succeed")
 
 	// Check output contains success message
@@ -190,11 +275,33 @@ func (suite *CommitTestSuite) TestCommitCommand_CustomMessage() {
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_NoVCS() {
-	// Create test files
-	suite.createTestFiles("1.0.0")
+	// Use suite app with no VCS (nil)
+	suite.testApp.VCS = nil
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", nil)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, nil)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
 
-	// Ensure no VCS is registered (already handled in TearDownTest)
-	vcs.UnregisterVCS("git")
+	// Create test files in memory filesystem
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+	
+	err = afero.WriteFile(suite.fs, "VERSION", []byte("1.0.0"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Capture stderr
 	var buf bytes.Buffer
@@ -202,22 +309,45 @@ func (suite *CommitTestSuite) TestCommitCommand_NoVCS() {
 	rootCmd.SetArgs([]string{"commit"})
 
 	// Execute the commit command - should fail
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	suite.Error(err, "Expected commit command to fail when no VCS is available")
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_DirtyWorkingDirectory() {
-	// Create test files
-	suite.createTestFiles("1.0.0")
-
 	// Setup mock VCS
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(".", nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
 
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
+	// Update suite app with mock VCS
+	suite.testApp.VCS = mockVCS
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", mockVCS)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, mockVCS)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create test files in memory filesystem
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+	
+	err = afero.WriteFile(suite.fs, "VERSION", []byte("1.0.0"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Capture stderr
 	var buf bytes.Buffer
@@ -225,24 +355,46 @@ func (suite *CommitTestSuite) TestCommitCommand_DirtyWorkingDirectory() {
 	rootCmd.SetArgs([]string{"commit"})
 
 	// Execute the commit command - should fail
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	suite.Error(err, "Expected commit command to fail when working directory is dirty")
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_TagExists_NoForce() {
-	// Create test files
-	suite.createTestFiles("1.0.0")
-
 	// Setup mock VCS
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(".", nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
 
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
+	// Update suite app with mock VCS
+	suite.testApp.VCS = mockVCS
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", mockVCS)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, mockVCS)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create test files in memory filesystem
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+	
+	err = afero.WriteFile(suite.fs, "VERSION", []byte("1.0.0"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Capture stderr
 	var buf bytes.Buffer
@@ -250,25 +402,47 @@ func (suite *CommitTestSuite) TestCommitCommand_TagExists_NoForce() {
 	rootCmd.SetArgs([]string{"commit"})
 
 	// Execute the commit command - should fail
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	suite.Error(err, "Expected commit command to fail when tag exists and force is not used")
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_TagExists_WithForce() {
-	// Create test files
-	suite.createTestFiles("1.0.0")
-
 	// Setup mock VCS
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(".", nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
 
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
+	// Update suite app with mock VCS
+	suite.testApp.VCS = mockVCS
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", mockVCS)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, mockVCS)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create test files in memory filesystem
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+	
+	err = afero.WriteFile(suite.fs, "VERSION", []byte("1.0.0"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
 	// Capture stdout
 	var buf bytes.Buffer
@@ -276,7 +450,7 @@ func (suite *CommitTestSuite) TestCommitCommand_TagExists_WithForce() {
 	rootCmd.SetArgs([]string{"commit", "--force"})
 
 	// Execute the commit command
-	err := rootCmd.Execute()
+	err = rootCmd.Execute()
 	suite.Require().NoError(err, "commit command should succeed with force flag")
 
 	// Check output contains success message
@@ -285,6 +459,27 @@ func (suite *CommitTestSuite) TestCommitCommand_TagExists_WithForce() {
 }
 
 func (suite *CommitTestSuite) TestCommitCommand_NoVersionFile() {
+	// Setup mock VCS
+	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
+	mockVCS.EXPECT().Name().Return("git").AnyTimes()
+	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(".", nil).AnyTimes()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v0.0.0").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v0.0.0", "Release 0.0.0").Return(nil)
+
+	// Update suite app with mock VCS
+	suite.testApp.VCS = mockVCS
+	suite.testApp.VersionManager = version.NewVersion(suite.fs, ".", mockVCS)
+	suite.testApp.Versionator = versionator.NewVersionator(suite.fs, mockVCS)
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = suite.testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
 	// Create only config file (no VERSION file)
 	configContent := `prefix: ""
 suffix:
@@ -295,20 +490,8 @@ suffix:
 logging:
   output: "console"
 `
-	err := os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
+	err := afero.WriteFile(suite.fs, ".versionator.yaml", []byte(configContent), 0644)
 	suite.Require().NoError(err, "Failed to create config file")
-
-	// Setup mock VCS
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
-	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
-	mockVCS.EXPECT().TagExists("v0.0.0").Return(false, nil)
-	mockVCS.EXPECT().CreateTag("v0.0.0", "Release 0.0.0").Return(nil)
-
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
 
 	// Capture stdout
 	var buf bytes.Buffer

@@ -5,20 +5,26 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"versionator/internal/vcs"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/spf13/afero"
 )
 
 // GitVersionControlSystem implements VersionControlSystem for Git
 type GitVersionControlSystem struct {
 	repoRoot string
+	fs       afero.Fs
 }
 
 // NewGitVCS creates a new GitVersionControlSystem
-func NewGitVCS() *GitVersionControlSystem {
-	return &GitVersionControlSystem{}
+func NewGitVCS(fs afero.Fs) *GitVersionControlSystem {
+	return &GitVersionControlSystem{fs: fs}
+}
+
+// NewGitVCSDefault creates a new GitVersionControlSystem using the OS filesystem
+func NewGitVCSDefault() *GitVersionControlSystem {
+	return NewGitVCS(afero.NewOsFs())
 }
 
 // Name returns "git"
@@ -28,7 +34,7 @@ func (g *GitVersionControlSystem) Name() string {
 
 // IsRepository checks if we're in a git repository
 func (g *GitVersionControlSystem) IsRepository() bool {
-	cwd, err := os.Getwd()
+	cwd, err := g.getWorkingDir()
 	if err != nil {
 		return false
 	}
@@ -41,13 +47,26 @@ func (g *GitVersionControlSystem) IsRepository() bool {
 	return false
 }
 
+// getWorkingDir gets the current working directory using the filesystem interface
+func (g *GitVersionControlSystem) getWorkingDir() (string, error) {
+	// For testing scenarios with memory filesystem, we start from root "/"
+	// For OS filesystem, we get the actual working directory using afero's capabilities
+	if _, ok := g.fs.(*afero.MemMapFs); ok {
+		return "/", nil
+	}
+	
+	// For OS filesystem, we still need to use os.Getwd() since afero doesn't provide
+	// a direct equivalent for getting current working directory
+	return os.Getwd()
+}
+
 // GetRepositoryRoot returns the root directory of the git repository
 func (g *GitVersionControlSystem) GetRepositoryRoot() (string, error) {
 	if g.repoRoot != "" {
 		return g.repoRoot, nil
 	}
 
-	cwd, err := os.Getwd()
+	cwd, err := g.getWorkingDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current directory: %w", err)
 	}
@@ -164,7 +183,7 @@ func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 
 	for {
 		gitPath := filepath.Join(currentPath, ".git")
-		if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
+		if info, err := g.fs.Stat(gitPath); err == nil && info.IsDir() {
 			return currentPath
 		}
 
@@ -194,7 +213,7 @@ func (g *GitVersionControlSystem) openRepository() (*git.Repository, error) {
 
 // GetHashLength returns the configured hash length from config file or environment variable
 // Priority: 1) Config file, 2) VERSIONATOR_HASH_LENGTH env var, 3) Default (7)
-func GetHashLength() int {
+func (g *GitVersionControlSystem) GetHashLength() int {
 	const defaultLength = 7
 	const envVar = "VERSIONATOR_HASH_LENGTH"
 
@@ -208,68 +227,4 @@ func GetHashLength() int {
 	return defaultLength
 }
 
-// GetHashLengthFromConfig returns hash length from config, with fallback to environment/default
-func GetHashLengthFromConfig(configHashLength int) int {
-	// If config has a valid hash length, use it
-	if configHashLength >= 1 && configHashLength <= 40 {
-		return configHashLength
-	}
 
-	// Fall back to environment variable or default
-	return GetHashLength()
-}
-
-// GetGitShortHash returns the short hash of the current HEAD commit with specified length
-func GetGitShortHash(hashLength int) (string, error) {
-	gitVCS := vcs.GetVCS("git")
-	if gitVCS == nil || !gitVCS.IsRepository() {
-		return "", fmt.Errorf("not in a git repository")
-	}
-
-	return gitVCS.GetVCSIdentifier(hashLength)
-}
-
-// IsGitRepository checks if we're in a git repository
-func IsGitRepository() bool {
-	gitVCS := vcs.GetVCS("git")
-	if gitVCS == nil {
-		return false
-	}
-	return gitVCS.IsRepository()
-}
-
-// IsWorkingDirectoryClean checks if the git working directory is clean (no uncommitted changes)
-func IsWorkingDirectoryClean() (bool, error) {
-	gitVCS := vcs.GetVCS("git")
-	if gitVCS == nil || !gitVCS.IsRepository() {
-		return false, fmt.Errorf("not a git repository")
-	}
-
-	return gitVCS.IsWorkingDirectoryClean()
-}
-
-// CreateTag creates a git tag with the specified name and message
-func CreateTag(tagName, message string) error {
-	gitVCS := vcs.GetVCS("git")
-	if gitVCS == nil || !gitVCS.IsRepository() {
-		return fmt.Errorf("not a git repository")
-	}
-
-	return gitVCS.CreateTag(tagName, message)
-}
-
-// TagExists checks if a git tag with the specified name already exists
-func TagExists(tagName string) (bool, error) {
-	gitVCS := vcs.GetVCS("git")
-	if gitVCS == nil || !gitVCS.IsRepository() {
-		return false, fmt.Errorf("not a git repository")
-	}
-
-	return gitVCS.TagExists(tagName)
-}
-
-// Auto-registration
-func init() {
-	gitVCS := NewGitVCS()
-	vcs.RegisterVCS(gitVCS)
-}

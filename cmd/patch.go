@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"versionator/internal/version"
 
 	"github.com/spf13/cobra"
@@ -19,40 +18,38 @@ var patchIncrementCmd = &cobra.Command{
 	Aliases: []string{"inc", "+"},
 	Short:   "Increment patch version",
 	Long:    "Increment the patch version",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := version.Increment(version.PatchLevel); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := appInstance.Increment(version.PatchLevel); err != nil {
+			return fmt.Errorf("error incrementing patch version: %w", err)
 		}
 
-		version, err := version.GetCurrentVersion()
+		version, err := appInstance.GetCurrentVersion()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading updated version: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading updated version: %w", err)
 		}
 
-		fmt.Printf("Patch version incremented to: %s\n", version)
+		cmd.Printf("Patch version incremented to: %s\n", version)
+		return nil
 	},
 }
 
 var patchDecrementCmd = &cobra.Command{
 	Use:     "decrement",
-	Aliases: []string{"dec", "-"},
+	Aliases: []string{"dec"},
 	Short:   "Decrement patch version",
 	Long:    "Decrement the patch version",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := version.Decrement(version.PatchLevel); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := appInstance.Decrement(version.PatchLevel); err != nil {
+			return fmt.Errorf("error decrementing patch version: %w", err)
 		}
 
-		version, err := version.GetCurrentVersion()
+		version, err := appInstance.GetCurrentVersion()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading updated version: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading updated version: %w", err)
 		}
 
-		fmt.Printf("Patch version decremented to: %s\n", version)
+		cmd.Printf("Patch version decremented to: %s\n", version)
+		return nil
 	},
 }
 

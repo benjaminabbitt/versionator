@@ -1,48 +1,45 @@
 package version
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"versionator/internal/vcs"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/spf13/afero"
 )
 
 const versionFile = "VERSION"
 
 // getVersionFilePath returns the path to the VERSION file
-// If we're in a VCS repository, use the repository root, otherwise use current directory
-func getVersionFilePath() (string, error) {
-	activeVCS := vcs.GetActiveVCS()
-	if activeVCS != nil {
-		root, err := activeVCS.GetRepositoryRoot()
+// If we're in a VCS repository, use the repository root, otherwise use working directory
+func (v *Version) getVersionFilePath() (string, error) {
+	if v.vcs != nil && v.vcs.IsRepository() {
+		root, err := v.vcs.GetRepositoryRoot()
 		if err == nil {
 			return filepath.Join(root, versionFile), nil
 		}
 	}
 
-	// Fallback to current directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %w", err)
-	}
-	return filepath.Join(cwd, versionFile), nil
+	// Fallback to working directory
+	return filepath.Join(v.workingDir, versionFile), nil
 }
 
 // GetCurrentVersion reads the current version from the VERSION file
-func GetCurrentVersion() (string, error) {
-	filePath, err := getVersionFilePath()
+func (v *Version) GetCurrentVersion() (string, error) {
+	filePath, err := v.getVersionFilePath()
 	if err != nil {
 		return "", err
 	}
 
-	data, err := os.ReadFile(filePath)
+	data, err := afero.ReadFile(v.fs, filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			// If VERSION file doesn't exist, create it with 0.0.0
-			err := writeVersion("0.0.0")
+			err := v.WriteVersion("0.0.0")
 			if err != nil {
 				return "", fmt.Errorf("failed to create VERSION file: %w", err)
 			}
@@ -65,6 +62,19 @@ func GetCurrentVersion() (string, error) {
 	return version, nil
 }
 
+// Version provides version management operations with a filesystem
+type Version struct {
+	fs         afero.Fs
+	workingDir string
+	vcs        vcs.VersionControlSystem
+}
+
+// NewVersion creates a new Version instance with the provided filesystem, working directory, and VCS
+func NewVersion(fs afero.Fs, workingDir string, vcsInstance vcs.VersionControlSystem) *Version {
+	return &Version{fs: fs, workingDir: workingDir, vcs: vcsInstance}
+}
+
+
 // VersionLevel represents the semantic version component to modify
 type VersionLevel int
 
@@ -74,23 +84,23 @@ const (
 	PatchLevel
 )
 
-// writeVersion writes the version to the VERSION file
-func writeVersion(version string) error {
-	filePath, err := getVersionFilePath()
+// WriteVersion writes the version to the VERSION file
+func (v *Version) WriteVersion(version string) error {
+	filePath, err := v.getVersionFilePath()
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filePath, []byte(version+"\n"), 0644)
+	return afero.WriteFile(v.fs, filePath, []byte(version+"\n"), 0644)
 }
 
 // Increment increments the specified version level
-func Increment(level VersionLevel) error {
-	current, err := GetCurrentVersion()
+func (v *Version) Increment(level VersionLevel) error {
+	current, err := v.GetCurrentVersion()
 	if err != nil {
 		return err
 	}
 
-	v, err := semver.NewVersion(current)
+	ver, err := semver.NewVersion(current)
 	if err != nil {
 		return err
 	}
@@ -98,26 +108,26 @@ func Increment(level VersionLevel) error {
 	var newVersion semver.Version
 	switch level {
 	case MajorLevel:
-		newVersion = v.IncMajor()
+		newVersion = ver.IncMajor()
 	case MinorLevel:
-		newVersion = v.IncMinor()
+		newVersion = ver.IncMinor()
 	case PatchLevel:
-		newVersion = v.IncPatch()
+		newVersion = ver.IncPatch()
 	default:
 		return fmt.Errorf("invalid version level: %d", level)
 	}
 
-	return writeVersion(newVersion.String())
+	return v.WriteVersion(newVersion.String())
 }
 
 // Decrement decrements the specified version level
-func Decrement(level VersionLevel) error {
-	current, err := GetCurrentVersion()
+func (v *Version) Decrement(level VersionLevel) error {
+	current, err := v.GetCurrentVersion()
 	if err != nil {
 		return err
 	}
 
-	v, err := semver.NewVersion(current)
+	ver, err := semver.NewVersion(current)
 	if err != nil {
 		return err
 	}
@@ -125,23 +135,24 @@ func Decrement(level VersionLevel) error {
 	var newVersion semver.Version
 	switch level {
 	case MajorLevel:
-		if v.Major() == 0 {
+		if ver.Major() == 0 {
 			return fmt.Errorf("cannot decrement major version below 0")
 		}
-		newVersion = *semver.MustParse(fmt.Sprintf("%d.0.0", v.Major()-1))
+		newVersion = *semver.MustParse(fmt.Sprintf("%d.0.0", ver.Major()-1))
 	case MinorLevel:
-		if v.Minor() == 0 {
+		if ver.Minor() == 0 {
 			return fmt.Errorf("cannot decrement minor version below 0")
 		}
-		newVersion = *semver.MustParse(fmt.Sprintf("%d.%d.0", v.Major(), v.Minor()-1))
+		newVersion = *semver.MustParse(fmt.Sprintf("%d.%d.0", ver.Major(), ver.Minor()-1))
 	case PatchLevel:
-		if v.Patch() == 0 {
+		if ver.Patch() == 0 {
 			return fmt.Errorf("cannot decrement patch version below 0")
 		}
-		newVersion = *semver.MustParse(fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch()-1))
+		newVersion = *semver.MustParse(fmt.Sprintf("%d.%d.%d", ver.Major(), ver.Minor(), ver.Patch()-1))
 	default:
 		return fmt.Errorf("invalid version level: %d", level)
 	}
 
-	return writeVersion(newVersion.String())
+	return v.WriteVersion(newVersion.String())
 }
+
