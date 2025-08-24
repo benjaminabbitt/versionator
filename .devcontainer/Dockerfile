@@ -59,16 +59,16 @@ RUN mkdir -p /go/pkg/mod && \
     chown -R developer:developer /go && \
     chmod -R 755 /go
 
-# Install Go tools
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
-    go install golang.org/x/tools/cmd/goimports@latest && \
-    go install github.com/go-delve/delve/cmd/dlv@latest
-
 # Change default shell for developer user
 RUN chsh -s /bin/zsh developer
 
 # Switch to developer user
 USER developer
+
+# Install Go tools as developer user
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install golang.org/x/tools/cmd/goimports@latest && \
+    go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Install Rust for developer user
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
