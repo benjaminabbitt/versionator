@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
+
+	"github.com/spf13/afero"
 )
 
 const configFile = ".versionator.yaml"
@@ -32,8 +34,19 @@ type LoggingConfig struct {
 	Output string `yaml:"output"` // console, json, development
 }
 
+// ConfigManager manages configuration reading and writing with filesystem abstraction
+type ConfigManager struct {
+	fs afero.Fs
+}
+
+// NewConfigManager creates a new ConfigManager with the provided filesystem
+func NewConfigManager(fs afero.Fs) *ConfigManager {
+	return &ConfigManager{fs: fs}
+}
+
+
 // ReadConfig reads the configuration from .versionator.yaml file
-func ReadConfig() (*Config, error) {
+func (cm *ConfigManager) ReadConfig() (*Config, error) {
 	config := &Config{
 		Prefix: "v", // default prefix
 		Suffix: SuffixConfig{
@@ -48,7 +61,7 @@ func ReadConfig() (*Config, error) {
 		},
 	}
 
-	data, err := os.ReadFile(configFile)
+	data, err := afero.ReadFile(cm.fs, configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Config file doesn't exist, return default config
@@ -65,7 +78,8 @@ func ReadConfig() (*Config, error) {
 	return config, nil
 }
 
-func WriteConfig(config *Config) error {
+// WriteConfig writes the configuration to .versionator.yaml file
+func (cm *ConfigManager) WriteConfig(config *Config) error {
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
@@ -73,5 +87,8 @@ func WriteConfig(config *Config) error {
 
 	// Add a comment header
 	content := "# Versionator Configuration\n" + string(data)
-	return os.WriteFile(configFile, []byte(content), 0644)
+	return afero.WriteFile(cm.fs, configFile, []byte(content), 0644)
 }
+
+
+

@@ -5,75 +5,129 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"versionator/internal/app"
+	"versionator/internal/config"
+	"versionator/internal/vcs"
+	"versionator/internal/version"
+	"versionator/internal/versionator"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestMinorCommand(t *testing.T) {
-	tests := []struct {
-		name           string
-		args           []string
-		initialVersion string
-		expectedVersion string
-		expectError    bool
-		errorContains  string
-	}{
-		{
-			name:           "increment from 1.2.3",
-			args:           []string{"minor", "increment"},
-			initialVersion: "1.2.3",
-			expectedVersion: "1.3.0",
-			expectError:    false,
-		},
-		{
-			name:           "increment with inc alias",
-			args:           []string{"minor", "inc"},
-			initialVersion: "0.5.7",
-			expectedVersion: "0.6.0",
-			expectError:    false,
-		},
-		{
-			name:           "increment with + alias",
-			args:           []string{"minor", "+"},
-			initialVersion: "2.1.9",
-			expectedVersion: "2.2.0",
-			expectError:    false,
-		},
-		{
-			name:           "decrement from 1.3.5",
-			args:           []string{"minor", "decrement"},
-			initialVersion: "1.3.5",
-			expectedVersion: "1.2.0",
-			expectError:    false,
-		},
-		{
-			name:           "decrement with dec alias",
-			args:           []string{"minor", "dec"},
-			initialVersion: "2.5.1",
-			expectedVersion: "2.4.0",
-			expectError:    false,
-		},
-		{
-			name:           "increment from default version",
-			args:           []string{"minor", "increment"},
-			initialVersion: "", // No VERSION file
-			expectedVersion: "0.1.0",
-			expectError:    false,
-		},
-	}
+// MinorTestSuite provides a test suite for minor version commands
+type MinorTestSuite struct {
+	suite.Suite
+	originalDir string
+	tempDir     string
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
+// SetupTest runs before each test
+func (suite *MinorTestSuite) SetupTest() {
+	var err error
+	suite.originalDir, err = os.Getwd()
+	suite.Require().NoError(err, "Failed to get current working directory")
+
+	suite.tempDir = suite.T().TempDir()
+	err = os.Chdir(suite.tempDir)
+	suite.Require().NoError(err, "Failed to change to temp directory")
+	
+	// Unregister Git VCS to prevent interference with tests
+	vcs.UnregisterVCS("git")
+}
+
+// TearDownTest runs after each test
+func (suite *MinorTestSuite) TearDownTest() {
+	// Reset command state
+	rootCmd.SetOut(nil)
+	rootCmd.SetErr(nil)
+	rootCmd.SetArgs(nil)
+
+	// Change back to original directory
+	if suite.originalDir != "" {
+		err := os.Chdir(suite.originalDir)
+		suite.Require().NoError(err, "Failed to restore original directory")
+	}
+}
+
+
+func (suite *MinorTestSuite) TestMinorIncrementCommand() {
+	// Create fresh filesystem for this test
+	fs := afero.NewMemMapFs()
+	
+	// Create test app instance with fresh filesystem
+	testApp := &app.App{
+		ConfigManager:  config.NewConfigManager(fs),
+		VersionManager: version.NewVersion(fs, ".", nil),
+		Versionator:    versionator.NewVersionator(fs, nil),
+		VCS:            nil,
+		FileSystem:     fs,
+	}
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create config file
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+
+	// Create VERSION file
+	err = afero.WriteFile(fs, "VERSION", []byte("1.2.3"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
+
+	// Execute the minor increment command
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs([]string{"minor", "increment"})
+	err = rootCmd.Execute()
+	suite.Require().NoError(err, "minor increment command should succeed")
+	
+	// Reset command state
+	rootCmd.SetArgs([]string{})
+
+	// Verify VERSION file was updated correctly
+	content, err := afero.ReadFile(fs, "VERSION")
+	suite.Require().NoError(err, "Should be able to read VERSION file")
+	suite.Equal("1.3.0", strings.TrimSpace(string(content)), "VERSION file should contain '1.3.0'")
+}
+
+func (suite *MinorTestSuite) TestMinorIncrementCommand_Aliases() {
+	testCases := []string{"inc", "+"}
+
+	for _, alias := range testCases {
+		suite.Run("alias_"+alias, func() {
+			// Create fresh filesystem for this test
+			fs := afero.NewMemMapFs()
+			
+			// Create test app instance with fresh filesystem
+			testApp := &app.App{
+				ConfigManager:  config.NewConfigManager(fs),
+				VersionManager: version.NewVersion(fs, ".", nil),
+				Versionator:    versionator.NewVersionator(fs, nil),
+				VCS:            nil,
+				FileSystem:     fs,
+			}
+			
+			// Replace global app instance for command execution
+			originalApp := appInstance
+			appInstance = testApp
 			defer func() {
-				os.Chdir(originalDir)
+				appInstance = originalApp
 			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
 
 			// Create config file
 			configContent := `prefix: ""
@@ -85,52 +139,198 @@ suffix:
 logging:
   output: "console"
 `
-			err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
-			require.NoError(t, err)
+			err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
+			suite.Require().NoError(err, "Failed to create config file")
 
-			// Create VERSION file if initial version is provided
-			if tt.initialVersion != "" {
-				err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
-				require.NoError(t, err)
-			}
+			// Create VERSION file
+			err = afero.WriteFile(fs, "VERSION", []byte("0.5.7"), 0644)
+			suite.Require().NoError(err, "Failed to create VERSION file")
 
-			// Capture output
-			var stdout, stderr bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetErr(&stderr)
-			rootCmd.SetArgs(tt.args)
-
-			// Execute command
+			// Execute the minor increment command with alias
+			var buf bytes.Buffer
+			rootCmd.SetOut(&buf)
+			rootCmd.SetErr(&buf)
+			rootCmd.SetArgs([]string{"minor", alias})
 			err = rootCmd.Execute()
-
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-			} else {
-				assert.NoError(t, err)
-
-				// Verify VERSION file content
-				content, err := os.ReadFile("VERSION")
-				require.NoError(t, err)
-				actualVersion := strings.TrimSpace(string(content))
-				assert.Equal(t, tt.expectedVersion, actualVersion)
-
-				// The main behavior we care about is that the VERSION file was updated correctly
-				// Output message testing is less important and more brittle
-			}
-
+			suite.Require().NoError(err, "minor %s command should succeed", alias)
+			
 			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetErr(nil)
-			rootCmd.SetArgs(nil)
+			rootCmd.SetArgs([]string{})
+
+			// Verify VERSION file was updated correctly
+			content, err := afero.ReadFile(fs, "VERSION")
+			suite.Require().NoError(err, "Should be able to read VERSION file")
+			suite.Equal("0.6.0", strings.TrimSpace(string(content)), "VERSION file should contain '0.6.0'")
 		})
 	}
 }
 
-func TestMinorCommandHelp(t *testing.T) {
-	tests := []struct {
+func (suite *MinorTestSuite) TestMinorDecrementCommand() {
+	// Create fresh filesystem for this test
+	fs := afero.NewMemMapFs()
+	
+	// Create test app instance with fresh filesystem
+	testApp := &app.App{
+		ConfigManager:  config.NewConfigManager(fs),
+		VersionManager: version.NewVersion(fs, ".", nil),
+		Versionator:    versionator.NewVersionator(fs, nil),
+		VCS:            nil,
+		FileSystem:     fs,
+	}
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create config file
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+
+	// Create VERSION file
+	err = afero.WriteFile(fs, "VERSION", []byte("1.3.5"), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
+
+	// Execute the minor decrement command
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs([]string{"minor", "decrement"})
+	err = rootCmd.Execute()
+	suite.Require().NoError(err, "minor decrement command should succeed")
+	
+	// Reset command state
+	rootCmd.SetArgs([]string{})
+
+	// Verify VERSION file was updated correctly
+	content, err := afero.ReadFile(fs, "VERSION")
+	suite.Require().NoError(err, "Should be able to read VERSION file")
+	suite.Equal("1.2.0", strings.TrimSpace(string(content)), "VERSION file should contain '1.2.0'")
+}
+
+func (suite *MinorTestSuite) TestMinorDecrementCommand_Aliases() {
+	testCases := []string{"dec"}
+
+	for _, alias := range testCases {
+		suite.Run("alias_"+alias, func() {
+			// Create fresh filesystem for this test
+			fs := afero.NewMemMapFs()
+			
+			// Create test app instance with fresh filesystem
+			testApp := &app.App{
+				ConfigManager:  config.NewConfigManager(fs),
+				VersionManager: version.NewVersion(fs, ".", nil),
+				Versionator:    versionator.NewVersionator(fs, nil),
+				VCS:            nil,
+				FileSystem:     fs,
+			}
+			
+			// Replace global app instance for command execution
+			originalApp := appInstance
+			appInstance = testApp
+			defer func() {
+				appInstance = originalApp
+			}()
+
+			// Create config file
+			configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+			err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
+			suite.Require().NoError(err, "Failed to create config file")
+
+			// Create VERSION file
+			err = afero.WriteFile(fs, "VERSION", []byte("2.5.1"), 0644)
+			suite.Require().NoError(err, "Failed to create VERSION file")
+
+			// Execute the minor decrement command with alias
+			var buf bytes.Buffer
+			rootCmd.SetOut(&buf)
+			rootCmd.SetErr(&buf)
+			rootCmd.SetArgs([]string{"minor", alias})
+			err = rootCmd.Execute()
+			suite.Require().NoError(err, "minor %s command should succeed", alias)
+			
+			// Reset command state
+			rootCmd.SetArgs([]string{})
+
+			// Verify VERSION file was updated correctly
+			content, err := afero.ReadFile(fs, "VERSION")
+			suite.Require().NoError(err, "Should be able to read VERSION file")
+			suite.Equal("2.4.0", strings.TrimSpace(string(content)), "VERSION file should contain '2.4.0'")
+		})
+	}
+}
+
+func (suite *MinorTestSuite) TestMinorIncrementCommand_NoVersionFile() {
+	// Create fresh filesystem for this test
+	fs := afero.NewMemMapFs()
+	
+	// Create test app instance with fresh filesystem
+	testApp := &app.App{
+		ConfigManager:  config.NewConfigManager(fs),
+		VersionManager: version.NewVersion(fs, ".", nil),
+		Versionator:    versionator.NewVersionator(fs, nil),
+		VCS:            nil,
+		FileSystem:     fs,
+	}
+	
+	// Replace global app instance for command execution
+	originalApp := appInstance
+	appInstance = testApp
+	defer func() {
+		appInstance = originalApp
+	}()
+
+	// Create only config file (no VERSION file)
+	configContent := `prefix: ""
+suffix:
+  enabled: false
+  type: "git"
+  git:
+    hashLength: 7
+logging:
+  output: "console"
+`
+	err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+
+	// Execute the minor increment command - should succeed with default version
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs([]string{"minor", "increment"})
+	err = rootCmd.Execute()
+	suite.Require().NoError(err, "minor increment command should succeed with default version")
+	
+	// Reset command state
+	rootCmd.SetArgs([]string{})
+
+	// Verify VERSION file was created and updated correctly
+	content, err := afero.ReadFile(fs, "VERSION")
+	suite.Require().NoError(err, "Should be able to read VERSION file")
+	suite.Equal("0.1.0", strings.TrimSpace(string(content)), "VERSION file should contain '0.1.0'")
+}
+
+func (suite *MinorTestSuite) TestMinorCommandHelp() {
+	testCases := []struct {
 		name string
 		args []string
 	}{
@@ -148,21 +348,22 @@ func TestMinorCommandHelp(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tc := range testCases {
+		suite.Run(tc.name, func() {
 			var buf bytes.Buffer
 			rootCmd.SetOut(&buf)
-			rootCmd.SetArgs(tt.args)
+			rootCmd.SetArgs(tc.args)
 
 			err := rootCmd.Execute()
-			assert.NoError(t, err)
+			suite.NoError(err, "Help command should succeed")
 
 			output := buf.String()
-			assert.Contains(t, output, "Usage:")
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetArgs(nil)
+			suite.Contains(output, "Usage:", "Help output should contain usage information")
 		})
 	}
+}
+
+// TestMinorTestSuite runs the minor test suite
+func TestMinorTestSuite(t *testing.T) {
+	suite.Run(t, new(MinorTestSuite))
 }

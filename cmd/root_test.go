@@ -4,59 +4,51 @@ import (
 	"bytes"
 	"os"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestExecute_Success(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+// RootTestSuite provides a test suite for root command functionality
+type RootTestSuite struct {
+	suite.Suite
+	originalDir string
+	tempDir     string
+}
 
-	// Create a VERSION file
-	err := os.WriteFile("VERSION", []byte("1.0.0"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create VERSION file: %v", err)
-	}
+// SetupTest runs before each test
+func (suite *RootTestSuite) SetupTest() {
+	var err error
+	suite.originalDir, err = os.Getwd()
+	suite.Require().NoError(err, "Failed to get current working directory")
 
-	// Create a minimal config file
-	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-	err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
+	suite.tempDir = suite.T().TempDir()
+	err = os.Chdir(suite.tempDir)
+	suite.Require().NoError(err, "Failed to change to temp directory")
+}
 
-	// Test Execute function doesn't panic
-	err = Execute()
-	// Since Execute() runs the root command without args, it should show help and return nil
-	if err != nil {
-		t.Errorf("Execute() returned error: %v", err)
+// TearDownTest runs after each test
+func (suite *RootTestSuite) TearDownTest() {
+	// Reset command state
+	rootCmd.SetOut(nil)
+	rootCmd.SetErr(nil)
+	rootCmd.SetArgs(nil)
+
+	// Change back to original directory
+	if suite.originalDir != "" {
+		err := os.Chdir(suite.originalDir)
+		suite.Require().NoError(err, "Failed to restore original directory")
 	}
 }
 
-func TestVersionCommand(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+// createTestFiles creates test files in the temp directory
+func (suite *RootTestSuite) createTestFiles(version string, prefix string) {
+	// Create VERSION file
+	err := afero.WriteFile(afero.NewOsFs(), "VERSION", []byte(version), 0644)
+	suite.Require().NoError(err, "Failed to create VERSION file")
 
-	// Create a VERSION file
-	err := os.WriteFile("VERSION", []byte("2.1.0"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create VERSION file: %v", err)
-	}
-
-	// Create a minimal config file
-	configContent := `prefix: ""
+	// Create config file
+	configContent := `prefix: "` + prefix + `"
 suffix:
   enabled: false
   type: "git"
@@ -65,10 +57,23 @@ suffix:
 logging:
   output: "console"
 `
-	err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
+	err = afero.WriteFile(afero.NewOsFs(), ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
+}
+
+func (suite *RootTestSuite) TestExecute_Success() {
+	// Create test files
+	suite.createTestFiles("1.0.0", "")
+
+	// Test Execute function doesn't panic
+	err := Execute()
+	// Since Execute() runs the root command without args, it should show help and return nil
+	suite.NoError(err, "Execute() should not return error")
+}
+
+func (suite *RootTestSuite) TestVersionCommand() {
+	// Create test files
+	suite.createTestFiles("2.1.0", "")
 
 	// Capture stdout
 	var buf bytes.Buffer
@@ -76,33 +81,35 @@ logging:
 	rootCmd.SetArgs([]string{"version"})
 
 	// Execute the version command
-	err = rootCmd.Execute()
-	if err != nil {
-		t.Fatalf("version command failed: %v", err)
-	}
+	err := rootCmd.Execute()
+	suite.Require().NoError(err, "version command should succeed")
 
 	// Check output contains the version
 	output := buf.String()
-	if output != "2.1.0\n" {
-		t.Errorf("Expected '2.1.0\\n', got '%s'", output)
-	}
+	suite.Equal("2.1.0\n", output, "Version command should output correct version")
 }
 
-func TestVersionCommand_WithPrefix(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+func (suite *RootTestSuite) TestVersionCommand_WithPrefix() {
+	// Create test files with prefix
+	suite.createTestFiles("3.0.0", "v")
 
-	// Create a VERSION file
-	err := os.WriteFile("VERSION", []byte("3.0.0"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create VERSION file: %v", err)
-	}
+	// Capture stdout
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"version"})
 
-	// Create a config file with prefix
-	configContent := `prefix: "v"
+	// Execute the version command
+	err := rootCmd.Execute()
+	suite.Require().NoError(err, "version command should succeed")
+
+	// Check output contains the prefixed version
+	output := buf.String()
+	suite.Equal("v3.0.0\n", output, "Version command should output prefixed version")
+}
+
+func (suite *RootTestSuite) TestVersionCommand_NoVersionFile() {
+	// Create only config file (no VERSION file)
+	configContent := `prefix: ""
 suffix:
   enabled: false
   type: "git"
@@ -111,10 +118,8 @@ suffix:
 logging:
   output: "console"
 `
-	err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
+	err := afero.WriteFile(afero.NewOsFs(), ".versionator.yaml", []byte(configContent), 0644)
+	suite.Require().NoError(err, "Failed to create config file")
 
 	// Capture stdout
 	var buf bytes.Buffer
@@ -123,85 +128,58 @@ logging:
 
 	// Execute the version command
 	err = rootCmd.Execute()
-	if err != nil {
-		t.Fatalf("version command failed: %v", err)
-	}
+	suite.Require().NoError(err, "version command should succeed with default version")
 
-	// Check output contains the prefixed version
+	// Check output contains the default version
 	output := buf.String()
-	if output != "v3.0.0\n" {
-		t.Errorf("Expected 'v3.0.0\\n', got '%s'", output)
+	suite.Equal("0.0.0\n", output, "Version command should output default version when no VERSION file exists")
+}
+
+func (suite *RootTestSuite) TestLogFormatFlag() {
+	testCases := []struct {
+		name   string
+		flag   string
+		format string
+	}{
+		{
+			name:   "console format",
+			flag:   "--log-format=console",
+			format: "console",
+		},
+		{
+			name:   "json format",
+			flag:   "--log-format=json",
+			format: "json",
+		},
+		{
+			name:   "development format",
+			flag:   "--log-format=development",
+			format: "development",
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.Run(tc.name, func() {
+			// Create test files
+			suite.createTestFiles("1.0.0", "")
+
+			// Capture stdout
+			var buf bytes.Buffer
+			rootCmd.SetOut(&buf)
+			rootCmd.SetArgs([]string{tc.flag, "version"})
+
+			// Execute the command with log format flag
+			err := rootCmd.Execute()
+			suite.NoError(err, "Command with log format flag should succeed")
+
+			// Check that version is still output correctly
+			output := buf.String()
+			suite.Equal("1.0.0\n", output, "Version should be output correctly regardless of log format")
+		})
 	}
 }
 
-func TestVersionCommand_NoVersionFile(t *testing.T) {
-	// Create a temporary directory for testing (no VERSION file)
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
-
-	// Create a minimal config file
-	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-	err := os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
-
-	// Capture stderr
-	var buf bytes.Buffer
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"version"})
-
-	// Execute the version command - should fail
-	err = rootCmd.Execute()
-	if err == nil {
-		t.Fatal("Expected version command to fail when no VERSION file exists")
-	}
-}
-
-func TestLogFormatFlag(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
-
-	// Create a VERSION file
-	err := os.WriteFile("VERSION", []byte("1.0.0"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create VERSION file: %v", err)
-	}
-
-	// Create a config file with different log format
-	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "json"
-`
-	err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
-
-	// Test with log-format flag
-	rootCmd.SetArgs([]string{"--log-format", "development", "version"})
-
-	// Execute should not fail
-	err = rootCmd.Execute()
-	if err != nil {
-		t.Fatalf("Command with log-format flag failed: %v", err)
-	}
+// TestRootTestSuite runs the root test suite
+func TestRootTestSuite(t *testing.T) {
+	suite.Run(t, new(RootTestSuite))
 }

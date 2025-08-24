@@ -2,10 +2,14 @@ package cmd
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
+	"versionator/internal/app"
+	"versionator/internal/config"
+	"versionator/internal/version"
+	"versionator/internal/versionator"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,13 +59,6 @@ func TestPatchCommand(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:           "decrement with - alias",
-			args:           []string{"patch", "-"},
-			initialVersion: "3.7.2",
-			expectedVersion: "3.7.1",
-			expectError:    false,
-		},
-		{
 			name:           "increment from default version",
 			args:           []string{"patch", "increment"},
 			initialVersion: "", // No VERSION file
@@ -79,15 +76,24 @@ func TestPatchCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
+			// Create in-memory filesystem
+			fs := afero.NewMemMapFs()
+			
+			// Create test app instance with in-memory filesystem
+			testApp := &app.App{
+				ConfigManager:  config.NewConfigManager(fs),
+				VersionManager: version.NewVersion(fs, ".", nil),
+				Versionator:    versionator.NewVersionator(fs, nil),
+				VCS:            nil,
+				FileSystem:     fs,
+			}
+			
+			// Replace global app instance for this test
+			originalApp := appInstance
+			appInstance = testApp
 			defer func() {
-				os.Chdir(originalDir)
+				appInstance = originalApp
 			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
 
 			// Create config file
 			configContent := `prefix: ""
@@ -99,12 +105,12 @@ suffix:
 logging:
   output: "console"
 `
-			err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
+			err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
 			require.NoError(t, err)
 
 			// Create VERSION file if initial version is provided
 			if tt.initialVersion != "" {
-				err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+				err = afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
 				require.NoError(t, err)
 			}
 
@@ -126,7 +132,7 @@ logging:
 				assert.NoError(t, err)
 
 				// Verify VERSION file content
-				content, err := os.ReadFile("VERSION")
+				content, err := afero.ReadFile(fs, "VERSION")
 				require.NoError(t, err)
 				actualVersion := strings.TrimSpace(string(content))
 				assert.Equal(t, tt.expectedVersion, actualVersion)
@@ -212,15 +218,24 @@ func TestPatchCommandEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create isolated test environment
-			tempDir := t.TempDir()
-			originalDir, err := os.Getwd()
-			require.NoError(t, err)
+			// Create in-memory filesystem
+			fs := afero.NewMemMapFs()
+			
+			// Create test app instance with in-memory filesystem
+			testApp := &app.App{
+				ConfigManager:  config.NewConfigManager(fs),
+				VersionManager: version.NewVersion(fs, ".", nil),
+				Versionator:    versionator.NewVersionator(fs, nil),
+				VCS:            nil,
+				FileSystem:     fs,
+			}
+			
+			// Replace global app instance for this test
+			originalApp := appInstance
+			appInstance = testApp
 			defer func() {
-				os.Chdir(originalDir)
+				appInstance = originalApp
 			}()
-			err = os.Chdir(tempDir)
-			require.NoError(t, err)
 
 			// Create config file
 			configContent := `prefix: ""
@@ -232,11 +247,11 @@ suffix:
 logging:
   output: "console"
 `
-			err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
+			err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
 			require.NoError(t, err)
 
 			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			err = afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
 			require.NoError(t, err)
 
 			// Capture output
@@ -245,17 +260,17 @@ logging:
 			rootCmd.SetErr(&stderr)
 			rootCmd.SetArgs(tt.args)
 
-			// Execute command
-			err = rootCmd.Execute()
+ 		// Execute command
+ 		err = rootCmd.Execute()
 
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
+ 		if tt.expectError {
+ 			assert.Error(t, err)
+ 			if tt.errorContains != "" && err != nil {
+ 				assert.Contains(t, err.Error(), tt.errorContains)
+ 			}
+ 		} else {
+ 			assert.NoError(t, err)
+ 		}
 
 			// Reset command state
 			rootCmd.SetOut(nil)

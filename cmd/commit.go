@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"versionator/internal/vcs"
-	"versionator/internal/version"
 
 	"github.com/spf13/cobra"
 )
@@ -21,16 +19,16 @@ This command will:
 
 The command will fail if there are uncommitted changes or if the tag already exists.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get active VCS
-		vcs := vcs.GetActiveVCS()
-		if vcs == nil {
+		// Get VCS from app instance
+		vcsInstance := appInstance.VCS
+		if vcsInstance == nil {
 			return fmt.Errorf("not in a version control repository")
 		}
 
 		// Check if working directory is clean
-		clean, err := vcs.IsWorkingDirectoryClean()
+		clean, err := vcsInstance.IsWorkingDirectoryClean()
 		if err != nil {
-			return fmt.Errorf("error checking %s status: %w", vcs.Name(), err)
+			return fmt.Errorf("error checking %s status: %w", vcsInstance.Name(), err)
 		}
 
 		if !clean {
@@ -38,7 +36,7 @@ The command will fail if there are uncommitted changes or if the tag already exi
 		}
 
 		// Get current version
-		version, err := version.GetCurrentVersion()
+		version, err := appInstance.GetCurrentVersion()
 		if err != nil {
 			return fmt.Errorf("error getting current version: %w", err)
 		}
@@ -53,7 +51,7 @@ The command will fail if there are uncommitted changes or if the tag already exi
 		}
 
 		// Check if tag already exists
-		exists, err := vcs.TagExists(tagName)
+		exists, err := vcsInstance.TagExists(tagName)
 		if err != nil {
 			return fmt.Errorf("error checking if tag exists: %w", err)
 		}
@@ -72,11 +70,11 @@ The command will fail if there are uncommitted changes or if the tag already exi
 		}
 
 		// Create the tag
-		if err := vcs.CreateTag(tagName, message); err != nil {
+		if err := vcsInstance.CreateTag(tagName, message); err != nil {
 			return fmt.Errorf("error creating tag: %w", err)
 		}
 
-		cmd.Printf("✓ Successfully created tag '%s' for version %s using %s\n", tagName, version, vcs.Name())
+		cmd.Printf("✓ Successfully created tag '%s' for version %s using %s\n", tagName, version, vcsInstance.Name())
 
 		// Show additional information if requested
 		verbose, _ := cmd.Flags().GetBool("verbose")
@@ -84,8 +82,8 @@ The command will fail if there are uncommitted changes or if the tag already exi
 			cmd.Printf("  Message: %s\n", message)
 
 			// Get current VCS identifier
-			if identifier, err := vcs.GetVCSIdentifier(7); err == nil {
-				cmd.Printf("  %s ID: %s\n", vcs.Name(), identifier)
+			if identifier, err := vcsInstance.GetVCSIdentifier(7); err == nil {
+				cmd.Printf("  %s ID: %s\n", vcsInstance.Name(), identifier)
 			}
 		}
 

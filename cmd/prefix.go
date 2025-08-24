@@ -1,11 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"versionator/internal/config"
 	"versionator/internal/logging"
-	"versionator/internal/version"
-	"versionator/internal/versionator"
 
 	"github.com/spf13/cobra"
 )
@@ -23,26 +19,26 @@ var prefixEnableCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := logging.GetSugaredLogger()
 
-		cfg, err := config.ReadConfig()
+		cfg, err := appInstance.ReadConfig()
 		if err != nil {
 			logger.Fatalw("Error reading config", "error", err)
 		}
 
 		cfg.Prefix = "v"
 
-		if err := config.WriteConfig(cfg); err != nil {
+		if err := appInstance.WriteConfig(cfg); err != nil {
 			logger.Fatalw("Error writing config", "error", err)
 		}
 
-		fmt.Println("Version prefix enabled with default value 'v'")
+		cmd.Println("Version prefix enabled with default value 'v'")
 
 		// Show current version with prefix
-		version, err := versionator.GetVersionWithSuffix()
+		version, err := appInstance.GetVersionWithSuffix()
 		if err != nil {
 			logger.Fatalw("Error getting version", "error", err)
 		}
 
-		fmt.Printf("Current version: %s\n", version)
+		cmd.Printf("Current version: %s\n", version)
 	},
 }
 
@@ -53,26 +49,26 @@ var prefixDisableCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := logging.GetSugaredLogger()
 
-		cfg, err := config.ReadConfig()
+		cfg, err := appInstance.ReadConfig()
 		if err != nil {
 			logger.Fatalw("Error reading config", "error", err)
 		}
 
 		cfg.Prefix = ""
 
-		if err := config.WriteConfig(cfg); err != nil {
+		if err := appInstance.WriteConfig(cfg); err != nil {
 			logger.Fatalw("Error writing config", "error", err)
 		}
 
-		fmt.Println("Version prefix disabled")
+		cmd.Println("Version prefix disabled")
 
 		// Show current version without prefix
-		version, err := version.GetCurrentVersion()
+		version, err := appInstance.GetCurrentVersion()
 		if err != nil {
 			logger.Fatalw("Error getting version", "error", err)
 		}
 
-		fmt.Printf("Current version: %s\n", version)
+		cmd.Printf("Current version: %s\n", version)
 	},
 }
 
@@ -85,30 +81,30 @@ var prefixSetCmd = &cobra.Command{
 		logger := logging.GetSugaredLogger()
 		prefix := args[0]
 
-		cfg, err := config.ReadConfig()
+		cfg, err := appInstance.ReadConfig()
 		if err != nil {
 			logger.Fatalw("Error reading config", "error", err)
 		}
 
 		cfg.Prefix = prefix
 
-		if err := config.WriteConfig(cfg); err != nil {
+		if err := appInstance.WriteConfig(cfg); err != nil {
 			logger.Fatalw("Error writing config", "error", err)
 		}
 
 		if prefix == "" {
-			fmt.Println("Version prefix disabled (set to empty)")
+			cmd.Println("Version prefix disabled (set to empty)")
 		} else {
-			fmt.Printf("Version prefix set to: %s\n", prefix)
+			cmd.Printf("Version prefix set to: %s\n", prefix)
 		}
 
 		// Show current version with new prefix
-		version, err := versionator.GetVersionWithSuffix()
+		version, err := appInstance.GetVersionWithSuffix()
 		if err != nil {
 			logger.Fatalw("Error getting version", "error", err)
 		}
 
-		fmt.Printf("Current version: %s\n", version)
+		cmd.Printf("Current version: %s\n", version)
 	},
 }
 
@@ -119,25 +115,25 @@ var prefixStatusCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := logging.GetSugaredLogger()
 
-		cfg, err := config.ReadConfig()
+		cfg, err := appInstance.ReadConfig()
 		if err != nil {
 			logger.Fatalw("Error reading config", "error", err)
 		}
 
 		if cfg.Prefix == "" {
-			fmt.Println("Version prefix: DISABLED")
+			cmd.Println("Version prefix: DISABLED")
 		} else {
-			fmt.Printf("Version prefix: ENABLED\n")
-			fmt.Printf("Prefix value: %s\n", cfg.Prefix)
+			cmd.Printf("Version prefix: ENABLED\n")
+			cmd.Printf("Prefix value: %s\n", cfg.Prefix)
 		}
 
 		// Show current version
-		version, err := versionator.GetVersionWithSuffix()
+		version, err := appInstance.GetVersionWithSuffix()
 		if err != nil {
 			logger.Fatalw("Error getting version", "error", err)
 		}
 
-		fmt.Printf("Current version: %s\n", version)
+		cmd.Printf("Current version: %s\n", version)
 	},
 }
 
