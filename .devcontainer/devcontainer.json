@@ -44,7 +44,7 @@
     }
   },
   "forwardPorts": [],
-  "postCreateCommand": "just fix-perms && just build",
+  "postCreateCommand": "sudo chown -R developer:developer /workspace",
   "remoteUser": "developer",
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
