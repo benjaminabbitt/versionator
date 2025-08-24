@@ -2,49 +2,14 @@
 default:
     @just --list
 
-# Fix Go module cache permissions (try different approaches)
-fix-perms:
-    #!/bin/zsh
-    set -e
-
-    echo "Fixing Go module permissions..."
-
-    # Fix /go directory permissions if it exists
-    if [ -d "/go" ]; then
-        echo "Fixing /go directory permissions..."
-        if command -v sudo >/dev/null 2>&1; then
-            sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
-            sudo chmod -R u+w /go 2>/dev/null || true
-        else
-            chown -R $(whoami):$(whoami) /go 2>/dev/null || true
-            chmod -R u+w /go 2>/dev/null || true
-        fi
-    fi
-
-    # Fix local GOPATH if it exists
-    if [ -d "$HOME/go" ]; then
-        echo "Fixing local GOPATH permissions..."
-        chmod -R u+w $HOME/go 2>/dev/null || true
-    fi
-
-    # Create directories with proper permissions if they don't exist
-    mkdir -p /go/pkg/mod 2>/dev/null || true
-    mkdir -p /go/pkg/sumdb 2>/dev/null || true
-    mkdir -p $HOME/go/pkg/mod 2>/dev/null || true
-
-    # Set proper ownership for created directories
-    if command -v sudo >/dev/null 2>&1; then
-        sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
-    fi
-
 # Clean Go module cache and fix permissions
-clean-cache: fix-perms
+clean-cache:
     #!/bin/zsh
     echo "Cleaning Go module cache..."
     GO111MODULE=on go clean -modcache || true
 
 # Download dependencies with permission fix
-deps: fix-perms
+deps:
     #!/bin/zsh
     set -e
     echo "Fixing permissions before downloading dependencies..."
@@ -55,32 +20,28 @@ deps: fix-perms
     echo "Dependencies downloaded successfully!"
 
 # Build the application
-build: fix-git-dubious-ownership-warning
+build:
     #!/bin/zsh
     set -e
-    just fix-perms
     mkdir -p bin/
     echo "Building versionator..."
     GO111MODULE=on go build -o bin/versionator .
     echo "Build completed: bin/versionator"
 
 # Build with verbose output for debugging
-build-verbose: fix-git-dubious-ownership-warning
+build-verbose:
     #!/bin/zsh
     set -e
-    just fix-perms
     mkdir -p bin/
     echo "Building versionator (verbose)..."
     GO111MODULE=on go build -v -o bin/versionator .
 
 # Run the application with arguments
-run *args:
-    @just buildfix-git-dubious-ownership-warning
+run *args: build
     ./bin/versionator {{args}}
 
 # Install the binary to /usr/local/bin
-install:
-    @just build
+install: build
     sudo cp bin/versionator /usr/local/bin/
 
 # Clean build artifacts
@@ -90,12 +51,10 @@ clean:
 
 # Run tests
 test:
-    @just fix-perms
     GO111MODULE=on go test ./...
 
 # Run tests with coverage
 test-coverage:
-    @just fix-perms
     GO111MODULE=on go test -cover ./...
 
 # Format code
@@ -136,7 +95,7 @@ dev-setup:
     echo "Development environment ready!"
 
 # Build for all platforms with static linking
-build-all: fix-perms fix-git-dubious-ownership-warning
+build-all:
     #!/bin/zsh
     set -e
     echo "Building for all platforms with static linking..."
@@ -193,17 +152,4 @@ status:
     @echo "Build status:"
     @ls -la bin/ 2>/dev/null || echo "No build artifacts found"
 
-# Force rebuild everything
-rebuild:
-    #!/bin/zsh
-    set -e
-    echo "Rebuilding everything..."
-    just clean
-    just clean-cache
-    just init
-    just build
-    echo "Rebuild complete!"
-
-fix-git-dubious-ownership-warning:
-    git config --global --add safe.directory /workspace
 

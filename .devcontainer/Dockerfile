@@ -72,6 +72,8 @@ RUN mkdir -p /go/pkg/mod && \
     chown -R developer:developer /go && \
     chmod -R 755 /go
 
+RUN mkdir /workspace && chown -R developer:developer /workspace
+
 # Change default shell for developer user
 RUN chsh -s /bin/zsh developer
 
