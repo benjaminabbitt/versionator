@@ -2,13 +2,23 @@
 FROM debian:trixie
 
 # Make Go version configurable
-ARG GO_VERSION=1.21.5
+ARG GO_VERSION=1.25.0
+
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GOPATH=/go
 ENV GOROOT=/usr/local/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+
+RUN apt-get update && apt-get install wget -y \
+	&& mkdir -p -m 755 /etc/apt/keyrings \
+	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+	&& cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+	&& chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+	&& mkdir -p -m 755 /etc/apt/sources.list.d \
+	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update
 
 # Install basic packages and dependencies first
 RUN apt-get update && apt-get install -y \
@@ -27,7 +37,10 @@ RUN apt-get update && apt-get install -y \
     tree \
     zsh \
     just \
+    gh \
     && rm -rf /var/lib/apt/lists/*
+
+
 
 # Create developer user with sudo privileges
 RUN groupadd --gid 1000 developer \
@@ -62,6 +75,7 @@ RUN mkdir -p /go/pkg/mod && \
 # Change default shell for developer user
 RUN chsh -s /bin/zsh developer
 
+
 # Switch to developer user
 USER developer
 
@@ -83,7 +97,7 @@ RUN echo 'export GOROOT=/usr/local/go' >> ~/.zshrc \
     && echo 'export JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto' >> ~/.zshrc \
     && echo 'export PATH=$GOPATH/bin:$GOROOT/bin:$JAVA_HOME/bin:$HOME/.cargo/bin:$PATH' >> ~/.zshrc \
     && sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="agnoster"/' ~/.zshrc \
-    && sed -i 's/plugins=(git)/plugins=(git golang docker rust)/' ~/.zshrc
+    && sed -i 's/plugins=(git)/plugins=(git golang rust)/' ~/.zshrc
 
 # Set working directory
 WORKDIR /workspace
