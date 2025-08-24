@@ -3,13 +3,7 @@
   "build": {
     "dockerfile": "Dockerfile",
     "context": "..",
-    "secrets": {
-      "gh_token": "${localEnv:GH_TOKEN}"
-    }
   },
-  "runArgs": [
-    "--env-file", "${localWorkspaceFolder}/.devcontainer/.env"
-  ],
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
