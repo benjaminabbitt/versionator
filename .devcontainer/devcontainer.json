@@ -44,7 +44,7 @@
     }
   },
   "forwardPorts": [],
-  "postCreateCommand": "just fix-perms && pwd && go mod tidy && just build",
+  "postCreateCommand": "just fix-perms && just build",
   "remoteUser": "developer",
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
