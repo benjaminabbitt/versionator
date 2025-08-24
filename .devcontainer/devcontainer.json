@@ -44,7 +44,7 @@
     }
   },
   "forwardPorts": [],
-  "postCreateCommand": "sudo chown -R developer:developer /workspace",
+  "postCreateCommand": "sudo chown -R developer:developer /workspace && sudo chown -R developer:developer /go",
   "remoteUser": "developer",
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
