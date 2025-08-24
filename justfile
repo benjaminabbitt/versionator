@@ -1,0 +1,256 @@
+# Default recipe to display help
+default:
+    @just --list
+
+# Fix Go module cache permissions (try different approaches)
+fix-perms:
+    #!/bin/zsh
+    set -e
+
+    echo "Fixing Go module permissions..."
+
+    # Fix /go directory permissions if it exists
+    if [ -d "/go" ]; then
+        echo "Fixing /go directory permissions..."
+        if command -v sudo >/dev/null 2>&1; then
+            sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
+            sudo chmod -R u+w /go 2>/dev/null || true
+        else
+            chown -R $(whoami):$(whoami) /go 2>/dev/null || true
+            chmod -R u+w /go 2>/dev/null || true
+        fi
+    fi
+
+    # Fix local GOPATH if it exists
+    if [ -d "$HOME/go" ]; then
+        echo "Fixing local GOPATH permissions..."
+        chmod -R u+w $HOME/go 2>/dev/null || true
+    fi
+
+    # Create directories with proper permissions if they don't exist
+    mkdir -p /go/pkg/mod 2>/dev/null || true
+    mkdir -p /go/pkg/sumdb 2>/dev/null || true
+    mkdir -p $HOME/go/pkg/mod 2>/dev/null || true
+
+    # Set proper ownership for created directories
+    if command -v sudo >/dev/null 2>&1; then
+        sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
+    fi
+
+# Clean Go module cache and fix permissions
+clean-cache: fix-perms
+    #!/bin/zsh
+    echo "Cleaning Go module cache..."
+    go clean -modcache || true
+
+# Download dependencies with permission fix
+deps: fix-perms
+    #!/bin/zsh
+    set -e
+    echo "Fixing permissions before downloading dependencies..."
+    echo "Downloading Go modules..."
+    go mod download
+    echo "Tidying go.mod..."
+    go mod tidy
+    echo "Dependencies downloaded successfully!"
+
+# Build the application
+build:
+    #!/bin/zsh
+    set -e
+    just fix-perms
+    mkdir -p bin/
+    echo "Building versionator..."
+    go build -o bin/versionator .
+    echo "Build completed: bin/versionator"
+
+# Build with verbose output for debugging
+build-verbose:
+    #!/bin/zsh
+    set -e
+    just fix-perms
+    mkdir -p bin/
+    echo "Building versionator (verbose)..."
+    go build -v -o bin/versionator .
+
+# Run the application with arguments
+run *args:
+    @just build
+    ./bin/versionator {{args}}
+
+# Show current version
+version:
+    @just run version
+
+# Increment major version
+major-inc:
+    @just run major inc
+
+# Decrement major version
+major-dec:
+    @just run major dec
+
+# Increment minor version
+minor-inc:
+    @just run minor inc
+
+# Decrement minor version
+minor-dec:
+    @just run minor dec
+
+# Increment patch version
+patch-inc:
+    @just run patch inc
+
+# Decrement patch version
+patch-dec:
+    @just run patch dec
+
+# Enable git hash suffix
+suffix-enable:
+    @just run suffix enable
+
+# Disable git hash suffix
+suffix-disable:
+    @just run suffix disable
+
+# Show suffix status
+suffix-status:
+    @just run suffix status
+
+# Create a git tag for the current version
+commit:
+    @just run commit
+
+# Create a git tag with custom message
+commit-with-message message:
+    @just run commit --message "{{message}}"
+
+# Install the binary to /usr/local/bin
+install:
+    @just build
+    sudo cp bin/versionator /usr/local/bin/
+
+# Clean build artifacts
+clean:
+    rm -rf bin/
+    go clean
+
+# Run tests
+test:
+    @just fix-perms
+    go test ./...
+
+# Run tests with coverage
+test-coverage:
+    @just fix-perms
+    go test -cover ./...
+
+# Format code
+fmt:
+    go fmt ./...
+
+# Run linter (if golangci-lint is available)
+lint:
+    #!/bin/zsh
+    if command -v golangci-lint >/dev/null 2>&1; then
+        golangci-lint run
+    else
+        echo "golangci-lint not found, running go vet instead..."
+        go vet ./...
+    fi
+
+# Initialize project (run once after cloning)
+init:
+    #!/bin/zsh
+    set -e
+    echo "Initializing versionator project..."
+    echo "Step 1: Cleaning cache and fixing permissions..."
+    just clean-cache
+    echo "Step 2: Downloading dependencies..."
+    just deps
+    echo "Step 3: Creating bin directory..."
+    mkdir -p bin/
+    echo "Initialization complete!"
+
+# Development setup
+dev-setup:
+    #!/bin/zsh
+    set -e
+    echo "Setting up development environment..."
+    just init
+    echo "Building application..."
+    just build
+    echo "Development environment ready!"
+
+# Build for all platforms with static linking
+build-all: fix-perms
+    #!/bin/zsh
+    set -e
+    echo "Building for all platforms with static linking..."
+    mkdir -p bin/
+
+    # Linux amd64
+    echo "Building for Linux amd64..."
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-amd64 .
+
+    # Linux arm64
+    echo "Building for Linux arm64..."
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-arm64 .
+
+    # macOS amd64 (Intel)
+    echo "Building for macOS amd64..."
+    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-amd64 .
+
+    # macOS arm64 (Apple Silicon)
+    echo "Building for macOS arm64..."
+    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-arm64 .
+
+    # Windows amd64
+    echo "Building for Windows amd64..."
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-amd64.exe .
+
+    # Windows arm64
+    echo "Building for Windows arm64..."
+    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-arm64.exe .
+
+    # FreeBSD amd64
+    echo "Building for FreeBSD amd64..."
+    CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-freebsd-amd64 .
+
+    echo "All builds completed successfully!"
+    echo "Build artifacts:"
+    ls -la bin/
+
+# Show project status
+status:
+    @echo "=== Versionator Project Status ==="
+    @echo "Go version:"
+    @go version
+    @echo ""
+    @echo "Current version:"
+    @just version 2>/dev/null || echo "No VERSION file found"
+    @echo ""
+    @echo "Git Commands:"
+    @echo "  commit          - Create git tag for current version"
+    @echo "  commit-with-message MSG - Create git tag with custom message"
+    @echo ""
+    @echo "Module status:"
+    @go list -m all
+    @echo ""
+    @echo "Build status:"
+    @ls -la bin/ 2>/dev/null || echo "No build artifacts found"
+
+# Force rebuild everything
+rebuild:
+    #!/bin/zsh
+    set -e
+    echo "Rebuilding everything..."
+    just clean
+    just clean-cache
+    just init
+    just build
+    echo "Rebuild complete!"
+
+fix-git-dubious-ownership-warning:
+    git config --global --add safe.directory /workspace
