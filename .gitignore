@@ -5,6 +5,9 @@ versionator
 versionator.exe
 .devcontainer/.env
 
+#nul file is being created by Jetbrains or something else.  Deleted it, resbooted, deleted it, and it keeps coming back with *only* Goland running.
+nul
+
 # Sample application binaries
 examples/*/sample-app
 examples/**/sample-app
