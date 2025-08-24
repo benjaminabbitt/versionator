@@ -1,0 +1,58 @@
+{
+  "name": "Versionator Development",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-vscode.makefile-tools",
+        "vscjava.vscode-java-pack",
+        "rust-lang.rust-analyzer"
+      ],
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true,
+        "go.gopath": "/go",
+        "go.goroot": "/usr/local/go",
+        "go.lintTool": "golangci-lint",
+        "go.formatTool": "goimports",
+        "java.home": "/usr/lib/jvm/java-21-amazon-corretto",
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-21",
+            "path": "/usr/lib/jvm/java-21-amazon-corretto"
+          }
+        ],
+        "rust-analyzer.server.path": "rust-analyzer",
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/bin/zsh"
+          }
+        }
+      }
+    }
+  },
+  "forwardPorts": [],
+  "postCreateCommand": "sudo chown -R developer:developer /go && go mod tidy && just build",
+  "remoteUser": "developer",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "source=versionator-gomod-cache,target=/go/pkg/mod,type=volume"
+  ],
+  "containerEnv": {
+    "GOPATH": "/go",
+    "GOROOT": "/usr/local/go",
+    "GOCACHE": "/go/.cache"
+  }
+}

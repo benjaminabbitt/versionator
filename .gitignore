@@ -1,0 +1,46 @@
+# Build artifacts
+bin/**/*
+bin/
+versionator
+versionator.exe
+
+# Sample application binaries
+examples/*/sample-app
+examples/**/sample-app
+
+# Java class files
+*.class
+examples/java/**/*.class
+examples/java/out/
+
+# Go build cache
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
