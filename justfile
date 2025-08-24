@@ -41,7 +41,7 @@ fix-perms:
 clean-cache: fix-perms
     #!/bin/zsh
     echo "Cleaning Go module cache..."
-    go clean -modcache || true
+    GO111MODULE=on go clean -modcache || true
 
 # Download dependencies with permission fix
 deps: fix-perms
@@ -49,9 +49,9 @@ deps: fix-perms
     set -e
     echo "Fixing permissions before downloading dependencies..."
     echo "Downloading Go modules..."
-    go mod download
+    GO111MODULE=on go mod download
     echo "Tidying go.mod..."
-    go mod tidy
+    GO111MODULE=on go mod tidy
     echo "Dependencies downloaded successfully!"
 
 # Build the application
@@ -61,7 +61,7 @@ build:
     just fix-perms
     mkdir -p bin/
     echo "Building versionator..."
-    go build -o bin/versionator .
+    GO111MODULE=on go build -o bin/versionator .
     echo "Build completed: bin/versionator"
 
 # Build with verbose output for debugging
@@ -71,7 +71,7 @@ build-verbose:
     just fix-perms
     mkdir -p bin/
     echo "Building versionator (verbose)..."
-    go build -v -o bin/versionator .
+    GO111MODULE=on go build -v -o bin/versionator .
 
 # Run the application with arguments
 run *args:
@@ -134,30 +134,30 @@ install:
 # Clean build artifacts
 clean:
     rm -rf bin/
-    go clean
+    GO111MODULE=on go clean
 
 # Run tests
 test:
     @just fix-perms
-    go test ./...
+    GO111MODULE=on go test ./...
 
 # Run tests with coverage
 test-coverage:
     @just fix-perms
-    go test -cover ./...
+    GO111MODULE=on go test -cover ./...
 
 # Format code
 fmt:
-    go fmt ./...
+    GO111MODULE=on go fmt ./...
 
 # Run linter (if golangci-lint is available)
 lint:
     #!/bin/zsh
     if command -v golangci-lint >/dev/null 2>&1; then
-        golangci-lint run
+        GO111MODULE=on golangci-lint run
     else
         echo "golangci-lint not found, running go vet instead..."
-        go vet ./...
+        GO111MODULE=on go vet ./...
     fi
 
 # Initialize project (run once after cloning)
@@ -192,31 +192,31 @@ build-all: fix-perms
 
     # Linux amd64
     echo "Building for Linux amd64..."
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-amd64 .
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-amd64 .
 
     # Linux arm64
     echo "Building for Linux arm64..."
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-arm64 .
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-arm64 .
 
     # macOS amd64 (Intel)
     echo "Building for macOS amd64..."
-    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-amd64 .
+    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-amd64 .
 
     # macOS arm64 (Apple Silicon)
     echo "Building for macOS arm64..."
-    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-arm64 .
+    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-arm64 .
 
     # Windows amd64
     echo "Building for Windows amd64..."
-    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-amd64.exe .
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-amd64.exe .
 
     # Windows arm64
     echo "Building for Windows arm64..."
-    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-arm64.exe .
+    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-arm64.exe .
 
     # FreeBSD amd64
     echo "Building for FreeBSD amd64..."
-    CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o bin/versionator-freebsd-amd64 .
+    CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-freebsd-amd64 .
 
     echo "All builds completed successfully!"
     echo "Build artifacts:"
@@ -236,7 +236,7 @@ status:
     @echo "  commit-with-message MSG - Create git tag with custom message"
     @echo ""
     @echo "Module status:"
-    @go list -m all
+    @GO111MODULE=on go list -m all
     @echo ""
     @echo "Build status:"
     @ls -la bin/ 2>/dev/null || echo "No build artifacts found"
