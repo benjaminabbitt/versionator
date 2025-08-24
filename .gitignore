@@ -3,6 +3,7 @@ bin/**/*
 bin/
 versionator
 versionator.exe
+.devcontainer/.env
 
 # Sample application binaries
 examples/*/sample-app
