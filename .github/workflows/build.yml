@@ -53,11 +53,53 @@ jobs:
         path: coverage.html
         retention-days: 30
 
-    - name: Upload build artifacts
+    - name: Upload Linux amd64 binary
       uses: actions/upload-artifact@v4
       with:
-        name: application-binaries
-        path: bin/
+        name: versionator-linux-amd64
+        path: bin/versionator-linux-amd64
+        retention-days: 30
+
+    - name: Upload Linux arm64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-linux-arm64
+        path: bin/versionator-linux-arm64
+        retention-days: 30
+
+    - name: Upload macOS amd64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-darwin-amd64
+        path: bin/versionator-darwin-amd64
+        retention-days: 30
+
+    - name: Upload macOS arm64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-darwin-arm64
+        path: bin/versionator-darwin-arm64
+        retention-days: 30
+
+    - name: Upload Windows amd64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-windows-amd64.exe
+        path: bin/versionator-windows-amd64.exe
+        retention-days: 30
+
+    - name: Upload Windows arm64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-windows-arm64.exe
+        path: bin/versionator-windows-arm64.exe
+        retention-days: 30
+
+    - name: Upload FreeBSD amd64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-freebsd-amd64
+        path: bin/versionator-freebsd-amd64
         retention-days: 30
 #
 #  integration-test:
@@ -111,37 +153,58 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Download build artifacts
+    - name: Download Linux amd64 binary
       uses: actions/download-artifact@v4
       with:
-        name: application-binaries
-        path: bin/
+        name: versionator-linux-amd64
+        path: release/
 
-    - name: Create release assets
+    - name: Download Linux arm64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: versionator-linux-arm64
+        path: release/
+
+    - name: Download macOS amd64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: versionator-darwin-amd64
+        path: release/
+
+    - name: Download macOS arm64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: versionator-darwin-arm64
+        path: release/
+
+    - name: Download Windows amd64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: versionator-windows-amd64.exe
+        path: release/
+
+    - name: Download Windows arm64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: versionator-windows-arm64.exe
+        path: release/
+
+    - name: Download FreeBSD amd64 binary
+      uses: actions/download-artifact@v4
+      with:
+        name: versionator-freebsd-amd64
+        path: release/
+
+    - name: Create checksums
       run: |
-        # Create release directory
-        mkdir -p release
-
-        # Copy and rename binaries
-        cp bin/versionator-linux-amd64 release/versionator-linux-amd64
-        cp bin/versionator-darwin-amd64 release/versionator-darwin-amd64
-        cp bin/versionator-darwin-arm64 release/versionator-darwin-arm64
-        cp bin/versionator-windows-amd64.exe release/versionator-windows-amd64.exe
-
-        # Create checksums
+        # Create checksums for all downloaded binaries
         cd release
         sha256sum * > checksums.txt
         ls -la
 
-    - name: Upload release artifact - Windows/amd64
+    - name: Upload checksums
       uses: actions/upload-artifact@v4
       with:
-        name: versionator.exe
-        path: release/versionator-windows-amd64.exe
+        name: checksums.txt
+        path: release/checksums.txt
         retention-days: 90
-
-    - run: echo hello > world.txt
-    - uses: actions/upload-artifact@v4
-      with:
-        name: hello
-        path: world.txt
