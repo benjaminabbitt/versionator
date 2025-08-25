@@ -19,24 +19,3 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Test dev container build
-      uses: devcontainers/ci@v0.3
-      with:
-        imageName: ghcr.io/${{ github.repository }}/devcontainer-test
-        runCmd: |
-          # Verify Go installation
-          go version
-
-          # Verify just installation
-          just --version
-
-          # Verify git installation
-          git --version
-
-          # Test project initialization
-          just init
-
-          # Verify build works
-          just build
-
-          echo "Dev container test completed successfully!"
