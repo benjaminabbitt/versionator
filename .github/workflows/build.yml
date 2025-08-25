@@ -79,27 +79,28 @@ jobs:
     - name: Make binary executable
       run: chmod +x bin/${{ env.LINUX_BINARY }}
 
-    - name: Integration test
+    - name: Setup integration test environment
       run: |
-        # Initialize VERSION file without BOM
-        printf "1.0.0" > VERSION
+        # Create a temporary directory outside the repository
+        TEMP_TEST_DIR=$(mktemp -d)
+        echo "TEMP_TEST_DIR=$TEMP_TEST_DIR" >> $GITHUB_ENV
+        
+        # Copy the integration test script to temp directory
+        cp integration_test/run_integration_test.sh $TEMP_TEST_DIR/
+        chmod +x $TEMP_TEST_DIR/run_integration_test.sh
+        
+        # Copy the binary to temp directory for easier access
+        cp bin/${{ env.LINUX_BINARY }} $TEMP_TEST_DIR/
+        
+        echo "Integration test environment created at: $TEMP_TEST_DIR"
 
-        # Test version reading
-        VERSION=$(./bin/${{ env.LINUX_BINARY }} version)
-        echo "Current version: $VERSION"
-
-        # Test version incrementing
-        ./bin/${{ env.LINUX_BINARY }} patch increment
-        NEW_VERSION=$(./bin/${{ env.LINUX_BINARY }} version)
-        echo "New version: $NEW_VERSION"
-
-        # Verify version changed
-        if [ "$VERSION" = "$NEW_VERSION" ]; then
-          echo "ERROR: Version did not increment"
-          exit 1
-        fi
-
-        echo "Integration test passed!"
+    - name: Run integration test from outside repository
+      run: |
+        # Change to temp directory (outside repository)
+        cd ${{ env.TEMP_TEST_DIR }}
+        
+        # Run the integration test script
+        ./run_integration_test.sh ./${{ env.LINUX_BINARY }}
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
