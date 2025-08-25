@@ -75,6 +75,8 @@ The command will fail if there are uncommitted changes or if the tag already exi
 		}
 
 		cmd.Printf("✓ Successfully created tag '%s' for version %s using %s\n", tagName, version, vcsInstance.Name())
+		cmd.Printf("\nTo push this tag to the remote repository, run:\n")
+		cmd.Printf("  git push origin tag %s\n", tagName)
 
 		// Show additional information if requested
 		verbose, _ := cmd.Flags().GetBool("verbose")
