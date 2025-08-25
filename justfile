@@ -24,8 +24,10 @@ build:
     #!/bin/zsh
     set -e
     mkdir -p bin/
-    echo "Building versionator..."
-    GO111MODULE=on go build -o bin/versionator .
+    echo "Getting version from versionator..."
+    VERSION=$(./bin/versionator version 2>/dev/null || cat VERSION 2>/dev/null || echo "dev")
+    echo "Building versionator with version: $VERSION"
+    GO111MODULE=on go build -ldflags "-X main.VERSION=$VERSION" -o bin/versionator .
     echo "Build completed: bin/versionator"
 
 # Build with verbose output for debugging
@@ -33,8 +35,10 @@ build-verbose:
     #!/bin/zsh
     set -e
     mkdir -p bin/
-    echo "Building versionator (verbose)..."
-    GO111MODULE=on go build -v -o bin/versionator .
+    echo "Getting version from versionator..."
+    VERSION=$(./bin/versionator version 2>/dev/null || cat VERSION 2>/dev/null || echo "dev")
+    echo "Building versionator (verbose) with version: $VERSION"
+    GO111MODULE=on go build -v -ldflags "-X main.VERSION=$VERSION" -o bin/versionator .
 
 # Run the application with arguments
 run *args: build
@@ -100,46 +104,50 @@ build-all:
     set -e
     echo "Building for all platforms with static linking and UPX compression..."
     mkdir -p bin/
+    
+    # Get version information
+    VERSION=$(./bin/versionator version 2>/dev/null || cat VERSION 2>/dev/null || echo "dev")
+    echo "Building with version: $VERSION"
 
     # Linux amd64
     echo "Building for Linux amd64..."
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-amd64 .
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-linux-amd64 .
     echo "Compressing Linux amd64 binary with UPX..."
     upx --best --lzma bin/versionator-linux-amd64
 
     # Linux arm64
     echo "Building for Linux arm64..."
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-arm64 .
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-linux-arm64 .
     echo "Compressing Linux arm64 binary with UPX..."
     upx --best --lzma bin/versionator-linux-arm64
 
     # macOS amd64 (Intel)
     echo "Building for macOS amd64..."
-    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-amd64 .
+    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-amd64 .
     echo "Compressing macOS amd64 binary with UPX..."
     upx --best --lzma bin/versionator-darwin-amd64
 
     # macOS arm64 (Apple Silicon)
     echo "Building for macOS arm64..."
-    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-arm64 .
+    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-arm64 .
     echo "Compressing macOS arm64 binary with UPX..."
     upx --best --lzma bin/versionator-darwin-arm64
 
     # Windows amd64
     echo "Building for Windows amd64..."
-    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-amd64.exe .
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-windows-amd64.exe .
     echo "Compressing Windows amd64 binary with UPX..."
     upx --best --lzma bin/versionator-windows-amd64.exe
 
     # Windows arm64
     echo "Building for Windows arm64..."
-    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-arm64.exe .
+    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-windows-arm64.exe .
     echo "Compressing Windows arm64 binary with UPX..."
     upx --best --lzma bin/versionator-windows-arm64.exe
 
     # FreeBSD amd64
     echo "Building for FreeBSD amd64..."
-    CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-freebsd-amd64 .
+    CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-freebsd-amd64 .
     echo "Compressing FreeBSD amd64 binary with UPX..."
     upx --best --lzma bin/versionator-freebsd-amd64
 

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"versionator/internal/logging"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -17,17 +17,17 @@ var prefixEnableCmd = &cobra.Command{
 	Short: "Enable version prefix",
 	Long:  "Enable version prefix with default value 'v'",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
-
 		cfg, err := appInstance.ReadConfig()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			cmd.Printf("Error reading config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cfg.Prefix = "v"
 
 		if err := appInstance.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
+			cmd.Printf("Error writing config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Println("Version prefix enabled with default value 'v'")
@@ -35,7 +35,8 @@ var prefixEnableCmd = &cobra.Command{
 		// Show current version with prefix
 		version, err := appInstance.GetVersionWithSuffix()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			cmd.Printf("Error getting version: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Printf("Current version: %s\n", version)
@@ -47,17 +48,17 @@ var prefixDisableCmd = &cobra.Command{
 	Short: "Disable version prefix",
 	Long:  "Disable version prefix by setting it to empty string",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
-
 		cfg, err := appInstance.ReadConfig()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			cmd.Printf("Error reading config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cfg.Prefix = ""
 
 		if err := appInstance.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
+			cmd.Printf("Error writing config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Println("Version prefix disabled")
@@ -65,7 +66,8 @@ var prefixDisableCmd = &cobra.Command{
 		// Show current version without prefix
 		version, err := appInstance.GetCurrentVersion()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			cmd.Printf("Error getting version: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Printf("Current version: %s\n", version)
@@ -78,18 +80,19 @@ var prefixSetCmd = &cobra.Command{
 	Long:  "Set a custom version prefix",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
 		prefix := args[0]
 
 		cfg, err := appInstance.ReadConfig()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			cmd.Printf("Error reading config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cfg.Prefix = prefix
 
 		if err := appInstance.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
+			cmd.Printf("Error writing config: %v\n", err)
+			os.Exit(1)
 		}
 
 		if prefix == "" {
@@ -101,7 +104,8 @@ var prefixSetCmd = &cobra.Command{
 		// Show current version with new prefix
 		version, err := appInstance.GetVersionWithSuffix()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			cmd.Printf("Error getting version: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Printf("Current version: %s\n", version)
@@ -113,11 +117,10 @@ var prefixStatusCmd = &cobra.Command{
 	Short: "Show prefix configuration status",
 	Long:  "Show current version prefix configuration",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
-
 		cfg, err := appInstance.ReadConfig()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			cmd.Printf("Error reading config: %v\n", err)
+			os.Exit(1)
 		}
 
 		if cfg.Prefix == "" {
@@ -130,7 +133,8 @@ var prefixStatusCmd = &cobra.Command{
 		// Show current version
 		version, err := appInstance.GetVersionWithSuffix()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			cmd.Printf("Error getting version: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Printf("Current version: %s\n", version)

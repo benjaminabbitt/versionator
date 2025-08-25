@@ -12,9 +12,8 @@ const configFile = ".application.yaml"
 
 // Config holds configuration for version suffix behavior
 type Config struct {
-	Prefix  string        `yaml:"prefix"`
-	Suffix  SuffixConfig  `yaml:"suffix"`
-	Logging LoggingConfig `yaml:"logging"`
+	Prefix string       `yaml:"prefix"`
+	Suffix SuffixConfig `yaml:"suffix"`
 }
 
 // SuffixConfig holds suffix-specific configuration
@@ -29,10 +28,6 @@ type GitConfig struct {
 	HashLength int `yaml:"hashLength"`
 }
 
-// LoggingConfig holds logging-specific configuration
-type LoggingConfig struct {
-	Output string `yaml:"output"` // console, json, development
-}
 
 // ConfigManager manages configuration reading and writing with filesystem abstraction
 type ConfigManager struct {
@@ -54,9 +49,6 @@ func (cm *ConfigManager) ReadConfig() (*Config, error) {
 			Git: GitConfig{
 				HashLength: 7, // default hash length
 			},
-		},
-		Logging: LoggingConfig{
-			Output: "console", // default to human-readable console output
 		},
 	}
 
