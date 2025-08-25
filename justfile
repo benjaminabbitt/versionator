@@ -124,16 +124,16 @@ build-all:
     # macOS amd64 (Intel)
     echo "Building for macOS amd64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-amd64 .
-    echo "Compressing macOS amd64 binary with UPX..."
+    # echo "Compressing macOS amd64 binary with UPX..."
     # MacOS is not supported
     # upx --best --lzma bin/versionator-darwin-amd64
 
     # macOS arm64 (Apple Silicon)
     echo "Building for macOS arm64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-arm64 .
-    echo "Compressing macOS arm64 binary with UPX..."
+    # echo "Compressing macOS arm64 binary with UPX..."
     # MacOS is not supported
-    #upx --best --lzma bin/versionator-darwin-arm64
+    # upx --best --lzma bin/versionator-darwin-arm64
 
     # Windows amd64
     echo "Building for Windows amd64..."
@@ -144,15 +144,16 @@ build-all:
     # Windows arm64
     echo "Building for Windows arm64..."
     CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-windows-arm64.exe .
-    echo "Compressing Windows arm64 binary with UPX..."
+    # echo "Compressing Windows arm64 binary with UPX..."
     # Windows ARM64 is not supported
     # upx --best --lzma bin/versionator-windows-arm64.exe
 
     # FreeBSD amd64
     echo "Building for FreeBSD amd64..."
     CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-freebsd-amd64 .
-    echo "Compressing FreeBSD amd64 binary with UPX..."
-    upx --best --lzma bin/versionator-freebsd-amd64
+    # echo "Compressing FreeBSD amd64 binary with UPX..."
+    # FreeBSD amd64 is not supported
+    # upx --best --lzma bin/versionator-freebsd-amd64
 
     echo "All builds and UPX compression completed successfully!"
     echo "Build artifacts:"
