@@ -63,6 +63,8 @@ jobs:
   integration-test:
     runs-on: ubuntu-latest
     needs: build-and-test
+    env:
+      LINUX_BINARY: versionator-linux-amd64
 
     steps:
     - name: Checkout code
@@ -78,10 +80,10 @@ jobs:
       run: ls bin
 
     - name: What do we have here?
-      run: file bin/versionator-linux-amd64
+      run: file bin/${{ env.LINUX_BINARY }}
 
     - name: Make binary executable
-      run: chmod +x bin/versionator-linux-amd64
+      run: chmod +x bin/${{ env.LINUX_BINARY }}
 
     - name: Integration test
       run: |
@@ -89,12 +91,12 @@ jobs:
         echo "1.0.0" > VERSION
 
         # Test version reading
-        VERSION=$(./bin/versionator-linux-amd64 version)
+        VERSION=$(./bin/${{ env.LINUX_BINARY }} version)
         echo "Current version: $VERSION"
 
         # Test version incrementing
-        ./bin/versionator-linux-amd64 patch increment
-        NEW_VERSION=$(./bin/versionator-linux-amd64 version)
+        ./bin/${{ env.LINUX_BINARY }} patch increment
+        NEW_VERSION=$(./bin/${{ env.LINUX_BINARY }} version)
         echo "New version: $NEW_VERSION"
 
         # Verify version changed
