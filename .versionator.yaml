@@ -1,5 +1,5 @@
 # Versionator Configuration
-prefix: beta-
+prefix: v
 suffix:
     type: git
     enabled: false
