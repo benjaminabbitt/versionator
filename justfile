@@ -98,38 +98,52 @@ dev-setup:
 build-all:
     #!/bin/zsh
     set -e
-    echo "Building for all platforms with static linking..."
+    echo "Building for all platforms with static linking and UPX compression..."
     mkdir -p bin/
 
     # Linux amd64
     echo "Building for Linux amd64..."
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-amd64 .
+    echo "Compressing Linux amd64 binary with UPX..."
+    upx --best --lzma bin/versionator-linux-amd64
 
     # Linux arm64
     echo "Building for Linux arm64..."
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-arm64 .
+    echo "Compressing Linux arm64 binary with UPX..."
+    upx --best --lzma bin/versionator-linux-arm64
 
     # macOS amd64 (Intel)
     echo "Building for macOS amd64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-amd64 .
+    echo "Compressing macOS amd64 binary with UPX..."
+    upx --best --lzma bin/versionator-darwin-amd64
 
     # macOS arm64 (Apple Silicon)
     echo "Building for macOS arm64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-arm64 .
+    echo "Compressing macOS arm64 binary with UPX..."
+    upx --best --lzma bin/versionator-darwin-arm64
 
     # Windows amd64
     echo "Building for Windows amd64..."
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-amd64.exe .
+    echo "Compressing Windows amd64 binary with UPX..."
+    upx --best --lzma bin/versionator-windows-amd64.exe
 
     # Windows arm64
     echo "Building for Windows arm64..."
     CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-arm64.exe .
+    echo "Compressing Windows arm64 binary with UPX..."
+    upx --best --lzma bin/versionator-windows-arm64.exe
 
     # FreeBSD amd64
     echo "Building for FreeBSD amd64..."
     CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-freebsd-amd64 .
+    echo "Compressing FreeBSD amd64 binary with UPX..."
+    upx --best --lzma bin/versionator-freebsd-amd64
 
-    echo "All builds completed successfully!"
+    echo "All builds and UPX compression completed successfully!"
     echo "Build artifacts:"
     ls -la bin/
 

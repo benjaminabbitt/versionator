@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y \
     zsh \
     just \
     gh \
+    upx-ucl \
     && rm -rf /var/lib/apt/lists/*
 
 

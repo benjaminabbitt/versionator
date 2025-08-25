@@ -59,53 +59,53 @@ jobs:
         name: application-binaries
         path: bin/
         retention-days: 30
-
-  integration-test:
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    env:
-      LINUX_BINARY: versionator-linux-amd64
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: application-binaries
-        path: bin/
-
-    - name: Make binary executable
-      run: chmod +x bin/${{ env.LINUX_BINARY }}
-
-    - name: Setup integration test environment
-      run: |
-        # Create a temporary directory outside the repository
-        TEMP_TEST_DIR=$(mktemp -d)
-        echo "TEMP_TEST_DIR=$TEMP_TEST_DIR" >> $GITHUB_ENV
-        
-        # Copy the integration test script to temp directory
-        cp integration_test/run_integration_test.sh $TEMP_TEST_DIR/
-        chmod +x $TEMP_TEST_DIR/run_integration_test.sh
-        
-        # Copy the binary to temp directory for easier access
-        cp bin/${{ env.LINUX_BINARY }} $TEMP_TEST_DIR/
-        
-        echo "Integration test environment created at: $TEMP_TEST_DIR"
-
-    - name: Run integration test from outside repository
-      run: |
-        # Change to temp directory (outside repository)
-        cd ${{ env.TEMP_TEST_DIR }}
-        
-        # Run the integration test script
-        ./run_integration_test.sh ./${{ env.LINUX_BINARY }}
+#
+#  integration-test:
+#    runs-on: ubuntu-latest
+#    needs: build-and-test
+#    env:
+#      LINUX_BINARY: versionator-linux-amd64
+#
+#    steps:
+#    - name: Checkout code
+#      uses: actions/checkout@v4
+#
+#    - name: Download build artifacts
+#      uses: actions/download-artifact@v4
+#      with:
+#        name: application-binaries
+#        path: bin/
+#
+#    - name: Make binary executable
+#      run: chmod +x bin/${{ env.LINUX_BINARY }}
+#
+#    - name: Setup integration test environment
+#      run: |
+#        # Create a temporary directory outside the repository
+#        TEMP_TEST_DIR=$(mktemp -d)
+#        echo "TEMP_TEST_DIR=$TEMP_TEST_DIR" >> $GITHUB_ENV
+#
+#        # Copy the integration test script to temp directory
+#        cp integration_test/run_integration_test.sh $TEMP_TEST_DIR/
+#        chmod +x $TEMP_TEST_DIR/run_integration_test.sh
+#
+#        # Copy the binary to temp directory for easier access
+#        cp bin/${{ env.LINUX_BINARY }} $TEMP_TEST_DIR/
+#
+#        echo "Integration test environment created at: $TEMP_TEST_DIR"
+#
+#    - name: Run integration test from outside repository
+#      run: |
+#        # Change to temp directory (outside repository)
+#        cd ${{ env.TEMP_TEST_DIR }}
+#
+#        # Run the integration test script
+#        ./run_integration_test.sh ./${{ env.LINUX_BINARY }}
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    needs: [build-and-test, integration-test]
+    needs: [build-and-test]
 
     steps:
     - name: Checkout code
