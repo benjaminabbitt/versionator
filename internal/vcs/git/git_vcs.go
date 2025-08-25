@@ -3,11 +3,11 @@ package git
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/afero"
 )
 
@@ -82,22 +82,20 @@ func (g *GitVersionControlSystem) GetRepositoryRoot() (string, error) {
 
 // IsWorkingDirectoryClean checks if there are no uncommitted changes
 func (g *GitVersionControlSystem) IsWorkingDirectoryClean() (bool, error) {
-	repo, err := g.openRepository()
+	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return false, err
 	}
 
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return false, fmt.Errorf("failed to get working tree: %w", err)
-	}
-
-	status, err := worktree.Status()
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = root
+	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("failed to get git status: %w", err)
 	}
 
-	return status.IsClean(), nil
+	// If output is empty, working directory is clean
+	return len(strings.TrimSpace(string(output))) == 0, nil
 }
 
 // GetVCSIdentifier returns a short hash of the current commit
@@ -106,23 +104,20 @@ func (g *GitVersionControlSystem) GetVCSIdentifier(length int) (string, error) {
 		return "", fmt.Errorf("invalid hash length: %d (must be between 1 and 40)", length)
 	}
 
-	repo, err := g.openRepository()
+	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return "", err
 	}
 
-	ref, err := repo.Head()
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = root
+	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to get HEAD reference: %w", err)
+		return "", fmt.Errorf("failed to get HEAD hash: %w", err)
 	}
 
-	commit, err := repo.CommitObject(ref.Hash())
-	if err != nil {
-		return "", fmt.Errorf("failed to get commit object: %w", err)
-	}
-
-	fullHash := commit.Hash.String()
-	if length > len(fullHash) {
+	fullHash := strings.TrimSpace(string(output))
+	if len(fullHash) < length {
 		length = len(fullHash)
 	}
 
@@ -131,20 +126,14 @@ func (g *GitVersionControlSystem) GetVCSIdentifier(length int) (string, error) {
 
 // CreateTag creates a git tag
 func (g *GitVersionControlSystem) CreateTag(tagName, message string) error {
-	repo, err := g.openRepository()
+	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return err
 	}
 
-	head, err := repo.Head()
-	if err != nil {
-		return fmt.Errorf("failed to get HEAD reference: %w", err)
-	}
-
-	_, err = repo.CreateTag(tagName, head.Hash(), &git.CreateTagOptions{
-		Message: message,
-	})
-	if err != nil {
+	cmd := exec.Command("git", "tag", "-a", tagName, "-m", message)
+	cmd.Dir = root
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create tag: %w", err)
 	}
 
@@ -153,28 +142,20 @@ func (g *GitVersionControlSystem) CreateTag(tagName, message string) error {
 
 // TagExists checks if a tag exists
 func (g *GitVersionControlSystem) TagExists(tagName string) (bool, error) {
-	repo, err := g.openRepository()
+	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return false, err
 	}
 
-	tags, err := repo.Tags()
+	cmd := exec.Command("git", "tag", "-l", tagName)
+	cmd.Dir = root
+	output, err := cmd.Output()
 	if err != nil {
-		return false, fmt.Errorf("failed to get tags: %w", err)
+		return false, fmt.Errorf("failed to list tags: %w", err)
 	}
 
-	exists := false
-	err = tags.ForEach(func(tag *plumbing.Reference) error {
-		if tag.Name().Short() == tagName {
-			exists = true
-		}
-		return nil
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to iterate tags: %w", err)
-	}
-
-	return exists, nil
+	// If output contains the tag name, it exists
+	return strings.TrimSpace(string(output)) == tagName, nil
 }
 
 // Helper methods
@@ -195,20 +176,6 @@ func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 	}
 
 	return ""
-}
-
-func (g *GitVersionControlSystem) openRepository() (*git.Repository, error) {
-	root, err := g.GetRepositoryRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	repo, err := git.PlainOpen(root)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open git repository: %w", err)
-	}
-
-	return repo, nil
 }
 
 // GetHashLength returns the configured hash length from config file or environment variable
