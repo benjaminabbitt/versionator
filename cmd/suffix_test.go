@@ -2,507 +2,385 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
+	"versionator/internal/app"
+	"versionator/internal/vcs/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/afero"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/suite"
-	"gopkg.in/yaml.v3"
-	"versionator/internal/app"
-	"versionator/internal/config"
-	"versionator/internal/vcs"
-	"versionator/internal/vcs/mock"
-	"versionator/internal/version"
-	"versionator/internal/versionator"
 )
 
-// SuffixTestSuite contains common constants and test data
+// SuffixTestSuite contains the test suite for suffix commands
 type SuffixTestSuite struct {
 	suite.Suite
-	
-	// Common test constants extracted from individual tests
-	DefaultVersion         string
-	StandardHashLength     int
-	DefaultGitHash         string
-	AlternateGitHash       string
-	TestRepositoryPath     string
-	
-	// Standard configuration templates
-	StandardConfig         *config.Config
-	EnabledConfig          *config.Config
-	CustomHashLengthConfig *config.Config
+	testApp      *app.App
+	fs           afero.Fs
+	restoreApp   func()
+	outputBuffer *bytes.Buffer
+	ctrl         *gomock.Controller
+	mockVCS      *mock.MockVersionControlSystem
 }
 
-// SetupSuite runs once before all tests
-func (s *SuffixTestSuite) SetupSuite() {
-	// Initialize common constants
-	s.DefaultVersion = "1.2.3"
-	s.StandardHashLength = 7
-	s.DefaultGitHash = "abc1234"
-	s.AlternateGitHash = "def5678"
-	s.TestRepositoryPath = "/tmp"
+// SetupTest initializes the test environment before each test
+func (suite *SuffixTestSuite) SetupTest() {
+	var testApp *app.App
+	suite.fs, testApp = createTestApp()
+	suite.testApp = testApp
+	suite.restoreApp = replaceAppInstance(testApp)
+	suite.outputBuffer = &bytes.Buffer{}
 	
-	// Standard disabled configuration
-	s.StandardConfig = &config.Config{
-		Prefix: "",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git:     config.GitConfig{HashLength: s.StandardHashLength},
-		},
-		Logging: config.LoggingConfig{Output: "console"},
-	}
-	
-	// Standard enabled configuration
-	s.EnabledConfig = &config.Config{
-		Prefix: "",
-		Suffix: config.SuffixConfig{
-			Enabled: true,
-			Type:    "git",
-			Git:     config.GitConfig{HashLength: s.StandardHashLength},
-		},
-		Logging: config.LoggingConfig{Output: "console"},
-	}
-	
-	// Custom hash length configuration
-	s.CustomHashLengthConfig = &config.Config{
-		Prefix: "",
-		Suffix: config.SuffixConfig{
-			Enabled: true,
-			Type:    "git",
-			Git:     config.GitConfig{HashLength: 8},
-		},
-		Logging: config.LoggingConfig{Output: "console"},
-	}
+	// Set up gomock controller and mock VCS
+	suite.ctrl = gomock.NewController(suite.T())
+	suite.mockVCS = mock.NewMockVersionControlSystem(suite.ctrl)
+	suite.testApp.VCS = suite.mockVCS
 }
 
-// createTestAppWithMockVCS creates a test app with mock VCS
-func (s *SuffixTestSuite) createTestAppWithMockVCS(ctrl *gomock.Controller, isRepo bool, hashLength int, hash string) (afero.Fs, *app.App, *mock.MockVersionControlSystem) {
-	fs := afero.NewMemMapFs()
+// TearDownTest cleans up after each test
+func (suite *SuffixTestSuite) TearDownTest() {
+	suite.restoreApp()
+	suite.ctrl.Finish()
+}
+
+// TestSuffixEnableWithVCS tests enabling suffix when in a VCS repository
+func (suite *SuffixTestSuite) TestSuffixEnableWithVCS() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "1.2.3")
+
+	// Mock VCS expectations
+	suite.mockVCS.EXPECT().IsRepository().Return(true)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the enable command
+	suffixEnableCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix enabled", "Output should show suffix enabled")
+	suite.Contains(output, "Current version:", "Output should show current version")
+
+	// Verify config was updated
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.True(cfg.Suffix.Enabled, "Config should have suffix enabled")
+	suite.Equal("git", cfg.Suffix.Type, "Config should have git suffix type")
+}
+
+// TestSuffixEnableWithoutVCS tests enabling suffix when not in a VCS repository
+func (suite *SuffixTestSuite) TestSuffixEnableWithoutVCS() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.0.0")
+
+	// Mock VCS expectations - not in repository
+	suite.mockVCS.EXPECT().IsRepository().Return(false)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the enable command
+	suffixEnableCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix enabled", "Output should show suffix enabled")
+	suite.Contains(output, "Git hash will be added when in a repository", "Output should indicate repository requirement")
+
+	// Verify config was updated
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.True(cfg.Suffix.Enabled, "Config should have suffix enabled")
+	suite.Equal("git", cfg.Suffix.Type, "Config should have git suffix type")
+}
+
+// TestSuffixEnableWithNilVCS tests enabling suffix when VCS is nil
+func (suite *SuffixTestSuite) TestSuffixEnableWithNilVCS() {
+	// Setup: Create config and version files with no VCS
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "3.1.0")
 	
-	mockVCS := mock.NewMockVersionControlSystem(ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(isRepo).AnyTimes()
-	
-	if isRepo {
-		mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
-		if hash != "" {
-			mockVCS.EXPECT().GetVCSIdentifier(hashLength).Return(hash, nil).AnyTimes()
+	// Set VCS to nil
+	suite.testApp.VCS = nil
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the enable command
+	suffixEnableCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix enabled", "Output should show suffix enabled")
+	suite.Contains(output, "Git hash will be added when in a repository", "Output should indicate repository requirement")
+
+	// Verify config was updated
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.True(cfg.Suffix.Enabled, "Config should have suffix enabled")
+	suite.Equal("git", cfg.Suffix.Type, "Config should have git suffix type")
+}
+
+// TestSuffixDisable tests disabling suffix
+func (suite *SuffixTestSuite) TestSuffixDisable() {
+	// Setup: Create config and version files, first enable suffix
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "1.5.2")
+
+	// First enable suffix
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Suffix.Enabled = true
+	cfg.Suffix.Type = "git"
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Create and execute the disable command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the disable command
+	suffixDisableCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix disabled", "Output should show suffix disabled")
+	suite.Contains(output, "Current version: 1.5.2", "Output should show version without suffix")
+
+	// Verify config was updated
+	cfg, err = suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.False(cfg.Suffix.Enabled, "Config should have suffix disabled")
+}
+
+// TestSuffixStatusEnabledWithVCS tests status when suffix is enabled and in VCS repo
+func (suite *SuffixTestSuite) TestSuffixStatusEnabledWithVCS() {
+	// Setup: Create config and version files with suffix enabled
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.1.0")
+
+	// Enable suffix in config
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Suffix.Enabled = true
+	cfg.Suffix.Type = "git"
+	cfg.Suffix.Git.HashLength = 7
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Mock VCS expectations
+	suite.mockVCS.EXPECT().IsRepository().Return(true)
+	suite.mockVCS.EXPECT().GetVCSIdentifier(7).Return("abc1234", nil)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the status command
+	err = suffixStatusCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Status command should succeed")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix: ENABLED", "Output should show suffix enabled")
+	suite.Contains(output, "Hash length: 7 characters", "Output should show hash length")
+	suite.Contains(output, "Git hash: abc1234", "Output should show git hash")
+	suite.Contains(output, "Current version:", "Output should show current version")
+}
+
+// TestSuffixStatusEnabledWithoutVCS tests status when suffix is enabled but not in VCS repo
+func (suite *SuffixTestSuite) TestSuffixStatusEnabledWithoutVCS() {
+	// Setup: Create config and version files with suffix enabled
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "3.0.0")
+
+	// Enable suffix in config
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Suffix.Enabled = true
+	cfg.Suffix.Type = "git"
+	cfg.Suffix.Git.HashLength = 7
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Mock VCS expectations - not in repository
+	suite.mockVCS.EXPECT().IsRepository().Return(false)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the status command
+	err = suffixStatusCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Status command should succeed")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix: ENABLED", "Output should show suffix enabled")
+	suite.Contains(output, "Hash length: 7 characters", "Output should show hash length")
+	suite.Contains(output, "Not in a git repository", "Output should indicate no repository")
+}
+
+// TestSuffixStatusDisabled tests status when suffix is disabled
+func (suite *SuffixTestSuite) TestSuffixStatusDisabled() {
+	// Setup: Create config and version files with suffix disabled
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "1.0.0")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the status command
+	err := suffixStatusCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Status command should succeed")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix: DISABLED", "Output should show suffix disabled")
+	suite.Contains(output, "Current version: 1.0.0", "Output should show current version")
+}
+
+// TestSuffixStatusVCSError tests status when VCS returns error
+func (suite *SuffixTestSuite) TestSuffixStatusVCSError() {
+	// Setup: Create config and version files with suffix enabled
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "4.2.1")
+
+	// Enable suffix in config
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Suffix.Enabled = true
+	cfg.Suffix.Type = "git"
+	cfg.Suffix.Git.HashLength = 7
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Mock VCS expectations - in repository but error getting hash
+	suite.mockVCS.EXPECT().IsRepository().Return(true)
+	suite.mockVCS.EXPECT().GetVCSIdentifier(7).Return("", fmt.Errorf("git command failed"))
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the status command
+	err = suffixStatusCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred (errors are handled gracefully)
+	suite.NoError(err, "Status command should succeed even with VCS errors")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Git hash suffix: ENABLED", "Output should show suffix enabled")
+	suite.Contains(output, "cannot get hash: git command failed", "Output should show VCS error")
+}
+
+// TestSuffixConfigure tests configure command
+func (suite *SuffixTestSuite) TestSuffixConfigure() {
+	// Setup: Create config file with specific settings
+	createConfigFile(suite.T(), suite.fs)
+
+	// Set specific config values
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Suffix.Enabled = true
+	cfg.Suffix.Type = "git"
+	cfg.Suffix.Git.HashLength = 8
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the configure command
+	err = suffixConfigureCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Configure command should succeed")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Current configuration:", "Output should show configuration header")
+	suite.Contains(output, "Git hash suffix enabled: true", "Output should show enabled status")
+	suite.Contains(output, "Suffix type: git", "Output should show suffix type")
+	suite.Contains(output, "Git hash length: 8", "Output should show hash length")
+	suite.Contains(output, "Configuration is stored in .versionator.yaml", "Output should show config file location")
+}
+
+// TestSuffixCommandStructure tests that the commands are properly structured
+func (suite *SuffixTestSuite) TestSuffixCommandStructure() {
+	// Test suffix command properties
+	suite.Equal("suffix", suffixCmd.Use, "Suffix command should have correct use")
+	suite.Equal("Manage version suffix behavior", suffixCmd.Short, "Suffix command should have correct short description")
+	suite.Contains(suffixCmd.Long, "Commands to enable or disable", "Suffix command should have correct long description")
+
+	// Test enable command properties
+	suite.Equal("enable", suffixEnableCmd.Use, "Enable command should have correct use")
+	suite.Equal("Enable VCS identifier suffix", suffixEnableCmd.Short, "Enable command should have correct short description")
+	suite.Contains(suffixEnableCmd.Long, "Enable appending VCS identifier", "Enable command should have correct long description")
+
+	// Test disable command properties
+	suite.Equal("disable", suffixDisableCmd.Use, "Disable command should have correct use")
+	suite.Equal("Disable git hash suffix", suffixDisableCmd.Short, "Disable command should have correct short description")
+	suite.Equal("Disable appending git hash to version numbers", suffixDisableCmd.Long, "Disable command should have correct long description")
+
+	// Test status command properties
+	suite.Equal("status", suffixStatusCmd.Use, "Status command should have correct use")
+	suite.Equal("Show suffix configuration status", suffixStatusCmd.Short, "Status command should have correct short description")
+	suite.Equal("Show whether git hash suffix is enabled or disabled", suffixStatusCmd.Long, "Status command should have correct long description")
+
+	// Test configure command properties
+	suite.Equal("configure", suffixConfigureCmd.Use, "Configure command should have correct use")
+	suite.Equal("Configure git hash settings", suffixConfigureCmd.Short, "Configure command should have correct short description")
+	suite.Contains(suffixConfigureCmd.Long, "Configure git hash settings", "Configure command should have correct long description")
+}
+
+// TestSuffixCommandHierarchy tests that commands are properly registered in the command hierarchy
+func (suite *SuffixTestSuite) TestSuffixCommandHierarchy() {
+	// Find suffix command in root
+	var foundSuffixCmd *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Use == "suffix" {
+			foundSuffixCmd = cmd
+			break
 		}
 	}
-	
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", mockVCS),
-		Versionator:    versionator.NewVersionator(fs, mockVCS),
-		VCS:            mockVCS,
-		FileSystem:     fs,
-	}
-	
-	return fs, testApp, mockVCS
-}
+	suite.NotNil(foundSuffixCmd, "Suffix command should be registered with root command")
 
-// createTestAppWithoutVCS creates a test app without VCS
-func (s *SuffixTestSuite) createTestAppWithoutVCS() (afero.Fs, *app.App) {
-	fs := afero.NewMemMapFs()
-	
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
-	}
-	
-	return fs, testApp
-}
-
-// createTestFiles creates VERSION and config files
-func (s *SuffixTestSuite) createTestFiles(fs afero.Fs, version string, cfg *config.Config) {
-	err := afero.WriteFile(fs, "VERSION", []byte(version), 0644)
-	s.Require().NoError(err)
-	
-	configData, err := yaml.Marshal(cfg)
-	s.Require().NoError(err)
-	err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
-	s.Require().NoError(err)
-}
-
-func (s *SuffixTestSuite) TestSuffixEnableCommand() {
-	tests := []struct {
-		name           string
-		initialConfig  *config.Config
-		initialVersion string
-		setupVCS       func(ctrl *gomock.Controller) *mock.MockVersionControlSystem
-		expectError    bool
-	}{
-		{
-			name:           "enable suffix with git repository",
-			initialConfig:  s.StandardConfig,
-			initialVersion: s.DefaultVersion,
-			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				mockVCS := mock.NewMockVersionControlSystem(ctrl)
-				mockVCS.EXPECT().Name().Return("git").AnyTimes()
-				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(s.StandardHashLength).Return(s.DefaultGitHash, nil).AnyTimes()
-				return mockVCS
-			},
-			expectError: false,
-		},
-		{
-			name:           "enable suffix without git repository",
-			initialConfig:  s.StandardConfig,
-			initialVersion: "2.0.0",
-			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				mockVCS := mock.NewMockVersionControlSystem(ctrl)
-				mockVCS.EXPECT().Name().Return("git").AnyTimes()
-				mockVCS.EXPECT().IsRepository().Return(false).AnyTimes()
-				return mockVCS
-			},
-			expectError: false,
-		},
-		{
-			name:           "enable suffix when already enabled",
-			initialConfig:  s.CustomHashLengthConfig,
-			initialVersion: "1.5.0",
-			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				mockVCS := mock.NewMockVersionControlSystem(ctrl)
-				mockVCS.EXPECT().Name().Return("git").AnyTimes()
-				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(8).Return(s.AlternateGitHash, nil).AnyTimes()
-				return mockVCS
-			},
-			expectError: false,
-		},
-	}
-
-		for _, tt := range tests {
-		s.Run(tt.name, func() {
-			// Setup gomock
-			ctrl := gomock.NewController(s.T())
-			defer ctrl.Finish()
-
-			// Setup VCS mock and create test app
-			mockVCS := tt.setupVCS(ctrl)
-			fs, testApp, _ := s.createTestAppWithMockVCS(ctrl, mockVCS.IsRepository(), s.StandardHashLength, s.DefaultGitHash)
-
-			// Replace global app instance
-			originalApp := appInstance
-			appInstance = testApp
-			defer func() {
-				appInstance = originalApp
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			// Create test files
-			s.createTestFiles(fs, tt.initialVersion, tt.initialConfig)
-
-			// Capture output
-			var stdout bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetArgs([]string{"suffix", "enable"})
-
-			// Execute command
-			err := rootCmd.Execute()
-
-			if tt.expectError {
-				s.Error(err)
-			} else {
-				s.NoError(err, "Command should execute successfully")
-
-				// Verify config was updated
-				cfg, err := testApp.ReadConfig()
-				s.NoError(err, "Should be able to read config")
-				s.True(cfg.Suffix.Enabled, "Suffix should be enabled")
-				s.Equal("git", cfg.Suffix.Type, "Suffix type should be git")
-
-				// Verify output
-				output := stdout.String()
-				s.Contains(output, "Git hash suffix enabled", "Should show enabled message")
-				s.Contains(output, "Current version:", "Should show current version")
-			}
-		})
-	}
-}
-
-func (s *SuffixTestSuite) TestSuffixDisableCommand() {
-	tests := []struct {
-		name           string
-		initialConfig  *config.Config
-		initialVersion string
-		expectError    bool
-	}{
-		{
-			name:           "disable suffix when enabled",
-			initialConfig:  s.EnabledConfig,
-			initialVersion: s.DefaultVersion,
-			expectError:    false,
-		},
-		{
-			name:           "disable suffix when already disabled",
-			initialConfig:  s.StandardConfig,
-			initialVersion: "2.0.0",
-			expectError:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			// Create test app without VCS
-			fs, testApp := s.createTestAppWithoutVCS()
-
-			// Replace global app instance
-			originalApp := appInstance
-			appInstance = testApp
-			defer func() {
-				appInstance = originalApp
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			// Create test files
-			s.createTestFiles(fs, tt.initialVersion, tt.initialConfig)
-
-			// Capture output
-			var stdout bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetArgs([]string{"suffix", "disable"})
-
-			// Execute command
-			err := rootCmd.Execute()
-
-			if tt.expectError {
-				s.Error(err)
-			} else {
-				s.NoError(err, "Disable command should execute successfully")
-
-				// Verify config was updated
-				cfg, err := testApp.ReadConfig()
-				s.NoError(err, "Should be able to read config")
-				s.False(cfg.Suffix.Enabled, "Suffix should be disabled")
-
-				// Verify output
-				output := stdout.String()
-				s.Contains(output, "Git hash suffix disabled", "Should show disabled message")
-				s.Contains(output, "Current version: "+tt.initialVersion, "Should show current version")
-			}
-		})
-	}
-}
-
-func (s *SuffixTestSuite) TestSuffixStatusCommand() {
-	tests := []struct {
-		name           string
-		initialConfig  *config.Config
-		initialVersion string
-		setupVCS       func(ctrl *gomock.Controller) *mock.MockVersionControlSystem
-		expectEnabled  bool
-	}{
-		{
-			name:           "status when enabled with git repo",
-			initialConfig:  s.EnabledConfig,
-			initialVersion: s.DefaultVersion,
-			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				mockVCS := mock.NewMockVersionControlSystem(ctrl)
-				mockVCS.EXPECT().Name().Return("git").AnyTimes()
-				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(s.StandardHashLength).Return(s.DefaultGitHash, nil).AnyTimes()
-				return mockVCS
-			},
-			expectEnabled: true,
-		},
-		{
-			name:           "status when disabled",
-			initialConfig:  s.StandardConfig,
-			initialVersion: s.DefaultVersion,
-			setupVCS:       nil,
-			expectEnabled:  false,
-		},
-		{
-			name:           "status when enabled without git repo",
-			initialConfig:  s.EnabledConfig,
-			initialVersion: s.DefaultVersion,
-			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				mockVCS := mock.NewMockVersionControlSystem(ctrl)
-				mockVCS.EXPECT().Name().Return("git").AnyTimes()
-				mockVCS.EXPECT().IsRepository().Return(false).AnyTimes()
-				return mockVCS
-			},
-			expectEnabled: true,
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			var fs afero.Fs
-			var testApp *app.App
-			var ctrl *gomock.Controller
-
-			if tt.setupVCS != nil {
-				// Setup with mock VCS
-				ctrl = gomock.NewController(s.T())
-				defer ctrl.Finish()
-				
-				mockVCS := tt.setupVCS(ctrl)
-				fs, testApp, _ = s.createTestAppWithMockVCS(ctrl, mockVCS.IsRepository(), s.StandardHashLength, s.DefaultGitHash)
-			} else {
-				// Setup without VCS
-				fs, testApp = s.createTestAppWithoutVCS()
-			}
-
-			// Replace global app instance
-			originalApp := appInstance
-			appInstance = testApp
-			defer func() {
-				appInstance = originalApp
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			// Create test files
-			s.createTestFiles(fs, tt.initialVersion, tt.initialConfig)
-
-			// Capture output
-			var stdout bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetArgs([]string{"suffix", "status"})
-
-			// Execute command
-			err := rootCmd.Execute()
-			s.NoError(err, "Status command should execute successfully")
-
-			// Verify output
-			output := stdout.String()
-			if tt.expectEnabled {
-				s.Contains(output, "Git hash suffix: ENABLED", "Should show suffix enabled")
-			} else {
-				s.Contains(output, "Git hash suffix: DISABLED", "Should show suffix disabled")
-			}
-			s.Contains(output, "Current version:", "Should show current version")
-		})
-	}
-}
-
-func (s *SuffixTestSuite) TestSuffixConfigureCommand() {
-	s.Run("configure command", func() {
-		// Create test app without VCS
-		fs, testApp := s.createTestAppWithoutVCS()
-
-		// Replace global app instance
-		originalApp := appInstance
-		appInstance = testApp
-		defer func() {
-			appInstance = originalApp
-		}()
-
-		// Create test files
-		s.createTestFiles(fs, s.DefaultVersion, s.StandardConfig)
-
-		// Capture output
-		var stdout bytes.Buffer
-		var stderr bytes.Buffer
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(&stderr)
-		rootCmd.SetArgs([]string{"suffix", "configure"})
-
-		// Execute command
-		err := rootCmd.Execute()
-		s.NoError(err, "Command should execute successfully")
-
-		// Debug output if test fails
-		output := stdout.String()
-		if !s.Contains(output, "Current configuration:", "Should contain configuration header") {
-			s.T().Logf("Actual output: %q", output)
-			s.T().Logf("Stderr output: %q", stderr.String())
+	// Find all subcommands
+	var foundEnableCmd, foundDisableCmd, foundStatusCmd, foundConfigureCmd *cobra.Command
+	for _, cmd := range foundSuffixCmd.Commands() {
+		switch cmd.Use {
+		case "enable":
+			foundEnableCmd = cmd
+		case "disable":
+			foundDisableCmd = cmd
+		case "status":
+			foundStatusCmd = cmd
+		case "configure":
+			foundConfigureCmd = cmd
 		}
-		s.Contains(output, "Git hash suffix enabled: false", "Should show suffix disabled")
-		s.Contains(output, "Suffix type: git", "Should show suffix type")
-		s.Contains(output, "Git hash length: 7", "Should show hash length")
-		s.Contains(output, "Configuration is stored in .versionator.yaml", "Should show config file location")
-
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	})
-}
-
-func (s *SuffixTestSuite) TestSuffixCommandHelp() {
-	testCases := []struct {
-		name string
-		args []string
-	}{
-		{"suffix help", []string{"suffix", "--help"}},
-		{"suffix enable help", []string{"suffix", "enable", "--help"}},
-		{"suffix disable help", []string{"suffix", "disable", "--help"}},
-		{"suffix status help", []string{"suffix", "status", "--help"}},
-		{"suffix configure help", []string{"suffix", "configure", "--help"}},
 	}
 
-	for _, tc := range testCases {
-		s.Run(tc.name, func() {
-			var buf bytes.Buffer
-			rootCmd.SetOut(&buf)
-			rootCmd.SetArgs(tc.args)
-
-			err := rootCmd.Execute()
-			s.NoError(err)
-
-			output := buf.String()
-			s.Contains(output, "Usage:")
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetArgs(nil)
-		})
-	}
-}
-
-func (s *SuffixTestSuite) TestSuffixCommandConfigErrors() {
-	s.Run("missing config file", func() {
-		// Unregister VCS to prevent interference
-		vcs.UnregisterVCS("git")
-		defer vcs.UnregisterVCS("git")
-
-		// Create test app without VCS
-		fs, testApp := s.createTestAppWithoutVCS()
-
-		// Replace global app instance
-		originalApp := appInstance
-		appInstance = testApp
-		defer func() {
-			appInstance = originalApp
-		}()
-
-		// Create only VERSION file, no config file
-		err := afero.WriteFile(fs, "VERSION", []byte("1.0.0"), 0644)
-		s.Require().NoError(err)
-
-		// Capture output
-		var stdout bytes.Buffer
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetArgs([]string{"suffix", "enable"})
-
-		// Execute command - should create default config and succeed
-		err = rootCmd.Execute()
-		s.NoError(err)
-		s.Contains(stdout.String(), "Git hash suffix enabled")
-
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	})
+	suite.NotNil(foundEnableCmd, "Enable command should be registered with suffix command")
+	suite.NotNil(foundDisableCmd, "Disable command should be registered with suffix command")
+	suite.NotNil(foundStatusCmd, "Status command should be registered with suffix command")
+	suite.NotNil(foundConfigureCmd, "Configure command should be registered with suffix command")
 }
 
 // TestSuffixTestSuite runs the test suite

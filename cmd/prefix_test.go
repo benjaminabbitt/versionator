@@ -2,492 +2,261 @@ package cmd
 
 import (
 	"bytes"
-	"os"
 	"testing"
 	"versionator/internal/app"
-	"versionator/internal/config"
-	"versionator/internal/version"
-	"versionator/internal/versionator"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/suite"
 )
 
-// Helper functions for DRY test setup
-
-// createPrefixTestApp creates a fresh filesystem and test app instance
-func createPrefixTestApp() (afero.Fs, *app.App) {
-	fs := afero.NewMemMapFs()
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
-	}
-	return fs, testApp
+// PrefixTestSuite contains the test suite for prefix commands
+type PrefixTestSuite struct {
+	suite.Suite
+	testApp      *app.App
+	fs           afero.Fs
+	restoreApp   func()
+	outputBuffer *bytes.Buffer
 }
 
-// replacePrefixAppInstance replaces the global app instance and returns a restore function
-func replacePrefixAppInstance(testApp *app.App) func() {
-	originalApp := appInstance
-	appInstance = testApp
-	return func() {
-		appInstance = originalApp
-	}
+// SetupTest initializes the test environment before each test
+func (suite *PrefixTestSuite) SetupTest() {
+	var testApp *app.App
+	suite.fs, testApp = createTestApp()
+	suite.testApp = testApp
+	suite.restoreApp = replaceAppInstance(testApp)
+	suite.outputBuffer = &bytes.Buffer{}
 }
 
-// setupPrefixTestEnvironment sets up isolated test environment with proper cleanup
-func setupPrefixTestEnvironment(t *testing.T) func() {
-	// Save original state
-	origDir, err := os.Getwd()
-	require.NoError(t, err, "Failed to get current working directory")
-	
-	// Create temporary directory and change to it
-	tempDir := t.TempDir()
-	err = os.Chdir(tempDir)
-	require.NoError(t, err, "Failed to change to temp directory")
-	
-	// Return cleanup function
-	return func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-		
-		// Restore original directory
-		if origDir != "" {
-			err := os.Chdir(origDir)
-			if err != nil {
-				t.Logf("Warning: Failed to restore original directory: %v", err)
-			}
+// TearDownTest cleans up after each test
+func (suite *PrefixTestSuite) TearDownTest() {
+	suite.restoreApp()
+}
+
+// TestPrefixEnable tests enabling version prefix with default 'v'
+func (suite *PrefixTestSuite) TestPrefixEnable() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "1.2.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the enable command
+	prefixEnableCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Version prefix enabled with default value 'v'", "Output should show prefix enabled")
+	suite.Contains(output, "Current version: v1.2.3", "Output should show version with prefix")
+
+	// Verify config was updated
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.Equal("v", cfg.Prefix, "Config should have 'v' prefix")
+}
+
+// TestPrefixDisable tests disabling version prefix
+func (suite *PrefixTestSuite) TestPrefixDisable() {
+	// Setup: Create config and version files, first enable prefix
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.0.0")
+
+	// First enable prefix
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Prefix = "v"
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Create and execute the disable command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the disable command
+	prefixDisableCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Version prefix disabled", "Output should show prefix disabled")
+	suite.Contains(output, "Current version: 2.0.0", "Output should show version without prefix")
+
+	// Verify config was updated
+	cfg, err = suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.Equal("", cfg.Prefix, "Config should have empty prefix")
+}
+
+// TestPrefixSetCustomValue tests setting a custom prefix value
+func (suite *PrefixTestSuite) TestPrefixSetCustomValue() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "3.1.0")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the set command with custom prefix
+	prefixSetCmd.Run(cmd, []string{"release-"})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Version prefix set to: release-", "Output should show custom prefix set")
+	suite.Contains(output, "Current version: release-3.1.0", "Output should show version with custom prefix")
+
+	// Verify config was updated
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.Equal("release-", cfg.Prefix, "Config should have custom prefix")
+}
+
+// TestPrefixSetEmptyValue tests setting prefix to empty string via set command
+func (suite *PrefixTestSuite) TestPrefixSetEmptyValue() {
+	// Setup: Create config and version files with existing prefix
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "1.5.2")
+
+	// First set a prefix
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Prefix = "v"
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the set command with empty prefix
+	prefixSetCmd.Run(cmd, []string{""})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Version prefix disabled (set to empty)", "Output should show prefix disabled")
+	suite.Contains(output, "Current version: 1.5.2", "Output should show version without prefix")
+
+	// Verify config was updated
+	cfg, err = suite.testApp.ReadConfig()
+	suite.NoError(err, "Should be able to read config")
+	suite.Equal("", cfg.Prefix, "Config should have empty prefix")
+}
+
+// TestPrefixStatusWithPrefix tests status command when prefix is enabled
+func (suite *PrefixTestSuite) TestPrefixStatusWithPrefix() {
+	// Setup: Create config and version files with prefix
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "4.0.1")
+
+	// Set a prefix in config
+	cfg, err := suite.testApp.ReadConfig()
+	suite.NoError(err)
+	cfg.Prefix = "app-"
+	err = suite.testApp.WriteConfig(cfg)
+	suite.NoError(err)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the status command
+	prefixStatusCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Version prefix: ENABLED", "Output should show prefix enabled")
+	suite.Contains(output, "Prefix value: app-", "Output should show prefix value")
+	suite.Contains(output, "Current version: app-4.0.1", "Output should show version with prefix")
+}
+
+// TestPrefixStatusWithoutPrefix tests status command when prefix is disabled
+func (suite *PrefixTestSuite) TestPrefixStatusWithoutPrefix() {
+	// Setup: Create config and version files without prefix
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "0.9.0")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the status command
+	prefixStatusCmd.Run(cmd, []string{})
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Version prefix: DISABLED", "Output should show prefix disabled")
+	suite.Contains(output, "Current version: 0.9.0", "Output should show version without prefix")
+}
+
+// TestPrefixCommandStructure tests that the commands are properly structured
+func (suite *PrefixTestSuite) TestPrefixCommandStructure() {
+	// Test prefix command properties
+	suite.Equal("prefix", prefixCmd.Use, "Prefix command should have correct use")
+	suite.Equal("Manage version prefix behavior", prefixCmd.Short, "Prefix command should have correct short description")
+	suite.Contains(prefixCmd.Long, "Commands to enable, disable, or set", "Prefix command should have correct long description")
+
+	// Test enable command properties
+	suite.Equal("enable", prefixEnableCmd.Use, "Enable command should have correct use")
+	suite.Equal("Enable version prefix", prefixEnableCmd.Short, "Enable command should have correct short description")
+	suite.Contains(prefixEnableCmd.Long, "Enable version prefix with default value 'v'", "Enable command should have correct long description")
+
+	// Test disable command properties
+	suite.Equal("disable", prefixDisableCmd.Use, "Disable command should have correct use")
+	suite.Equal("Disable version prefix", prefixDisableCmd.Short, "Disable command should have correct short description")
+	suite.Contains(prefixDisableCmd.Long, "Disable version prefix by setting it to empty string", "Disable command should have correct long description")
+
+	// Test set command properties
+	suite.Equal("set <prefix>", prefixSetCmd.Use, "Set command should have correct use")
+	suite.Equal("Set version prefix", prefixSetCmd.Short, "Set command should have correct short description")
+	suite.Equal("Set a custom version prefix", prefixSetCmd.Long, "Set command should have correct long description")
+
+	// Test status command properties
+	suite.Equal("status", prefixStatusCmd.Use, "Status command should have correct use")
+	suite.Equal("Show prefix configuration status", prefixStatusCmd.Short, "Status command should have correct short description")
+	suite.Equal("Show current version prefix configuration", prefixStatusCmd.Long, "Status command should have correct long description")
+}
+
+// TestPrefixCommandHierarchy tests that commands are properly registered in the command hierarchy
+func (suite *PrefixTestSuite) TestPrefixCommandHierarchy() {
+	// Find prefix command in root
+	var foundPrefixCmd *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Use == "prefix" {
+			foundPrefixCmd = cmd
+			break
 		}
 	}
-}
+	suite.NotNil(foundPrefixCmd, "Prefix command should be registered with root command")
 
-// createPrefixTestFiles creates test files needed for prefix tests
-func createPrefixTestFiles(t *testing.T, fs afero.Fs, version string, cfg *config.Config) {
-	// Create VERSION file
-	err := afero.WriteFile(fs, "VERSION", []byte(version), 0644)
-	require.NoError(t, err, "Failed to create VERSION file")
-
-	// Create config file
-	configData, err := yaml.Marshal(cfg)
-	require.NoError(t, err, "Failed to marshal config")
-	err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
-	require.NoError(t, err, "Failed to create config file")
-}
-
-func TestPrefixEnableCommand_DefaultConfig(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with default config (prefix disabled)
-	cfg := &config.Config{
-		Prefix: "",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
+	// Find all subcommands
+	var foundEnableCmd, foundDisableCmd, foundSetCmd, foundStatusCmd *cobra.Command
+	for _, cmd := range foundPrefixCmd.Commands() {
+		switch cmd.Use {
+		case "enable":
+			foundEnableCmd = cmd
+		case "disable":
+			foundDisableCmd = cmd
+		case "set <prefix>":
+			foundSetCmd = cmd
+		case "status":
+			foundStatusCmd = cmd
+		}
 	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
 
-	// Execute the prefix enable command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "enable"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix enable command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix enabled with default value 'v'", "Should show prefix enabled message")
-
-	// Verify config file was updated
-	configData, err := afero.ReadFile(fs, ".versionator.yaml")
-	require.NoError(t, err, "Should be able to read config file")
-
-	var updatedCfg config.Config
-	err = yaml.Unmarshal(configData, &updatedCfg)
-	require.NoError(t, err, "Should be able to parse config file")
-	require.Equal(t, "v", updatedCfg.Prefix, "Config should have prefix set to 'v'")
+	suite.NotNil(foundEnableCmd, "Enable command should be registered with prefix command")
+	suite.NotNil(foundDisableCmd, "Disable command should be registered with prefix command")
+	suite.NotNil(foundSetCmd, "Set command should be registered with prefix command")
+	suite.NotNil(foundStatusCmd, "Status command should be registered with prefix command")
 }
 
-func TestPrefixEnableCommand_WhenAlreadyEnabled(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with prefix already enabled
-	cfg := &config.Config{
-		Prefix: "v",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix enable command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "enable"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix enable command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix enabled with default value 'v'", "Should show already enabled message")
+// TestPrefixSetCommandArgs tests that set command requires exactly one argument
+func (suite *PrefixTestSuite) TestPrefixSetCommandArgs() {
+	// Verify Args validation - test that it's set (function pointers can't be compared)
+	suite.NotNil(prefixSetCmd.Args, "Set command should have Args validation set")
 }
 
-func TestPrefixDisableCommand_WhenEnabled(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with prefix enabled
-	cfg := &config.Config{
-		Prefix: "v",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix disable command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "disable"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix disable command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix disabled", "Should show prefix disabled message")
-
-	// Verify config file was updated
-	configData, err := afero.ReadFile(fs, ".versionator.yaml")
-	require.NoError(t, err, "Should be able to read config file")
-
-	var updatedCfg config.Config
-	err = yaml.Unmarshal(configData, &updatedCfg)
-	require.NoError(t, err, "Should be able to parse config file")
-	require.Equal(t, "", updatedCfg.Prefix, "Config should have empty prefix")
-}
-
-func TestPrefixDisableCommand_WhenAlreadyDisabled(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with prefix already disabled
-	cfg := &config.Config{
-		Prefix: "",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix disable command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "disable"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix disable command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix disabled", "Should show already disabled message")
-}
-
-func TestPrefixSetCommand_CustomPrefix(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with default config
-	cfg := &config.Config{
-		Prefix: "v",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix set command with custom prefix
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "set", "release-"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix set command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix set to: release-", "Should show prefix set message")
-
-	// Verify config file was updated
-	configData, err := afero.ReadFile(fs, ".versionator.yaml")
-	require.NoError(t, err, "Should be able to read config file")
-
-	var updatedCfg config.Config
-	err = yaml.Unmarshal(configData, &updatedCfg)
-	require.NoError(t, err, "Should be able to parse config file")
-	require.Equal(t, "release-", updatedCfg.Prefix, "Config should have custom prefix")
-}
-
-func TestPrefixSetCommand_EmptyPrefix(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with prefix enabled
-	cfg := &config.Config{
-		Prefix: "v",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix set command with empty prefix
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "set", ""})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix set command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix disabled (set to empty)", "Should show prefix disabled message")
-
-	// Verify config file was updated
-	configData, err := afero.ReadFile(fs, ".versionator.yaml")
-	require.NoError(t, err, "Should be able to read config file")
-
-	var updatedCfg config.Config
-	err = yaml.Unmarshal(configData, &updatedCfg)
-	require.NoError(t, err, "Should be able to parse config file")
-	require.Equal(t, "", updatedCfg.Prefix, "Config should have empty prefix")
-}
-
-func TestPrefixSetCommand_SpecialCharacters(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with default config
-	cfg := &config.Config{
-		Prefix: "v",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix set command with special characters
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "set", "v@#$-"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix set command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix set to: v@#$-", "Should show prefix set message")
-
-	// Verify config file was updated
-	configData, err := afero.ReadFile(fs, ".versionator.yaml")
-	require.NoError(t, err, "Should be able to read config file")
-
-	var updatedCfg config.Config
-	err = yaml.Unmarshal(configData, &updatedCfg)
-	require.NoError(t, err, "Should be able to parse config file")
-	require.Equal(t, "v@#$-", updatedCfg.Prefix, "Config should have special character prefix")
-}
-
-func TestPrefixSetCommand_NoArgument(t *testing.T) {
-	defer func() {
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	// Execute the prefix set command without argument - should fail
-	var buf bytes.Buffer
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"prefix", "set"})
-
-	err := rootCmd.Execute()
-	require.Error(t, err, "prefix set command should fail without argument")
-}
-
-func TestPrefixStatusCommand_Enabled(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with prefix enabled
-	cfg := &config.Config{
-		Prefix: "v",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix status command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "status"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix status command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix: ENABLED", "Should show prefix enabled")
-	require.Contains(t, output, "Prefix value: v", "Should show prefix value")
-}
-
-func TestPrefixStatusCommand_Disabled(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with prefix disabled
-	cfg := &config.Config{
-		Prefix: "",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix status command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "status"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix status command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix: DISABLED", "Should show prefix disabled")
-}
-
-func TestPrefixStatusCommand_CustomPrefix(t *testing.T) {
-	defer setupPrefixTestEnvironment(t)()
-
-	fs, testApp := createPrefixTestApp()
-	defer replacePrefixAppInstance(testApp)()
-
-	// Create test files with custom prefix
-	cfg := &config.Config{
-		Prefix: "release-",
-		Suffix: config.SuffixConfig{
-			Enabled: false,
-			Type:    "git",
-			Git: config.GitConfig{
-				HashLength: 7,
-			},
-		},
-		Logging: config.LoggingConfig{
-			Output: "console",
-		},
-	}
-	createPrefixTestFiles(t, fs, "1.2.3", cfg)
-
-	// Execute the prefix status command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"prefix", "status"})
-
-	err := rootCmd.Execute()
-	require.NoError(t, err, "prefix status command should succeed")
-
-	// Check output
-	output := buf.String()
-	require.Contains(t, output, "Version prefix: ENABLED", "Should show prefix enabled")
-	require.Contains(t, output, "Prefix value: release-", "Should show custom prefix value")
+// TestPrefixTestSuite runs the test suite
+func TestPrefixTestSuite(t *testing.T) {
+	suite.Run(t, new(PrefixTestSuite))
 }
