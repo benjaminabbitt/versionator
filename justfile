@@ -125,13 +125,15 @@ build-all:
     echo "Building for macOS amd64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-amd64 .
     echo "Compressing macOS amd64 binary with UPX..."
-    upx --best --lzma bin/versionator-darwin-amd64
+    # MacOS is not supported
+    # upx --best --lzma bin/versionator-darwin-amd64
 
     # macOS arm64 (Apple Silicon)
     echo "Building for macOS arm64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-arm64 .
     echo "Compressing macOS arm64 binary with UPX..."
-    upx --best --lzma bin/versionator-darwin-arm64
+    # MacOS is not supported
+    #upx --best --lzma bin/versionator-darwin-arm64
 
     # Windows amd64
     echo "Building for Windows amd64..."
