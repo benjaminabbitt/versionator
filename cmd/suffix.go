@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"versionator/internal/logging"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -18,18 +18,18 @@ var suffixEnableCmd = &cobra.Command{
 	Short: "Enable VCS identifier suffix",
 	Long:  "Enable appending VCS identifier to version numbers (format: version-identifier)",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
-
 		cfg, err := appInstance.ReadConfig()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			cmd.Printf("Error reading config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cfg.Suffix.Enabled = true
 		cfg.Suffix.Type = "git"
 
 		if err := appInstance.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
+			cmd.Printf("Error writing config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Println("Git hash suffix enabled")
@@ -37,7 +37,8 @@ var suffixEnableCmd = &cobra.Command{
 		// Show current version with suffix
 		version, err := appInstance.GetVersionWithSuffix()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			cmd.Printf("Error getting version: %v\n", err)
+			os.Exit(1)
 		}
 
 		// Use the VCS from app instance instead of global registry
@@ -54,17 +55,17 @@ var suffixDisableCmd = &cobra.Command{
 	Short: "Disable git hash suffix",
 	Long:  "Disable appending git hash to version numbers",
 	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
-
 		cfg, err := appInstance.ReadConfig()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			cmd.Printf("Error reading config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cfg.Suffix.Enabled = false
 
 		if err := appInstance.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
+			cmd.Printf("Error writing config: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Println("Git hash suffix disabled")
@@ -72,7 +73,8 @@ var suffixDisableCmd = &cobra.Command{
 		// Show current version without suffix
 		version, err := appInstance.GetCurrentVersion()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			cmd.Printf("Error getting version: %v\n", err)
+			os.Exit(1)
 		}
 
 		cmd.Printf("Current version: %s\n", version)
