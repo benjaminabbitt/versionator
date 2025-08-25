@@ -108,48 +108,73 @@ build-all:
     # Get version information
     VERSION=$(./bin/versionator version 2>/dev/null || cat VERSION 2>/dev/null || echo "dev")
     echo "Building with version: $VERSION"
+    echo ""
+
+    # Function to format file size
+    format_size() {
+        local size=$1
+        if [ $size -ge 1048576 ]; then
+            echo "$(echo "scale=2; $size / 1048576" | bc)MB"
+        elif [ $size -ge 1024 ]; then
+            echo "$(echo "scale=1; $size / 1024" | bc)KB"
+        else
+            echo "${size}B"
+        fi
+    }
+
+    # Function to show compression stats
+    show_compression() {
+        local binary=$1
+        local before_size=$(stat -f%z "$binary" 2>/dev/null || stat -c%s "$binary" 2>/dev/null)
+        echo "  Before: $(format_size $before_size)"
+        upx --best --lzma "$binary"
+        local after_size=$(stat -f%z "$binary" 2>/dev/null || stat -c%s "$binary" 2>/dev/null)
+        local compression_ratio=$(echo "scale=1; (1 - $after_size / $before_size) * 100" | bc)
+        echo "  After:  $(format_size $after_size) (${compression_ratio}% compression)"
+        echo ""
+    }
 
     # Linux amd64
     echo "Building for Linux amd64..."
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-linux-amd64 .
     echo "Compressing Linux amd64 binary with UPX..."
-    upx --best --lzma bin/versionator-linux-amd64
+    show_compression bin/versionator-linux-amd64
 
     # Linux arm64
     echo "Building for Linux arm64..."
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-linux-arm64 .
     echo "Compressing Linux arm64 binary with UPX..."
-    upx --best --lzma bin/versionator-linux-arm64
+    show_compression bin/versionator-linux-arm64
 
     # macOS amd64 (Intel)
     echo "Building for macOS amd64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-amd64 .
     echo "Compressing macOS amd64 binary with UPX..."
-    upx --best --lzma bin/versionator-darwin-amd64
+    show_compression bin/versionator-darwin-amd64
 
     # macOS arm64 (Apple Silicon)
     echo "Building for macOS arm64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-darwin-arm64 .
     echo "Compressing macOS arm64 binary with UPX..."
-    upx --best --lzma bin/versionator-darwin-arm64
+    show_compression bin/versionator-darwin-arm64
 
     # Windows amd64
     echo "Building for Windows amd64..."
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-windows-amd64.exe .
     echo "Compressing Windows amd64 binary with UPX..."
-    upx --best --lzma bin/versionator-windows-amd64.exe
+    show_compression bin/versionator-windows-amd64.exe
 
     # Windows arm64
     echo "Building for Windows arm64..."
     CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-windows-arm64.exe .
     echo "Compressing Windows arm64 binary with UPX..."
-    upx --best --lzma bin/versionator-windows-arm64.exe
+    show_compression bin/versionator-windows-arm64.exe
 
     # FreeBSD amd64
     echo "Building for FreeBSD amd64..."
     CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-freebsd-amd64 .
     echo "Compressing FreeBSD amd64 binary with UPX..."
-    upx --best --lzma bin/versionator-freebsd-amd64
+    show_compression bin/versionator-freebsd-amd64
 
     echo "All builds and UPX compression completed successfully!"
     echo "Build artifacts:"
