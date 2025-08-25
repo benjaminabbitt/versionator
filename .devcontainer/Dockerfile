@@ -86,6 +86,11 @@ RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
     go install golang.org/x/tools/cmd/goimports@latest && \
     go install github.com/go-delve/delve/cmd/dlv@latest
 
+# Install lefthook for git hooks management
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh' | sudo bash && \
+    sudo apt-get update && \
+    sudo apt-get install lefthook -y
+
 # Install Rust for developer user
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ENV PATH="/home/developer/.cargo/bin:$PATH"

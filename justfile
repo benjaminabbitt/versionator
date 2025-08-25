@@ -42,7 +42,7 @@ run *args: build
 
 # Install the binary to /usr/local/bin
 install: build
-    sudo cp bin/versionator /usr/local/bin/
+    sudo cp bin/application /usr/local/bin/
 
 # Clean build artifacts
 clean:
@@ -133,10 +133,53 @@ build-all:
     echo "Build artifacts:"
     ls -la bin/
 
+# Install and setup lefthook git hooks
+lefthook-install:
+    #!/bin/zsh
+    set -e
+    if ! command -v lefthook >/dev/null 2>&1; then
+        echo "lefthook not found. Installing..."
+        # Install lefthook via package manager or binary download
+        if command -v apt-get >/dev/null 2>&1; then
+            curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh' | sudo bash
+            sudo apt-get update && sudo apt-get install lefthook -y
+        elif command -v brew >/dev/null 2>&1; then
+            brew install lefthook
+        else
+            echo "Please install lefthook manually from https://github.com/evilmartians/lefthook"
+            exit 1
+        fi
+    fi
+    echo "Installing lefthook hooks..."
+    lefthook install
+    echo "Lefthook hooks installed successfully!"
+
+# Update lefthook hooks
+lefthook-update:
+    lefthook install
+
+# Run lefthook hooks manually
+lefthook-run hook:
+    lefthook run {{hook}}
+
+# Uninstall lefthook hooks
+lefthook-uninstall:
+    lefthook uninstall
+
+# Check lefthook status and configuration
+lefthook-status:
+    @echo "=== Lefthook Status ==="
+    @lefthook version
+    @echo ""
+    @echo "Installed hooks:"
+    @ls -la .git/hooks/ 2>/dev/null || echo "No git hooks found"
+    @echo ""
+    @echo "Configuration file:"
+    @ls -la lefthook.yml 2>/dev/null || echo "No lefthook.yml found"
+
 # Show project status
 status:
     @echo "=== Versionator Project Status ==="
-    @echo "Go version:"
     @go version
     @echo ""
     @echo "Current version:"
@@ -145,6 +188,11 @@ status:
     @echo "Git Commands:"
     @echo "  commit          - Create git tag for current version"
     @echo "  commit-with-message MSG - Create git tag with custom message"
+    @echo ""
+    @echo "Lefthook Commands:"
+    @echo "  lefthook-install - Install git hooks with lefthook"
+    @echo "  lefthook-status  - Show lefthook status"
+    @echo "  lefthook-run     - Run specific hook manually"
     @echo ""
     @echo "Module status:"
     @GO111MODULE=on go list -m all

@@ -31,7 +31,7 @@ func (suite *SuffixTestSuite) SetupTest() {
 	suite.testApp = testApp
 	suite.restoreApp = replaceAppInstance(testApp)
 	suite.outputBuffer = &bytes.Buffer{}
-	
+
 	// Set up gomock controller and mock VCS
 	suite.ctrl = gomock.NewController(suite.T())
 	suite.mockVCS = mock.NewMockVersionControlSystem(suite.ctrl)
@@ -105,7 +105,7 @@ func (suite *SuffixTestSuite) TestSuffixEnableWithNilVCS() {
 	// Setup: Create config and version files with no VCS
 	createConfigFile(suite.T(), suite.fs)
 	createVersionFile(suite.T(), suite.fs, "3.1.0")
-	
+
 	// Set VCS to nil
 	suite.testApp.VCS = nil
 
@@ -319,7 +319,7 @@ func (suite *SuffixTestSuite) TestSuffixConfigure() {
 	suite.Contains(output, "Git hash suffix enabled: true", "Output should show enabled status")
 	suite.Contains(output, "Suffix type: git", "Output should show suffix type")
 	suite.Contains(output, "Git hash length: 8", "Output should show hash length")
-	suite.Contains(output, "Configuration is stored in .versionator.yaml", "Output should show config file location")
+	suite.Contains(output, "Configuration is stored in .application.yaml", "Output should show config file location")
 }
 
 // TestSuffixCommandStructure tests that the commands are properly structured

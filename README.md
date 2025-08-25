@@ -8,15 +8,15 @@ Download the pre-compiled binary for your platform from [GitHub Releases](https:
 
 ```bash
 # Show current version
-./versionator version
+./application version
 
 # Increment versions
-./versionator major inc     # 1.0.0 → 2.0.0
-./versionator minor inc     # 1.0.0 → 1.1.0  
-./versionator patch inc     # 1.0.0 → 1.0.1
+./application major inc     # 1.0.0 → 2.0.0
+./application minor inc     # 1.0.0 → 1.1.0  
+./application patch inc     # 1.0.0 → 1.0.1
 
 # Create git tag
-./versionator commit
+./application commit
 ```
 
 ## Integration Examples

@@ -1,4 +1,4 @@
-c# Build the sample application with version from versionator
+c# Build the sample application with version from application
 
 SHELL := /bin/zsh
 
