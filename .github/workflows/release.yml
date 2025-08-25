@@ -65,11 +65,60 @@ jobs:
           sha256sum * > checksums.txt
           ls -la
 
-    - name: Upload release artifacts
+    - name: Upload Linux amd64 binary
       uses: actions/upload-artifact@v4
       with:
-        name: application-release-${{ steps.tag_version.outputs.version }}
-        path: release/
+        name: versionator-${{ steps.tag_version.outputs.version }}-linux-amd64
+        path: release/versionator-${{ steps.tag_version.outputs.version }}-linux-amd64
+        retention-days: 90
+
+    - name: Upload Linux arm64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-${{ steps.tag_version.outputs.version }}-linux-arm64
+        path: release/versionator-${{ steps.tag_version.outputs.version }}-linux-arm64
+        retention-days: 90
+
+    - name: Upload macOS amd64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-${{ steps.tag_version.outputs.version }}-darwin-amd64
+        path: release/versionator-${{ steps.tag_version.outputs.version }}-darwin-amd64
+        retention-days: 90
+
+    - name: Upload macOS arm64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-${{ steps.tag_version.outputs.version }}-darwin-arm64
+        path: release/versionator-${{ steps.tag_version.outputs.version }}-darwin-arm64
+        retention-days: 90
+
+    - name: Upload Windows amd64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-${{ steps.tag_version.outputs.version }}-windows-amd64.exe
+        path: release/versionator-${{ steps.tag_version.outputs.version }}-windows-amd64.exe
+        retention-days: 90
+
+    - name: Upload Windows arm64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-${{ steps.tag_version.outputs.version }}-windows-arm64.exe
+        path: release/versionator-${{ steps.tag_version.outputs.version }}-windows-arm64.exe
+        retention-days: 90
+
+    - name: Upload FreeBSD amd64 binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: versionator-${{ steps.tag_version.outputs.version }}-freebsd-amd64
+        path: release/versionator-${{ steps.tag_version.outputs.version }}-freebsd-amd64
+        retention-days: 90
+
+    - name: Upload checksums
+      uses: actions/upload-artifact@v4
+      with:
+        name: checksums-${{ steps.tag_version.outputs.version }}.txt
+        path: release/checksums.txt
         retention-days: 90
 
     - name: Create Release
