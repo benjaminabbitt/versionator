@@ -74,6 +74,9 @@ jobs:
         name: application-binaries
         path: bin/
 
+    - name: What do we have here?
+      run: ls bin
+
     - name: Make binary executable
       run: chmod +x bin/application-linux-amd64
 
