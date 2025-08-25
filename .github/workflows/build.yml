@@ -78,10 +78,10 @@ jobs:
       run: ls bin
 
     - name: What do we have here?
-      run: file bin/application-linux-amd64
+      run: file bin/versionator-linux-amd64
 
     - name: Make binary executable
-      run: chmod +x bin/application-linux-amd64
+      run: chmod +x bin/versionator-linux-amd64
 
     - name: Integration test
       run: |
