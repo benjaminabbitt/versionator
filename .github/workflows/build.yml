@@ -76,19 +76,13 @@ jobs:
         name: application-binaries
         path: bin/
 
-    - name: What do we have here?
-      run: ls bin
-
-    - name: What do we have here?
-      run: file bin/${{ env.LINUX_BINARY }}
-
     - name: Make binary executable
       run: chmod +x bin/${{ env.LINUX_BINARY }}
 
     - name: Integration test
       run: |
-        # Initialize VERSION file
-        echo "1.0.0" > VERSION
+        # Initialize VERSION file without BOM
+        printf "1.0.0" > VERSION
 
         # Test version reading
         VERSION=$(./bin/${{ env.LINUX_BINARY }} version)

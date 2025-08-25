@@ -210,6 +210,6 @@ go list -u -m all
 go mod verify
 ```
 
+## Cleanup
+Clean up all test scripts and ai/ml generated support tooling after every command.
 ---
-
-**Remember: This project does NOT maintain backwards compatibility. Breaking changes can and will be introduced without notice or migration paths.**
