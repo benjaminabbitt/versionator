@@ -226,4 +226,6 @@ status:
     @echo "Build status:"
     @ls -la bin/ 2>/dev/null || echo "No build artifacts found"
 
-
+get-versionator:
+    mkdir -p bin
+    curl https://github.com/benjaminabbitt/versionator/releases/latest/versionator-windows-amd64.exe -o bin/versionator.exe
