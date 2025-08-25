@@ -1,0 +1,79 @@
+# Lefthook configuration for Go development
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    # Format Go code
+    fmt:
+      glob: "*.go"
+      run: go fmt ./...
+      stage_fixed: true
+    
+    # Import formatting
+    imports:
+      glob: "*.go"
+      run: goimports -w {staged_files}
+      stage_fixed: true
+    
+    # Go vet for static analysis
+    vet:
+      glob: "*.go"
+      run: go vet ./...
+    
+    # Run golangci-lint
+    lint:
+      glob: "*.go"
+      run: golangci-lint run --new-from-rev=HEAD~1
+      skip:
+        - merge
+        - rebase
+
+pre-push:
+  parallel: true
+  commands:
+    # Run tests
+    test:
+      run: go test ./...
+      skip:
+        - merge
+        - rebase
+    
+    # Run tests with race detection
+    test-race:
+      run: go test -race ./...
+      skip:
+        - merge
+        - rebase
+    
+    # Check module tidiness
+    mod-tidy:
+      run: |
+        go mod tidy
+        if [ -n "$(git status --porcelain go.mod go.sum)" ]; then
+          echo "go.mod or go.sum needs to be updated. Run 'go mod tidy' and commit the changes."
+          exit 1
+        fi
+      skip:
+        - merge
+        - rebase
+
+commit-msg:
+  commands:
+    # Check commit message format (basic check)
+    format:
+      run: |
+        if ! grep -qE "^(feat|fix|docs|style|refactor|test|chore|ci|build|perf)(\(.+\))?: .{1,50}" {1}; then
+          echo "Commit message should follow conventional commits format:"
+          echo "  type(scope): description"
+          echo "  Types: feat, fix, docs, style, refactor, test, chore, ci, build, perf"
+          echo "  Example: feat(auth): add user authentication"
+          exit 1
+        fi
+
+# Skip hooks for specific scenarios
+skip_output:
+  - meta
+  - summary
+
+colors: true

@@ -24,7 +24,7 @@ The mock VCS allows you to test code that depends on version control operations 
 import (
     "testing"
     "github.com/golang/mock/gomock"
-    "versionator/internal/vcs/mock"
+    "application/internal/vcs/mock"
 )
 
 func TestYourFunction(t *testing.T) {

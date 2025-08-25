@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-const configFile = ".versionator.yaml"
+const configFile = ".application.yaml"
 
 // Config holds configuration for version suffix behavior
 type Config struct {
@@ -44,8 +44,7 @@ func NewConfigManager(fs afero.Fs) *ConfigManager {
 	return &ConfigManager{fs: fs}
 }
 
-
-// ReadConfig reads the configuration from .versionator.yaml file
+// ReadConfig reads the configuration from .application.yaml file
 func (cm *ConfigManager) ReadConfig() (*Config, error) {
 	config := &Config{
 		Prefix: "v", // default prefix
@@ -78,7 +77,7 @@ func (cm *ConfigManager) ReadConfig() (*Config, error) {
 	return config, nil
 }
 
-// WriteConfig writes the configuration to .versionator.yaml file
+// WriteConfig writes the configuration to .application.yaml file
 func (cm *ConfigManager) WriteConfig(config *Config) error {
 	data, err := yaml.Marshal(config)
 	if err != nil {
@@ -89,6 +88,3 @@ func (cm *ConfigManager) WriteConfig(config *Config) error {
 	content := "# Versionator Configuration\n" + string(data)
 	return afero.WriteFile(cm.fs, configFile, []byte(content), 0644)
 }
-
-
-

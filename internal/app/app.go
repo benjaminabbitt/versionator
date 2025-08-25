@@ -1,11 +1,11 @@
 package app
 
 import (
+	"versionator/internal/application"
 	"versionator/internal/config"
 	"versionator/internal/vcs"
 	"versionator/internal/vcs/git"
 	"versionator/internal/version"
-	"versionator/internal/versionator"
 
 	"github.com/spf13/afero"
 )
@@ -14,7 +14,7 @@ import (
 type App struct {
 	ConfigManager  *config.ConfigManager
 	VersionManager *version.Version
-	Versionator    *versionator.Versionator
+	Versionator    *application.Versionator
 	VCS            vcs.VersionControlSystem
 	FileSystem     afero.Fs
 }
@@ -26,7 +26,7 @@ func NewApp() *App {
 	return &App{
 		ConfigManager:  config.NewConfigManager(fs),
 		VersionManager: version.NewVersion(fs, ".", gitVCS),
-		Versionator:    versionator.NewVersionator(fs, gitVCS),
+		Versionator:    application.NewVersionator(fs, gitVCS),
 		VCS:            gitVCS,
 		FileSystem:     fs,
 	}

@@ -1,4 +1,4 @@
-# Build the sample application with version from versionator
+# Build the sample application with version from application
 
 SHELL := /bin/zsh
 

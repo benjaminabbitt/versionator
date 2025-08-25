@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 	"versionator/internal/app"
+	"versionator/internal/application"
 	"versionator/internal/config"
 	"versionator/internal/version"
-	"versionator/internal/versionator"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ func createTestApp() (afero.Fs, *app.App) {
 	testApp := &app.App{
 		ConfigManager:  config.NewConfigManager(fs),
 		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
+		Versionator:    application.NewVersionator(fs, nil),
 		VCS:            nil,
 		FileSystem:     fs,
 	}
@@ -43,7 +43,7 @@ logging:
 
 // createConfigFile creates the standard config file in the filesystem
 func createConfigFile(t *testing.T, fs afero.Fs) {
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(getStandardConfigContent()), 0644)
+	err := afero.WriteFile(fs, ".application.yaml", []byte(getStandardConfigContent()), 0644)
 	require.NoError(t, err, "Failed to create config file")
 }
 

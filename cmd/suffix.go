@@ -133,7 +133,7 @@ var suffixConfigureCmd = &cobra.Command{
 		cmd.Printf("  Git hash suffix enabled: %t\n", cfg.Suffix.Enabled)
 		cmd.Printf("  Suffix type: %s\n", cfg.Suffix.Type)
 		cmd.Printf("  Git hash length: %d\n", cfg.Suffix.Git.HashLength)
-		cmd.Printf("\nConfiguration is stored in .versionator.yaml\n")
+		cmd.Printf("\nConfiguration is stored in .application.yaml\n")
 		return nil
 	},
 }

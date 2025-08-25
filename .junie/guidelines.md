@@ -33,7 +33,7 @@ go test -cover ./...
 
 # Run tests for specific package
 go test ./internal/config/
-go test ./internal/versionator/
+go test ./internal/application/
 go test ./internal/vcs/
 go test ./cmd/
 ```
@@ -46,7 +46,7 @@ go test ./cmd/
 # Standard build
 just build
 # OR
-go build -o bin/versionator .
+go build -o bin/application .
 
 # Verbose build (for debugging)
 just build-verbose
@@ -54,7 +54,7 @@ just build-verbose
 # Run application with arguments
 just run [args]
 # OR
-./bin/versionator [args]
+./bin/application [args]
 ```
 
 ### Cross-Platform Builds

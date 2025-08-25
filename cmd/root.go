@@ -12,7 +12,7 @@ var appInstance *app.App
 var logOutput string
 
 var rootCmd = &cobra.Command{
-	Use:   "versionator",
+	Use:   "application",
 	Short: "A semantic version management tool",
 	Long: `Versionator is a CLI tool for managing semantic versions.
 It allows you to increment and decrement major, minor, and patch versions
@@ -41,7 +41,7 @@ func Execute() error {
 func init() {
 	// Initialize the app with all dependencies
 	appInstance = app.NewApp()
-	
+
 	// Add persistent flag for log output format
 	rootCmd.PersistentFlags().StringVar(&logOutput, "log-format", "console", "Log output format (console, json, development)")
 
