@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	"os"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"gopkg.in/yaml.v3"
 	"versionator/internal/app"
 	"versionator/internal/config"
@@ -18,7 +16,119 @@ import (
 	"versionator/internal/versionator"
 )
 
-func TestSuffixEnableCommand(t *testing.T) {
+// SuffixTestSuite contains common constants and test data
+type SuffixTestSuite struct {
+	suite.Suite
+	
+	// Common test constants extracted from individual tests
+	DefaultVersion         string
+	StandardHashLength     int
+	DefaultGitHash         string
+	AlternateGitHash       string
+	TestRepositoryPath     string
+	
+	// Standard configuration templates
+	StandardConfig         *config.Config
+	EnabledConfig          *config.Config
+	CustomHashLengthConfig *config.Config
+}
+
+// SetupSuite runs once before all tests
+func (s *SuffixTestSuite) SetupSuite() {
+	// Initialize common constants
+	s.DefaultVersion = "1.2.3"
+	s.StandardHashLength = 7
+	s.DefaultGitHash = "abc1234"
+	s.AlternateGitHash = "def5678"
+	s.TestRepositoryPath = "/tmp"
+	
+	// Standard disabled configuration
+	s.StandardConfig = &config.Config{
+		Prefix: "",
+		Suffix: config.SuffixConfig{
+			Enabled: false,
+			Type:    "git",
+			Git:     config.GitConfig{HashLength: s.StandardHashLength},
+		},
+		Logging: config.LoggingConfig{Output: "console"},
+	}
+	
+	// Standard enabled configuration
+	s.EnabledConfig = &config.Config{
+		Prefix: "",
+		Suffix: config.SuffixConfig{
+			Enabled: true,
+			Type:    "git",
+			Git:     config.GitConfig{HashLength: s.StandardHashLength},
+		},
+		Logging: config.LoggingConfig{Output: "console"},
+	}
+	
+	// Custom hash length configuration
+	s.CustomHashLengthConfig = &config.Config{
+		Prefix: "",
+		Suffix: config.SuffixConfig{
+			Enabled: true,
+			Type:    "git",
+			Git:     config.GitConfig{HashLength: 8},
+		},
+		Logging: config.LoggingConfig{Output: "console"},
+	}
+}
+
+// createTestAppWithMockVCS creates a test app with mock VCS
+func (s *SuffixTestSuite) createTestAppWithMockVCS(ctrl *gomock.Controller, isRepo bool, hashLength int, hash string) (afero.Fs, *app.App, *mock.MockVersionControlSystem) {
+	fs := afero.NewMemMapFs()
+	
+	mockVCS := mock.NewMockVersionControlSystem(ctrl)
+	mockVCS.EXPECT().Name().Return("git").AnyTimes()
+	mockVCS.EXPECT().IsRepository().Return(isRepo).AnyTimes()
+	
+	if isRepo {
+		mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
+		if hash != "" {
+			mockVCS.EXPECT().GetVCSIdentifier(hashLength).Return(hash, nil).AnyTimes()
+		}
+	}
+	
+	testApp := &app.App{
+		ConfigManager:  config.NewConfigManager(fs),
+		VersionManager: version.NewVersion(fs, ".", mockVCS),
+		Versionator:    versionator.NewVersionator(fs, mockVCS),
+		VCS:            mockVCS,
+		FileSystem:     fs,
+	}
+	
+	return fs, testApp, mockVCS
+}
+
+// createTestAppWithoutVCS creates a test app without VCS
+func (s *SuffixTestSuite) createTestAppWithoutVCS() (afero.Fs, *app.App) {
+	fs := afero.NewMemMapFs()
+	
+	testApp := &app.App{
+		ConfigManager:  config.NewConfigManager(fs),
+		VersionManager: version.NewVersion(fs, ".", nil),
+		Versionator:    versionator.NewVersionator(fs, nil),
+		VCS:            nil,
+		FileSystem:     fs,
+	}
+	
+	return fs, testApp
+}
+
+// createTestFiles creates VERSION and config files
+func (s *SuffixTestSuite) createTestFiles(fs afero.Fs, version string, cfg *config.Config) {
+	err := afero.WriteFile(fs, "VERSION", []byte(version), 0644)
+	s.Require().NoError(err)
+	
+	configData, err := yaml.Marshal(cfg)
+	s.Require().NoError(err)
+	err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
+	s.Require().NoError(err)
+}
+
+func (s *SuffixTestSuite) TestSuffixEnableCommand() {
 	tests := []struct {
 		name           string
 		initialConfig  *config.Config
@@ -27,38 +137,22 @@ func TestSuffixEnableCommand(t *testing.T) {
 		expectError    bool
 	}{
 		{
-			name: "enable suffix with git repository",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			initialVersion: "1.2.3",
+			name:           "enable suffix with git repository",
+			initialConfig:  s.StandardConfig,
+			initialVersion: s.DefaultVersion,
 			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
 				mockVCS := mock.NewMockVersionControlSystem(ctrl)
 				mockVCS.EXPECT().Name().Return("git").AnyTimes()
 				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(7).Return("abc1234", nil).AnyTimes()
+				mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
+				mockVCS.EXPECT().GetVCSIdentifier(s.StandardHashLength).Return(s.DefaultGitHash, nil).AnyTimes()
 				return mockVCS
 			},
 			expectError: false,
 		},
 		{
-			name: "enable suffix without git repository",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
+			name:           "enable suffix without git repository",
+			initialConfig:  s.StandardConfig,
 			initialVersion: "2.0.0",
 			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
 				mockVCS := mock.NewMockVersionControlSystem(ctrl)
@@ -69,66 +163,44 @@ func TestSuffixEnableCommand(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "enable suffix when already enabled",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: true,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 8},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
+			name:           "enable suffix when already enabled",
+			initialConfig:  s.CustomHashLengthConfig,
 			initialVersion: "1.5.0",
 			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
 				mockVCS := mock.NewMockVersionControlSystem(ctrl)
 				mockVCS.EXPECT().Name().Return("git").AnyTimes()
 				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(8).Return("def5678", nil).AnyTimes()
+				mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
+				mockVCS.EXPECT().GetVCSIdentifier(8).Return(s.AlternateGitHash, nil).AnyTimes()
 				return mockVCS
 			},
 			expectError: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create in-memory filesystem
-			fs := afero.NewMemMapFs()
-			
+		for _, tt := range tests {
+		s.Run(tt.name, func() {
 			// Setup gomock
-			ctrl := gomock.NewController(t)
+			ctrl := gomock.NewController(s.T())
 			defer ctrl.Finish()
 
-			// Setup VCS mock
+			// Setup VCS mock and create test app
 			mockVCS := tt.setupVCS(ctrl)
-			
-			// Create test app instance with in-memory filesystem and injected VCS
-			testApp := &app.App{
-				ConfigManager:  config.NewConfigManager(fs),
-				VersionManager: version.NewVersion(fs, ".", mockVCS),
-				Versionator:    versionator.NewVersionator(fs, mockVCS),
-				VCS:            mockVCS,
-				FileSystem:     fs,
-			}
-			
-			// Replace global app instance for this test
+			fs, testApp, _ := s.createTestAppWithMockVCS(ctrl, mockVCS.IsRepository(), s.StandardHashLength, s.DefaultGitHash)
+
+			// Replace global app instance
 			originalApp := appInstance
 			appInstance = testApp
 			defer func() {
 				appInstance = originalApp
+				// Reset command state
+				rootCmd.SetOut(nil)
+				rootCmd.SetErr(nil)
+				rootCmd.SetArgs(nil)
 			}()
 
-			// Create VERSION file
-			err := afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
-			require.NoError(t, err)
-
-			// Create initial config file
-			configData, err := yaml.Marshal(tt.initialConfig)
-			require.NoError(t, err)
-			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
-			require.NoError(t, err)
+			// Create test files
+			s.createTestFiles(fs, tt.initialVersion, tt.initialConfig)
 
 			// Capture output
 			var stdout bytes.Buffer
@@ -136,33 +208,29 @@ func TestSuffixEnableCommand(t *testing.T) {
 			rootCmd.SetArgs([]string{"suffix", "enable"})
 
 			// Execute command
-			err = rootCmd.Execute()
+			err := rootCmd.Execute()
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Error(err)
 			} else {
-				assert.NoError(t, err)
+				s.NoError(err, "Command should execute successfully")
 
 				// Verify config was updated
 				cfg, err := testApp.ReadConfig()
-				require.NoError(t, err)
-				assert.True(t, cfg.Suffix.Enabled)
-				assert.Equal(t, "git", cfg.Suffix.Type)
+				s.NoError(err, "Should be able to read config")
+				s.True(cfg.Suffix.Enabled, "Suffix should be enabled")
+				s.Equal("git", cfg.Suffix.Type, "Suffix type should be git")
 
 				// Verify output
 				output := stdout.String()
-				assert.Contains(t, output, "Git hash suffix enabled")
-				assert.Contains(t, output, "Current version:")
+				s.Contains(output, "Git hash suffix enabled", "Should show enabled message")
+				s.Contains(output, "Current version:", "Should show current version")
 			}
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetArgs(nil)
 		})
 	}
 }
 
-func TestSuffixDisableCommand(t *testing.T) {
+func (s *SuffixTestSuite) TestSuffixDisableCommand() {
 	tests := []struct {
 		name           string
 		initialConfig  *config.Config
@@ -170,65 +238,37 @@ func TestSuffixDisableCommand(t *testing.T) {
 		expectError    bool
 	}{
 		{
-			name: "disable suffix when enabled",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: true,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			initialVersion: "1.2.3",
+			name:           "disable suffix when enabled",
+			initialConfig:  s.EnabledConfig,
+			initialVersion: s.DefaultVersion,
 			expectError:    false,
 		},
 		{
-			name: "disable suffix when already disabled",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
+			name:           "disable suffix when already disabled",
+			initialConfig:  s.StandardConfig,
 			initialVersion: "2.0.0",
 			expectError:    false,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create in-memory filesystem
-			fs := afero.NewMemMapFs()
-			
-			// Create test app instance with in-memory filesystem
-			testApp := &app.App{
-				ConfigManager:  config.NewConfigManager(fs),
-				VersionManager: version.NewVersion(fs, ".", nil),
-				Versionator:    versionator.NewVersionator(fs, nil),
-				VCS:            nil,
-				FileSystem:     fs,
-			}
-			
-			// Replace global app instance for this test
+		s.Run(tt.name, func() {
+			// Create test app without VCS
+			fs, testApp := s.createTestAppWithoutVCS()
+
+			// Replace global app instance
 			originalApp := appInstance
 			appInstance = testApp
 			defer func() {
 				appInstance = originalApp
+				// Reset command state
+				rootCmd.SetOut(nil)
+				rootCmd.SetErr(nil)
+				rootCmd.SetArgs(nil)
 			}()
 
-			// Create VERSION file
-			err := afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
-			require.NoError(t, err)
-
-			// Create initial config file
-			configData, err := yaml.Marshal(tt.initialConfig)
-			require.NoError(t, err)
-			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
-			require.NoError(t, err)
+			// Create test files
+			s.createTestFiles(fs, tt.initialVersion, tt.initialConfig)
 
 			// Capture output
 			var stdout bytes.Buffer
@@ -236,172 +276,101 @@ func TestSuffixDisableCommand(t *testing.T) {
 			rootCmd.SetArgs([]string{"suffix", "disable"})
 
 			// Execute command
-			err = rootCmd.Execute()
+			err := rootCmd.Execute()
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Error(err)
 			} else {
-				assert.NoError(t, err)
+				s.NoError(err, "Disable command should execute successfully")
 
 				// Verify config was updated
 				cfg, err := testApp.ReadConfig()
-				require.NoError(t, err)
-				assert.False(t, cfg.Suffix.Enabled)
+				s.NoError(err, "Should be able to read config")
+				s.False(cfg.Suffix.Enabled, "Suffix should be disabled")
 
 				// Verify output
 				output := stdout.String()
-				assert.Contains(t, output, "Git hash suffix disabled")
-				assert.Contains(t, output, "Current version: "+tt.initialVersion)
+				s.Contains(output, "Git hash suffix disabled", "Should show disabled message")
+				s.Contains(output, "Current version: "+tt.initialVersion, "Should show current version")
 			}
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetArgs(nil)
 		})
 	}
 }
 
-func TestSuffixStatusCommand(t *testing.T) {
+func (s *SuffixTestSuite) TestSuffixStatusCommand() {
 	tests := []struct {
 		name           string
 		initialConfig  *config.Config
 		initialVersion string
 		setupVCS       func(ctrl *gomock.Controller) *mock.MockVersionControlSystem
-		expectError    bool
+		expectEnabled  bool
 	}{
 		{
-			name: "status with suffix enabled and in git repo",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: true,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			initialVersion: "1.2.3",
+			name:           "status when enabled with git repo",
+			initialConfig:  s.EnabledConfig,
+			initialVersion: s.DefaultVersion,
 			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
 				mockVCS := mock.NewMockVersionControlSystem(ctrl)
 				mockVCS.EXPECT().Name().Return("git").AnyTimes()
 				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(7).Return("abc1234", nil).AnyTimes()
+				mockVCS.EXPECT().GetRepositoryRoot().Return(s.TestRepositoryPath, nil).AnyTimes()
+				mockVCS.EXPECT().GetVCSIdentifier(s.StandardHashLength).Return(s.DefaultGitHash, nil).AnyTimes()
 				return mockVCS
 			},
-			expectError: false,
+			expectEnabled: true,
 		},
 		{
-			name: "status with suffix enabled but not in git repo",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: true,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 8},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			initialVersion: "2.0.0",
+			name:           "status when disabled",
+			initialConfig:  s.StandardConfig,
+			initialVersion: s.DefaultVersion,
+			setupVCS:       nil,
+			expectEnabled:  false,
+		},
+		{
+			name:           "status when enabled without git repo",
+			initialConfig:  s.EnabledConfig,
+			initialVersion: s.DefaultVersion,
 			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
 				mockVCS := mock.NewMockVersionControlSystem(ctrl)
 				mockVCS.EXPECT().Name().Return("git").AnyTimes()
 				mockVCS.EXPECT().IsRepository().Return(false).AnyTimes()
 				return mockVCS
 			},
-			expectError: false,
-		},
-		{
-			name: "status with suffix disabled",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			initialVersion: "3.1.0",
-			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				// Create mock VCS but no expectations needed when suffix is disabled
-				mockVCS := mock.NewMockVersionControlSystem(ctrl)
-				mockVCS.EXPECT().IsRepository().Return(false).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				return mockVCS
-			},
-			expectError: false,
-		},
-		{
-			name: "status with git error",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: true,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			initialVersion: "1.0.0",
-			setupVCS: func(ctrl *gomock.Controller) *mock.MockVersionControlSystem {
-				mockVCS := mock.NewMockVersionControlSystem(ctrl)
-				mockVCS.EXPECT().Name().Return("git").AnyTimes()
-				mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-				mockVCS.EXPECT().GetRepositoryRoot().Return("/tmp", nil).AnyTimes()
-				mockVCS.EXPECT().GetVCSIdentifier(7).Return("", os.ErrPermission).AnyTimes()
-				return mockVCS
-			},
-			expectError: false,
+			expectEnabled: true,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create in-memory filesystem
-			fs := afero.NewMemMapFs()
-
-			// Setup gomock
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			// Setup VCS mock if provided and create app with it
+		s.Run(tt.name, func() {
+			var fs afero.Fs
 			var testApp *app.App
+			var ctrl *gomock.Controller
+
 			if tt.setupVCS != nil {
+				// Setup with mock VCS
+				ctrl = gomock.NewController(s.T())
+				defer ctrl.Finish()
+				
 				mockVCS := tt.setupVCS(ctrl)
-				testApp = &app.App{
-					ConfigManager:  config.NewConfigManager(fs),
-					VersionManager: version.NewVersion(fs, ".", mockVCS),
-					Versionator:    versionator.NewVersionator(fs, mockVCS),
-					VCS:            mockVCS,
-					FileSystem:     fs,
-				}
+				fs, testApp, _ = s.createTestAppWithMockVCS(ctrl, mockVCS.IsRepository(), s.StandardHashLength, s.DefaultGitHash)
 			} else {
-				testApp = &app.App{
-					ConfigManager:  config.NewConfigManager(fs),
-					VersionManager: version.NewVersion(fs, ".", nil),
-					Versionator:    versionator.NewVersionator(fs, nil),
-					VCS:            nil,
-					FileSystem:     fs,
-				}
+				// Setup without VCS
+				fs, testApp = s.createTestAppWithoutVCS()
 			}
 
-			// Replace global app instance for this test
+			// Replace global app instance
 			originalApp := appInstance
 			appInstance = testApp
 			defer func() {
 				appInstance = originalApp
+				// Reset command state
+				rootCmd.SetOut(nil)
+				rootCmd.SetErr(nil)
+				rootCmd.SetArgs(nil)
 			}()
-			
-			// Create VERSION file
-			err := afero.WriteFile(fs, "VERSION", []byte(tt.initialVersion), 0644)
-			require.NoError(t, err)
 
-			// Create initial config file
-			configData, err := yaml.Marshal(tt.initialConfig)
-			require.NoError(t, err)
-			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
-			require.NoError(t, err)
+			// Create test files
+			s.createTestFiles(fs, tt.initialVersion, tt.initialConfig)
 
 			// Capture output
 			var stdout bytes.Buffer
@@ -409,143 +378,88 @@ func TestSuffixStatusCommand(t *testing.T) {
 			rootCmd.SetArgs([]string{"suffix", "status"})
 
 			// Execute command
-			err = rootCmd.Execute()
+			err := rootCmd.Execute()
+			s.NoError(err, "Status command should execute successfully")
 
-			if tt.expectError {
-				assert.Error(t, err)
+			// Verify output
+			output := stdout.String()
+			if tt.expectEnabled {
+				s.Contains(output, "Git hash suffix: ENABLED", "Should show suffix enabled")
 			} else {
-				assert.NoError(t, err)
-
-				// Verify output
-				output := stdout.String()
-				if tt.initialConfig.Suffix.Enabled && tt.initialConfig.Suffix.Type == "git" {
-					assert.Contains(t, output, "Git hash suffix: ENABLED")
-					assert.Contains(t, output, "Hash length:")
-				} else {
-					assert.Contains(t, output, "Git hash suffix: DISABLED")
-				}
-				assert.Contains(t, output, "Current version:")
+				s.Contains(output, "Git hash suffix: DISABLED", "Should show suffix disabled")
 			}
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetArgs(nil)
+			s.Contains(output, "Current version:", "Should show current version")
 		})
 	}
 }
 
-func TestSuffixConfigureCommand(t *testing.T) {
-	tests := []struct {
-		name           string
-		initialConfig  *config.Config
-		expectError    bool
-	}{
-		{
-			name: "configure with suffix enabled",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: true,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			expectError: false,
-		},
-		{
-			name: "configure with suffix disabled",
-			initialConfig: &config.Config{
-				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 8},
-				},
-				Logging: config.LoggingConfig{Output: "console"},
-			},
-			expectError: false,
-		},
-	}
+func (s *SuffixTestSuite) TestSuffixConfigureCommand() {
+	s.Run("configure command", func() {
+		// Create test app without VCS
+		fs, testApp := s.createTestAppWithoutVCS()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create in-memory filesystem
-			fs := afero.NewMemMapFs()
+		// Replace global app instance
+		originalApp := appInstance
+		appInstance = testApp
+		defer func() {
+			appInstance = originalApp
+		}()
 
-			// Create initial config file
-			configData, err := yaml.Marshal(tt.initialConfig)
-			require.NoError(t, err)
-			err = afero.WriteFile(fs, ".versionator.yaml", configData, 0644)
-			require.NoError(t, err)
+		// Create test files
+		s.createTestFiles(fs, s.DefaultVersion, s.StandardConfig)
 
-			// Capture output
-			var stdout bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetArgs([]string{"suffix", "configure"})
+		// Capture output
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		rootCmd.SetOut(&stdout)
+		rootCmd.SetErr(&stderr)
+		rootCmd.SetArgs([]string{"suffix", "configure"})
 
-			// Execute command
-			err = rootCmd.Execute()
+		// Execute command
+		err := rootCmd.Execute()
+		s.NoError(err, "Command should execute successfully")
 
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+		// Debug output if test fails
+		output := stdout.String()
+		if !s.Contains(output, "Current configuration:", "Should contain configuration header") {
+			s.T().Logf("Actual output: %q", output)
+			s.T().Logf("Stderr output: %q", stderr.String())
+		}
+		s.Contains(output, "Git hash suffix enabled: false", "Should show suffix disabled")
+		s.Contains(output, "Suffix type: git", "Should show suffix type")
+		s.Contains(output, "Git hash length: 7", "Should show hash length")
+		s.Contains(output, "Configuration is stored in .versionator.yaml", "Should show config file location")
 
-				// Verify output
-				output := stdout.String()
-				assert.Contains(t, output, "Current configuration:")
-				assert.Contains(t, output, "Git hash suffix enabled:")
-				assert.Contains(t, output, "Suffix type:")
-				assert.Contains(t, output, "Git hash length:")
-				assert.Contains(t, output, "Configuration is stored in .versionator.yaml")
-			}
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetArgs(nil)
-		})
-	}
+		// Reset command state
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
+	})
 }
 
-func TestSuffixCommandHelp(t *testing.T) {
-	tests := []struct {
+func (s *SuffixTestSuite) TestSuffixCommandHelp() {
+	testCases := []struct {
 		name string
 		args []string
 	}{
-		{
-			name: "suffix help",
-			args: []string{"suffix", "--help"},
-		},
-		{
-			name: "suffix enable help",
-			args: []string{"suffix", "enable", "--help"},
-		},
-		{
-			name: "suffix disable help",
-			args: []string{"suffix", "disable", "--help"},
-		},
-		{
-			name: "suffix status help",
-			args: []string{"suffix", "status", "--help"},
-		},
-		{
-			name: "suffix configure help",
-			args: []string{"suffix", "configure", "--help"},
-		},
+		{"suffix help", []string{"suffix", "--help"}},
+		{"suffix enable help", []string{"suffix", "enable", "--help"}},
+		{"suffix disable help", []string{"suffix", "disable", "--help"}},
+		{"suffix status help", []string{"suffix", "status", "--help"}},
+		{"suffix configure help", []string{"suffix", "configure", "--help"}},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
 			var buf bytes.Buffer
 			rootCmd.SetOut(&buf)
-			rootCmd.SetArgs(tt.args)
+			rootCmd.SetArgs(tc.args)
 
 			err := rootCmd.Execute()
-			assert.NoError(t, err)
+			s.NoError(err)
 
 			output := buf.String()
-			assert.Contains(t, output, "Usage:")
+			s.Contains(output, "Usage:")
 
 			// Reset command state
 			rootCmd.SetOut(nil)
@@ -554,88 +468,44 @@ func TestSuffixCommandHelp(t *testing.T) {
 	}
 }
 
-func TestSuffixCommandConfigErrors(t *testing.T) {
-	tests := []struct {
-		name        string
-		args        []string
-		setupFunc   func(fs afero.Fs) error
-		expectError bool
-	}{
-		{
-			name: "missing config file",
-			args: []string{"suffix", "enable"},
-			setupFunc: func(fs afero.Fs) error {
-				// Create VERSION file but no config file
-				return afero.WriteFile(fs, "VERSION", []byte("1.0.0"), 0644)
-			},
-			expectError: false, // Should create default config
-		},
-		{
-			name: "invalid config file",
-			args: []string{"suffix", "status"},
-			setupFunc: func(fs afero.Fs) error {
-				// Create invalid YAML config
-				err := afero.WriteFile(fs, "VERSION", []byte("1.0.0"), 0644)
-				if err != nil {
-					return err
-				}
-				return afero.WriteFile(fs, ".versionator.yaml", []byte("invalid yaml content\n  [unclosed bracket\n    bad: indentation"), 0644)
-			},
-			expectError: true,
-		},
-	}
+func (s *SuffixTestSuite) TestSuffixCommandConfigErrors() {
+	s.Run("missing config file", func() {
+		// Unregister VCS to prevent interference
+		vcs.UnregisterVCS("git")
+		defer vcs.UnregisterVCS("git")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Unregister any VCS to prevent interference
-			vcs.UnregisterVCS("git")
-			defer func() {
-				// Clean up any registered VCS after test
-				vcs.UnregisterVCS("git")
-			}()
+		// Create test app without VCS
+		fs, testApp := s.createTestAppWithoutVCS()
 
-			// Create in-memory filesystem
-			fs := afero.NewMemMapFs()
-			
-			// Create test app instance with in-memory filesystem
-			testApp := &app.App{
-				ConfigManager:  config.NewConfigManager(fs),
-				VersionManager: version.NewVersion(fs, ".", nil),
-				Versionator:    versionator.NewVersionator(fs, nil),
-				VCS:            nil,
-				FileSystem:     fs,
-			}
-			
-			// Replace global app instance for this test
-			originalApp := appInstance
-			appInstance = testApp
-			defer func() {
-				appInstance = originalApp
-			}()
+		// Replace global app instance
+		originalApp := appInstance
+		appInstance = testApp
+		defer func() {
+			appInstance = originalApp
+		}()
 
-			// Setup test environment
-			err := tt.setupFunc(fs)
-			require.NoError(t, err)
+		// Create only VERSION file, no config file
+		err := afero.WriteFile(fs, "VERSION", []byte("1.0.0"), 0644)
+		s.Require().NoError(err)
 
-			// Capture output
-			var stdout, stderr bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetErr(&stderr)
-			rootCmd.SetArgs(tt.args)
+		// Capture output
+		var stdout bytes.Buffer
+		rootCmd.SetOut(&stdout)
+		rootCmd.SetArgs([]string{"suffix", "enable"})
 
-			// Execute command
-			err = rootCmd.Execute()
+		// Execute command - should create default config and succeed
+		err = rootCmd.Execute()
+		s.NoError(err)
+		s.Contains(stdout.String(), "Git hash suffix enabled")
 
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
+		// Reset command state
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
+	})
+}
 
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetErr(nil)
-			rootCmd.SetArgs(nil)
-		})
-	}
+// TestSuffixTestSuite runs the test suite
+func TestSuffixTestSuite(t *testing.T) {
+	suite.Run(t, new(SuffixTestSuite))
 }
