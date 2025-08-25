@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 	"versionator/internal/app"
@@ -11,46 +10,14 @@ import (
 	"versionator/internal/versionator"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-// MajorTestSuite defines the test suite for major command tests
-type MajorTestSuite struct {
-	suite.Suite
-	tempDir string
-	origDir string
-}
+// Helper functions for DRY test setup
 
-// SetupTest runs before each test
-func (suite *MajorTestSuite) SetupTest() {
-	// Keep temporary directory setup for compatibility but we won't use the real filesystem
-	suite.tempDir = suite.T().TempDir()
-	var err error
-	suite.origDir, err = os.Getwd()
-	suite.Require().NoError(err)
-	err = os.Chdir(suite.tempDir)
-	suite.Require().NoError(err)
-}
-
-// TearDownTest runs after each test
-func (suite *MajorTestSuite) TearDownTest() {
-	// Restore original directory
-	if suite.origDir != "" {
-		os.Chdir(suite.origDir)
-	}
-
-	// Reset command state
-	rootCmd.SetOut(nil)
-	rootCmd.SetErr(nil)
-	rootCmd.SetArgs(nil)
-}
-
-
-func (suite *MajorTestSuite) TestMajorIncrementCommand() {
-	// Create fresh filesystem for this test
+// createMajorTestApp creates a fresh filesystem and test app instance
+func createMajorTestApp() (afero.Fs, *app.App) {
 	fs := afero.NewMemMapFs()
-	
-	// Create test app instance with fresh filesystem
 	testApp := &app.App{
 		ConfigManager:  config.NewConfigManager(fs),
 		VersionManager: version.NewVersion(fs, ".", nil),
@@ -58,16 +25,12 @@ func (suite *MajorTestSuite) TestMajorIncrementCommand() {
 		VCS:            nil,
 		FileSystem:     fs,
 	}
-	
-	// Replace global app instance for command execution
-	originalApp := appInstance
-	appInstance = testApp
-	defer func() {
-		appInstance = originalApp
-	}()
+	return fs, testApp
+}
 
-	// Create config file
-	configContent := `prefix: ""
+// getMajorStandardConfigContent returns the standard config content used across tests
+func getMajorStandardConfigContent() string {
+	return `prefix: ""
 suffix:
   enabled: false
   type: "git"
@@ -76,260 +39,171 @@ suffix:
 logging:
   output: "console"
 `
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
-	suite.Require().NoError(err, "Failed to create config file")
+}
 
-	// Create VERSION file
-	err = afero.WriteFile(fs, "VERSION", []byte("1.2.3"), 0644)
-	suite.Require().NoError(err, "Failed to create VERSION file")
+// createMajorConfigFile creates the standard config file in the filesystem
+func createMajorConfigFile(t *testing.T, fs afero.Fs) {
+	err := afero.WriteFile(fs, ".versionator.yaml", []byte(getMajorStandardConfigContent()), 0644)
+	require.NoError(t, err, "Failed to create config file")
+}
+
+// createMajorVersionFile creates a VERSION file with the specified content
+func createMajorVersionFile(t *testing.T, fs afero.Fs, version string) {
+	err := afero.WriteFile(fs, "VERSION", []byte(version), 0644)
+	require.NoError(t, err, "Failed to create VERSION file")
+}
+
+// replaceMajorAppInstance replaces the global app instance and returns a restore function
+func replaceMajorAppInstance(testApp *app.App) func() {
+	originalApp := appInstance
+	appInstance = testApp
+	return func() {
+		appInstance = originalApp
+	}
+}
+
+// verifyMajorVersionFile verifies the VERSION file contains the expected content
+func verifyMajorVersionFile(t *testing.T, fs afero.Fs, expectedVersion string) {
+	content, err := afero.ReadFile(fs, "VERSION")
+	require.NoError(t, err, "Should be able to read VERSION file")
+	require.Equal(t, expectedVersion, strings.TrimSpace(string(content)), "VERSION file should contain '"+expectedVersion+"'")
+}
+
+func TestMajorIncrementCommand(t *testing.T) {
+	defer func() {
+		// Reset command state
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
+	}()
+
+	fs, testApp := createMajorTestApp()
+	defer replaceMajorAppInstance(testApp)()
+
+	createMajorConfigFile(t, fs)
+	createMajorVersionFile(t, fs, "1.2.3")
 
 	// Execute the major increment command
 	rootCmd.SetArgs([]string{"major", "increment"})
-	err = rootCmd.Execute()
-	suite.Require().NoError(err, "major increment command should succeed")
+	err := rootCmd.Execute()
+	require.NoError(t, err, "major increment command should succeed")
 
-	// Verify VERSION file was updated correctly
-	content, err := afero.ReadFile(fs, "VERSION")
-	suite.Require().NoError(err, "Should be able to read VERSION file")
-	suite.Equal("2.0.0", strings.TrimSpace(string(content)), "VERSION file should contain '2.0.0'")
+	verifyMajorVersionFile(t, fs, "2.0.0")
 }
 
-func (suite *MajorTestSuite) TestMajorIncrementCommand_Aliases() {
+func TestMajorIncrementCommand_Aliases(t *testing.T) {
 	testCases := []string{"inc", "+"}
 
 	for _, alias := range testCases {
-		suite.Run("alias_"+alias, func() {
-			// Create fresh filesystem for this test
-			fs := afero.NewMemMapFs()
-			
-			// Create test app instance with fresh filesystem
-			testApp := &app.App{
-				ConfigManager:  config.NewConfigManager(fs),
-				VersionManager: version.NewVersion(fs, ".", nil),
-				Versionator:    versionator.NewVersionator(fs, nil),
-				VCS:            nil,
-				FileSystem:     fs,
-			}
-			
-			// Replace global app instance for command execution
-			originalApp := appInstance
-			appInstance = testApp
+		t.Run("alias_"+alias, func(t *testing.T) {
 			defer func() {
-				appInstance = originalApp
+				// Reset command state
+				rootCmd.SetOut(nil)
+				rootCmd.SetErr(nil)
+				rootCmd.SetArgs(nil)
 			}()
 
-			// Create config file
-			configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-			err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
-			suite.Require().NoError(err, "Failed to create config file")
+			fs, testApp := createMajorTestApp()
+			defer replaceMajorAppInstance(testApp)()
 
-			// Create VERSION file
-			err = afero.WriteFile(fs, "VERSION", []byte("0.1.0"), 0644)
-			suite.Require().NoError(err, "Failed to create VERSION file")
+			createMajorConfigFile(t, fs)
+			createMajorVersionFile(t, fs, "0.1.0")
 
 			// Execute the major increment command with alias
 			rootCmd.SetArgs([]string{"major", alias})
-			err = rootCmd.Execute()
-			suite.Require().NoError(err, "major %s command should succeed", alias)
+			err := rootCmd.Execute()
+			require.NoError(t, err, "major %s command should succeed", alias)
 
-			// Verify VERSION file was updated correctly
-			content, err := afero.ReadFile(fs, "VERSION")
-			suite.Require().NoError(err, "Should be able to read VERSION file")
-			suite.Equal("1.0.0", strings.TrimSpace(string(content)), "VERSION file should contain '1.0.0'")
+			verifyMajorVersionFile(t, fs, "1.0.0")
 		})
 	}
 }
 
-func (suite *MajorTestSuite) TestMajorDecrementCommand() {
-	// Create fresh filesystem for this test
-	fs := afero.NewMemMapFs()
-	
-	// Create test app instance with fresh filesystem
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
-	}
-	
-	// Replace global app instance for command execution
-	originalApp := appInstance
-	appInstance = testApp
+func TestMajorDecrementCommand(t *testing.T) {
 	defer func() {
-		appInstance = originalApp
+		// Reset command state
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
 	}()
 
-	// Create config file
-	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
-	suite.Require().NoError(err, "Failed to create config file")
+	fs, testApp := createMajorTestApp()
+	defer replaceMajorAppInstance(testApp)()
 
-	// Create VERSION file
-	err = afero.WriteFile(fs, "VERSION", []byte("3.5.7"), 0644)
-	suite.Require().NoError(err, "Failed to create VERSION file")
+	createMajorConfigFile(t, fs)
+	createMajorVersionFile(t, fs, "3.5.7")
 
 	// Execute the major decrement command
 	rootCmd.SetArgs([]string{"major", "decrement"})
-	err = rootCmd.Execute()
-	suite.Require().NoError(err, "major decrement command should succeed")
+	err := rootCmd.Execute()
+	require.NoError(t, err, "major decrement command should succeed")
 
-	// Verify VERSION file was updated correctly
-	content, err := afero.ReadFile(fs, "VERSION")
-	suite.Require().NoError(err, "Should be able to read VERSION file")
-	suite.Equal("2.0.0", strings.TrimSpace(string(content)), "VERSION file should contain '2.0.0'")
+	verifyMajorVersionFile(t, fs, "2.0.0")
 }
 
-func (suite *MajorTestSuite) TestMajorDecrementCommand_Aliases() {
+func TestMajorDecrementCommand_Aliases(t *testing.T) {
 	testCases := []string{"dec"}
 
 	for _, alias := range testCases {
-		suite.Run("alias_"+alias, func() {
-			// Create fresh filesystem for this test
-			fs := afero.NewMemMapFs()
-			
-			// Create test app instance with fresh filesystem
-			testApp := &app.App{
-				ConfigManager:  config.NewConfigManager(fs),
-				VersionManager: version.NewVersion(fs, ".", nil),
-				Versionator:    versionator.NewVersionator(fs, nil),
-				VCS:            nil,
-				FileSystem:     fs,
-			}
-			
-			// Replace global app instance for command execution
-			originalApp := appInstance
-			appInstance = testApp
+		t.Run("alias_"+alias, func(t *testing.T) {
 			defer func() {
-				appInstance = originalApp
+				// Reset command state
+				rootCmd.SetOut(nil)
+				rootCmd.SetErr(nil)
+				rootCmd.SetArgs(nil)
 			}()
 
-			// Create config file
-			configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-			err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
-			suite.Require().NoError(err, "Failed to create config file")
+			fs, testApp := createMajorTestApp()
+			defer replaceMajorAppInstance(testApp)()
 
-			// Create VERSION file
-			err = afero.WriteFile(fs, "VERSION", []byte("2.1.0"), 0644)
-			suite.Require().NoError(err, "Failed to create VERSION file")
+			createMajorConfigFile(t, fs)
+			createMajorVersionFile(t, fs, "2.1.0")
 
 			// Execute the major decrement command with alias
 			rootCmd.SetArgs([]string{"major", alias})
-			err = rootCmd.Execute()
-			suite.Require().NoError(err, "major %s command should succeed", alias)
+			err := rootCmd.Execute()
+			require.NoError(t, err, "major %s command should succeed", alias)
 
-			// Verify VERSION file was updated correctly
-			content, err := afero.ReadFile(fs, "VERSION")
-			suite.Require().NoError(err, "Should be able to read VERSION file")
-			suite.Equal("1.0.0", strings.TrimSpace(string(content)), "VERSION file should contain '1.0.0'")
+			verifyMajorVersionFile(t, fs, "1.0.0")
 		})
 	}
 }
 
-func (suite *MajorTestSuite) TestMajorIncrementCommand_NoVersionFile() {
-	// Create fresh filesystem for this test
-	fs := afero.NewMemMapFs()
-	
-	// Create test app instance with fresh filesystem
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
-	}
-	
-	// Replace global app instance for command execution
-	originalApp := appInstance
-	appInstance = testApp
+func TestMajorIncrementCommand_NoVersionFile(t *testing.T) {
 	defer func() {
-		appInstance = originalApp
+		// Reset command state
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
 	}()
 
+	fs, testApp := createMajorTestApp()
+	defer replaceMajorAppInstance(testApp)()
+
 	// Create only config file (no VERSION file)
-	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
-	suite.Require().NoError(err, "Failed to create config file")
+	createMajorConfigFile(t, fs)
 
 	// Execute the major increment command - should succeed with default version
 	rootCmd.SetArgs([]string{"major", "increment"})
-	err = rootCmd.Execute()
-	suite.Require().NoError(err, "major increment command should succeed with default version")
+	err := rootCmd.Execute()
+	require.NoError(t, err, "major increment command should succeed with default version")
 
-	// Verify VERSION file was created and updated correctly
-	content, err := afero.ReadFile(fs, "VERSION")
-	suite.Require().NoError(err, "Should be able to read VERSION file")
-	suite.Equal("1.0.0", strings.TrimSpace(string(content)), "VERSION file should contain '1.0.0'")
+	verifyMajorVersionFile(t, fs, "1.0.0")
 }
 
-func (suite *MajorTestSuite) TestMajorDecrementCommand_AtZero() {
-	// Create fresh filesystem for this test
-	fs := afero.NewMemMapFs()
-	
-	// Create test app instance with fresh filesystem
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
-	}
-	
-	// Replace global app instance for command execution
-	originalApp := appInstance
-	appInstance = testApp
+func TestMajorDecrementCommand_AtZero(t *testing.T) {
 	defer func() {
-		appInstance = originalApp
+		// Reset command state
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
 	}()
 
-	// Create config file
-	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
-	suite.Require().NoError(err, "Failed to create config file")
+	fs, testApp := createMajorTestApp()
+	defer replaceMajorAppInstance(testApp)()
 
-	// Create VERSION file with major version at 0
-	err = afero.WriteFile(fs, "VERSION", []byte("0.5.3"), 0644)
-	suite.Require().NoError(err, "Failed to create VERSION file")
+	createMajorConfigFile(t, fs)
+	createMajorVersionFile(t, fs, "0.5.3")
 
 	// Capture stderr
 	var buf bytes.Buffer
@@ -337,52 +211,29 @@ logging:
 	rootCmd.SetArgs([]string{"major", "decrement"})
 
 	// Execute the major decrement command - should fail
-	err = rootCmd.Execute()
-	suite.Error(err, "Expected major decrement command to fail when major version is at 0")
+	err := rootCmd.Execute()
+	require.Error(t, err, "Expected major decrement command to fail when major version is at 0")
 }
 
-func (suite *MajorTestSuite) TestMajorCommand_InvalidVersionFile() {
-	// Create fresh filesystem for this test
-	fs := afero.NewMemMapFs()
-	
-	// Create test app instance with fresh filesystem
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
-	}
-	
-	// Replace global app instance for command execution
-	originalApp := appInstance
-	appInstance = testApp
-	defer func() {
-		appInstance = originalApp
-	}()
-
-	// Create an invalid VERSION file
-	err := afero.WriteFile(fs, "VERSION", []byte("invalid.version"), 0644)
-	suite.Require().NoError(err, "Failed to create VERSION file")
-
-	// Create a minimal config file
-	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-	err = afero.WriteFile(fs, ".versionator.yaml", []byte(configContent), 0644)
-	suite.Require().NoError(err, "Failed to create config file")
-
+func TestMajorCommand_InvalidVersionFile(t *testing.T) {
 	// Test both increment and decrement with invalid version
 	testCases := []string{"increment", "decrement"}
 
 	for _, operation := range testCases {
-		suite.Run(operation, func() {
+		t.Run(operation, func(t *testing.T) {
+			defer func() {
+				// Reset command state
+				rootCmd.SetOut(nil)
+				rootCmd.SetErr(nil)
+				rootCmd.SetArgs(nil)
+			}()
+
+			fs, testApp := createMajorTestApp()
+			defer replaceMajorAppInstance(testApp)()
+
+			createMajorConfigFile(t, fs)
+			createMajorVersionFile(t, fs, "invalid.version")
+
 			// Capture stderr
 			var buf bytes.Buffer
 			rootCmd.SetErr(&buf)
@@ -390,12 +241,7 @@ logging:
 
 			// Execute the command - should fail
 			err := rootCmd.Execute()
-			suite.Error(err, "Expected major %s command to fail with invalid version file", operation)
+			require.Error(t, err, "Expected major %s command to fail with invalid version file", operation)
 		})
 	}
-}
-
-// TestMajorTestSuite runs the major test suite
-func TestMajorTestSuite(t *testing.T) {
-	suite.Run(t, new(MajorTestSuite))
 }
