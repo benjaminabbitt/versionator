@@ -24,6 +24,8 @@ fi
 
 echo "Using binary: $BINARY_PATH"
 
+git init .
+
 # Initialize VERSION file without BOM
 printf "1.0.0" > VERSION
 
