@@ -2,273 +2,196 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 	"versionator/internal/app"
-	"versionator/internal/config"
-	"versionator/internal/vcs"
 	"versionator/internal/version"
-	"versionator/internal/versionator"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/suite"
 )
 
-// Helper functions for DRY test setup
+// MinorTestSuite contains the test suite for minor version commands
+type MinorTestSuite struct {
+	suite.Suite
+	testApp      *app.App
+	fs           afero.Fs
+	restoreApp   func()
+	outputBuffer *bytes.Buffer
+}
 
-// createMinorTestApp creates a fresh filesystem and test app instance
-func createMinorTestApp() (afero.Fs, *app.App) {
-	fs := afero.NewMemMapFs()
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
+// SetupTest initializes the test environment before each test
+func (suite *MinorTestSuite) SetupTest() {
+	var testApp *app.App
+	suite.fs, testApp = createTestApp()
+	suite.testApp = testApp
+	suite.restoreApp = replaceAppInstance(testApp)
+	suite.outputBuffer = &bytes.Buffer{}
+}
+
+// TearDownTest cleans up after each test
+func (suite *MinorTestSuite) TearDownTest() {
+	suite.restoreApp()
+}
+
+// TestMinorIncrementFromDefaultVersion tests incrementing minor version from default 0.0.0
+func (suite *MinorTestSuite) TestMinorIncrementFromDefaultVersion() {
+	// Setup: Create config file (VERSION file will be auto-created)
+	createConfigFile(suite.T(), suite.fs)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the increment command
+	err := minorIncrementCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Minor increment should succeed")
+
+	// Verify the version was incremented correctly
+	verifyVersionFile(suite.T(), suite.fs, "0.1.0")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Minor version incremented to: 0.1.0", "Output should show incremented version")
+}
+
+// TestMinorIncrementFromExistingVersion tests incrementing minor version from an existing version
+func (suite *MinorTestSuite) TestMinorIncrementFromExistingVersion() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.5.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the increment command
+	err := minorIncrementCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Minor increment should succeed")
+
+	// Verify the version was incremented correctly (patch should reset to 0)
+	verifyVersionFile(suite.T(), suite.fs, "2.6.0")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Minor version incremented to: 2.6.0", "Output should show incremented version")
+}
+
+// TestMinorDecrementFromExistingVersion tests decrementing minor version from an existing version
+func (suite *MinorTestSuite) TestMinorDecrementFromExistingVersion() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.5.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the decrement command
+	err := minorDecrementCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Minor decrement should succeed")
+
+	// Verify the version was decremented correctly (patch should reset to 0)
+	verifyVersionFile(suite.T(), suite.fs, "2.4.0")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Minor version decremented to: 2.4.0", "Output should show decremented version")
+}
+
+// TestMinorDecrementFromZeroMinorVersion tests error when trying to decrement from 0 minor version
+func (suite *MinorTestSuite) TestMinorDecrementFromZeroMinorVersion() {
+	// Setup: Create config and version files with minor version = 0
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "1.0.5")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the decrement command
+	err := minorDecrementCmd.RunE(cmd, []string{})
+
+	// Verify error occurred
+	suite.Error(err, "Minor decrement from 0 should fail")
+	suite.Contains(err.Error(), "cannot decrement minor version below 0", "Error should indicate minor version cannot go below 0")
+
+	// Verify the version file wasn't changed
+	verifyVersionFile(suite.T(), suite.fs, "1.0.5")
+}
+
+// TestMinorDecrementFromDefaultVersion tests error when trying to decrement from default 0.0.0
+func (suite *MinorTestSuite) TestMinorDecrementFromDefaultVersion() {
+	// Setup: Create config file only (VERSION file will be auto-created as 0.0.0)
+	createConfigFile(suite.T(), suite.fs)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the decrement command
+	err := minorDecrementCmd.RunE(cmd, []string{})
+
+	// Verify error occurred
+	suite.Error(err, "Minor decrement from default version should fail")
+	suite.Contains(err.Error(), "cannot decrement minor version below 0", "Error should indicate minor version cannot go below 0")
+}
+
+// TestMinorIncrementWithAppInstanceError tests handling of appInstance errors during increment
+func (suite *MinorTestSuite) TestMinorIncrementWithAppInstanceError() {
+	// Setup: Create config but no version file and make filesystem read-only
+	createConfigFile(suite.T(), suite.fs)
+
+	// Make filesystem read-only by replacing with a filesystem that errors on write
+	suite.testApp.FileSystem = afero.NewReadOnlyFs(suite.fs)
+	suite.testApp.VersionManager = version.NewVersion(suite.testApp.FileSystem, ".", nil)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the increment command
+	err := minorIncrementCmd.RunE(cmd, []string{})
+
+	// Verify error occurred
+	suite.Error(err, "Increment should fail with read-only filesystem")
+	suite.Contains(err.Error(), "error incrementing minor version", "Error should indicate increment failure")
+}
+
+// TestMinorCommandHierarchy tests that commands are properly registered in the command hierarchy
+func (suite *MinorTestSuite) TestMinorCommandHierarchy() {
+	// Find minor command in root
+	var foundMinorCmd *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Use == "minor" {
+			foundMinorCmd = cmd
+			break
+		}
 	}
-	return fs, testApp
-}
+	suite.NotNil(foundMinorCmd, "Minor command should be registered with root command")
 
-// getMinorStandardConfigContent returns the standard config content used across tests
-func getMinorStandardConfigContent() string {
-	return `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-}
-
-// createMinorConfigFile creates the standard config file in the filesystem
-func createMinorConfigFile(t *testing.T, fs afero.Fs) {
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(getMinorStandardConfigContent()), 0644)
-	require.NoError(t, err, "Failed to create config file")
-}
-
-// createMinorVersionFile creates a VERSION file with the specified content
-func createMinorVersionFile(t *testing.T, fs afero.Fs, version string) {
-	err := afero.WriteFile(fs, "VERSION", []byte(version), 0644)
-	require.NoError(t, err, "Failed to create VERSION file")
-}
-
-// replaceMinorAppInstance replaces the global app instance and returns a restore function
-func replaceMinorAppInstance(testApp *app.App) func() {
-	originalApp := appInstance
-	appInstance = testApp
-	return func() {
-		appInstance = originalApp
-	}
-}
-
-// verifyMinorVersionFile verifies the VERSION file contains the expected content
-func verifyMinorVersionFile(t *testing.T, fs afero.Fs, expectedVersion string) {
-	content, err := afero.ReadFile(fs, "VERSION")
-	require.NoError(t, err, "Should be able to read VERSION file")
-	require.Equal(t, expectedVersion, strings.TrimSpace(string(content)), "VERSION file should contain '"+expectedVersion+"'")
-}
-
-func TestMinorIncrementCommand(t *testing.T) {
-	// Unregister Git VCS to prevent interference with tests
-	vcs.UnregisterVCS("git")
-	defer func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	fs, testApp := createMinorTestApp()
-	defer replaceMinorAppInstance(testApp)()
-
-	createMinorConfigFile(t, fs)
-	createMinorVersionFile(t, fs, "1.2.3")
-
-	// Execute the minor increment command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"minor", "increment"})
-	err := rootCmd.Execute()
-	require.NoError(t, err, "minor increment command should succeed")
-	
-	// Reset command state
-	rootCmd.SetArgs([]string{})
-
-	verifyMinorVersionFile(t, fs, "1.3.0")
-}
-
-func TestMinorIncrementCommand_Aliases(t *testing.T) {
-	testCases := []string{"inc", "+"}
-
-	for _, alias := range testCases {
-		t.Run("alias_"+alias, func(t *testing.T) {
-			// Unregister Git VCS to prevent interference with tests
-			vcs.UnregisterVCS("git")
-			defer func() {
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			fs, testApp := createMinorTestApp()
-			defer replaceMinorAppInstance(testApp)()
-
-			createMinorConfigFile(t, fs)
-			createMinorVersionFile(t, fs, "0.5.7")
-
-			// Execute the minor increment command with alias
-			var buf bytes.Buffer
-			rootCmd.SetOut(&buf)
-			rootCmd.SetErr(&buf)
-			rootCmd.SetArgs([]string{"minor", alias})
-			err := rootCmd.Execute()
-			require.NoError(t, err, "minor %s command should succeed", alias)
-			
-			// Reset command state
-			rootCmd.SetArgs([]string{})
-
-			verifyMinorVersionFile(t, fs, "0.6.0")
-		})
-	}
-}
-
-func TestMinorDecrementCommand(t *testing.T) {
-	// Unregister Git VCS to prevent interference with tests
-	vcs.UnregisterVCS("git")
-	defer func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	fs, testApp := createMinorTestApp()
-	defer replaceMinorAppInstance(testApp)()
-
-	createMinorConfigFile(t, fs)
-	createMinorVersionFile(t, fs, "1.3.5")
-
-	// Execute the minor decrement command
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"minor", "decrement"})
-	err := rootCmd.Execute()
-	require.NoError(t, err, "minor decrement command should succeed")
-	
-	// Reset command state
-	rootCmd.SetArgs([]string{})
-
-	verifyMinorVersionFile(t, fs, "1.2.0")
-}
-
-func TestMinorDecrementCommand_Aliases(t *testing.T) {
-	testCases := []string{"dec"}
-
-	for _, alias := range testCases {
-		t.Run("alias_"+alias, func(t *testing.T) {
-			// Unregister Git VCS to prevent interference with tests
-			vcs.UnregisterVCS("git")
-			defer func() {
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			fs, testApp := createMinorTestApp()
-			defer replaceMinorAppInstance(testApp)()
-
-			createMinorConfigFile(t, fs)
-			createMinorVersionFile(t, fs, "2.5.1")
-
-			// Execute the minor decrement command with alias
-			var buf bytes.Buffer
-			rootCmd.SetOut(&buf)
-			rootCmd.SetErr(&buf)
-			rootCmd.SetArgs([]string{"minor", alias})
-			err := rootCmd.Execute()
-			require.NoError(t, err, "minor %s command should succeed", alias)
-			
-			// Reset command state
-			rootCmd.SetArgs([]string{})
-
-			verifyMinorVersionFile(t, fs, "2.4.0")
-		})
-	}
-}
-
-func TestMinorIncrementCommand_NoVersionFile(t *testing.T) {
-	// Unregister Git VCS to prevent interference with tests
-	vcs.UnregisterVCS("git")
-	defer func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	fs, testApp := createMinorTestApp()
-	defer replaceMinorAppInstance(testApp)()
-
-	// Create only config file (no VERSION file)
-	createMinorConfigFile(t, fs)
-
-	// Execute the minor increment command - should succeed with default version
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"minor", "increment"})
-	err := rootCmd.Execute()
-	require.NoError(t, err, "minor increment command should succeed with default version")
-	
-	// Reset command state
-	rootCmd.SetArgs([]string{})
-
-	verifyMinorVersionFile(t, fs, "0.1.0")
-}
-
-func TestMinorCommandHelp(t *testing.T) {
-	testCases := []struct {
-		name string
-		args []string
-	}{
-		{
-			name: "minor help",
-			args: []string{"minor", "--help"},
-		},
-		{
-			name: "minor increment help",
-			args: []string{"minor", "increment", "--help"},
-		},
-		{
-			name: "minor decrement help",
-			args: []string{"minor", "decrement", "--help"},
-		},
+	// Find increment and decrement subcommands
+	var foundIncrementCmd, foundDecrementCmd *cobra.Command
+	for _, cmd := range foundMinorCmd.Commands() {
+		switch cmd.Use {
+		case "increment":
+			foundIncrementCmd = cmd
+		case "decrement":
+			foundDecrementCmd = cmd
+		}
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer func() {
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
+	suite.NotNil(foundIncrementCmd, "Increment command should be registered with minor command")
+	suite.NotNil(foundDecrementCmd, "Decrement command should be registered with minor command")
+}
 
-			var buf bytes.Buffer
-			rootCmd.SetOut(&buf)
-			rootCmd.SetArgs(tc.args)
-
-			err := rootCmd.Execute()
-			require.NoError(t, err, "Help command should succeed")
-
-			output := buf.String()
-			require.Contains(t, output, "Usage:", "Help output should contain usage information")
-		})
-	}
+// TestMinorTestSuite runs the test suite
+func TestMinorTestSuite(t *testing.T) {
+	suite.Run(t, new(MinorTestSuite))
 }

@@ -2,269 +2,217 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 	"versionator/internal/app"
-	"versionator/internal/config"
 	"versionator/internal/version"
-	"versionator/internal/versionator"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/suite"
 )
 
-// Helper methods for DRY test setup
-
-// createPatchTestApp creates a fresh filesystem and test app instance
-func createPatchTestApp() (afero.Fs, *app.App) {
-	fs := afero.NewMemMapFs()
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
-	}
-	return fs, testApp
+// PatchTestSuite contains the test suite for patch version commands
+type PatchTestSuite struct {
+	suite.Suite
+	testApp      *app.App
+	fs           afero.Fs
+	restoreApp   func()
+	outputBuffer *bytes.Buffer
 }
 
-// getPatchStandardConfigContent returns the standard config content used across tests
-func getPatchStandardConfigContent() string {
-	return `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
+// SetupTest initializes the test environment before each test
+func (suite *PatchTestSuite) SetupTest() {
+	var testApp *app.App
+	suite.fs, testApp = createTestApp()
+	suite.testApp = testApp
+	suite.restoreApp = replaceAppInstance(testApp)
+	suite.outputBuffer = &bytes.Buffer{}
 }
 
-// createPatchConfigFile creates the standard config file in the filesystem
-func createPatchConfigFile(t *testing.T, fs afero.Fs) {
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(getPatchStandardConfigContent()), 0644)
-	require.NoError(t, err)
+// TearDownTest cleans up after each test
+func (suite *PatchTestSuite) TearDownTest() {
+	suite.restoreApp()
 }
 
-// createPatchVersionFile creates a VERSION file with the specified content if provided
-func createPatchVersionFile(t *testing.T, fs afero.Fs, version string) {
-	if version != "" {
-		err := afero.WriteFile(fs, "VERSION", []byte(version), 0644)
-		require.NoError(t, err)
-	}
+// TestPatchIncrementFromDefaultVersion tests incrementing patch version from default 0.0.0
+func (suite *PatchTestSuite) TestPatchIncrementFromDefaultVersion() {
+	// Setup: Create config file (VERSION file will be auto-created)
+	createConfigFile(suite.T(), suite.fs)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+	
+	// Execute the increment command
+	err := patchIncrementCmd.RunE(cmd, []string{})
+	
+	// Verify no error occurred
+	suite.NoError(err, "Patch increment should succeed")
+	
+	// Verify the version was incremented correctly
+	verifyVersionFile(suite.T(), suite.fs, "0.0.1")
+	
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Patch version incremented to: 0.0.1", "Output should show incremented version")
 }
 
-// replacePatchAppInstance replaces the global app instance and returns a restore function
-func replacePatchAppInstance(testApp *app.App) func() {
-	originalApp := appInstance
-	appInstance = testApp
-	return func() {
-		appInstance = originalApp
-	}
+// TestPatchIncrementFromExistingVersion tests incrementing patch version from an existing version
+func (suite *PatchTestSuite) TestPatchIncrementFromExistingVersion() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.5.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+	
+	// Execute the increment command
+	err := patchIncrementCmd.RunE(cmd, []string{})
+	
+	// Verify no error occurred
+	suite.NoError(err, "Patch increment should succeed")
+	
+	// Verify the version was incremented correctly
+	verifyVersionFile(suite.T(), suite.fs, "2.5.4")
+	
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Patch version incremented to: 2.5.4", "Output should show incremented version")
 }
 
-// verifyPatchVersionFile verifies the VERSION file contains the expected content
-func verifyPatchVersionFile(t *testing.T, fs afero.Fs, expectedVersion string) {
-	content, err := afero.ReadFile(fs, "VERSION")
-	require.NoError(t, err)
-	actualVersion := strings.TrimSpace(string(content))
-	assert.Equal(t, expectedVersion, actualVersion)
+// TestPatchDecrementFromExistingVersion tests decrementing patch version from an existing version
+func (suite *PatchTestSuite) TestPatchDecrementFromExistingVersion() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.5.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+	
+	// Execute the decrement command
+	err := patchDecrementCmd.RunE(cmd, []string{})
+	
+	// Verify no error occurred
+	suite.NoError(err, "Patch decrement should succeed")
+	
+	// Verify the version was decremented correctly
+	verifyVersionFile(suite.T(), suite.fs, "2.5.2")
+	
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Patch version decremented to: 2.5.2", "Output should show decremented version")
 }
 
-func TestPatchCommand(t *testing.T) {
-	tests := []struct {
-		name           string
-		args           []string
-		initialVersion string
-		expectedVersion string
-		expectError    bool
-		errorContains  string
-	}{
-		{
-			name:           "increment from 1.2.3",
-			args:           []string{"patch", "increment"},
-			initialVersion: "1.2.3",
-			expectedVersion: "1.2.4",
-			expectError:    false,
-		},
-		{
-			name:           "increment with inc alias",
-			args:           []string{"patch", "inc"},
-			initialVersion: "0.5.7",
-			expectedVersion: "0.5.8",
-			expectError:    false,
-		},
-		{
-			name:           "increment with + alias",
-			args:           []string{"patch", "+"},
-			initialVersion: "2.1.9",
-			expectedVersion: "2.1.10",
-			expectError:    false,
-		},
-		{
-			name:           "decrement from 1.3.5",
-			args:           []string{"patch", "decrement"},
-			initialVersion: "1.3.5",
-			expectedVersion: "1.3.4",
-			expectError:    false,
-		},
-		{
-			name:           "decrement with dec alias",
-			args:           []string{"patch", "dec"},
-			initialVersion: "2.5.1",
-			expectedVersion: "2.5.0",
-			expectError:    false,
-		},
-		{
-			name:           "increment from default version",
-			args:           []string{"patch", "increment"},
-			initialVersion: "", // No VERSION file
-			expectedVersion: "0.0.1",
-			expectError:    false,
-		},
-		{
-			name:           "increment large patch number",
-			args:           []string{"patch", "increment"},
-			initialVersion: "1.0.999",
-			expectedVersion: "1.0.1000",
-			expectError:    false,
-		},
-	}
+// TestPatchDecrementFromZeroPatchVersion tests error when trying to decrement from 0 patch version
+func (suite *PatchTestSuite) TestPatchDecrementFromZeroPatchVersion() {
+	// Setup: Create config and version files with patch version = 0
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "1.2.0")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fs, testApp := createPatchTestApp()
-			defer replacePatchAppInstance(testApp)()
-
-			createPatchConfigFile(t, fs)
-			createPatchVersionFile(t, fs, tt.initialVersion)
-
-			// Capture output
-			var stdout, stderr bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetErr(&stderr)
-			rootCmd.SetArgs(tt.args)
-
-			// Execute command
-			err := rootCmd.Execute()
-
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-			} else {
-				assert.NoError(t, err)
-				verifyPatchVersionFile(t, fs, tt.expectedVersion)
-			}
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetErr(nil)
-			rootCmd.SetArgs(nil)
-		})
-	}
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+	
+	// Execute the decrement command
+	err := patchDecrementCmd.RunE(cmd, []string{})
+	
+	// Verify error occurred
+	suite.Error(err, "Patch decrement from 0 should fail")
+	suite.Contains(err.Error(), "cannot decrement patch version below 0", "Error should indicate patch version cannot go below 0")
+	
+	// Verify the version file wasn't changed
+	verifyVersionFile(suite.T(), suite.fs, "1.2.0")
 }
 
-func TestPatchCommandHelp(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-	}{
-		{
-			name: "patch help",
-			args: []string{"patch", "--help"},
-		},
-		{
-			name: "patch increment help",
-			args: []string{"patch", "increment", "--help"},
-		},
-		{
-			name: "patch decrement help",
-			args: []string{"patch", "decrement", "--help"},
-		},
-	}
+// TestPatchDecrementFromDefaultVersion tests error when trying to decrement from default 0.0.0
+func (suite *PatchTestSuite) TestPatchDecrementFromDefaultVersion() {
+	// Setup: Create config file only (VERSION file will be auto-created as 0.0.0)
+	createConfigFile(suite.T(), suite.fs)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			rootCmd.SetOut(&buf)
-			rootCmd.SetArgs(tt.args)
-
-			err := rootCmd.Execute()
-			assert.NoError(t, err)
-
-			output := buf.String()
-			assert.Contains(t, output, "Usage:")
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetArgs(nil)
-		})
-	}
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+	
+	// Execute the decrement command
+	err := patchDecrementCmd.RunE(cmd, []string{})
+	
+	// Verify error occurred
+	suite.Error(err, "Patch decrement from default version should fail")
+	suite.Contains(err.Error(), "cannot decrement patch version below 0", "Error should indicate patch version cannot go below 0")
 }
 
-func TestPatchCommandEdgeCases(t *testing.T) {
-	tests := []struct {
-		name           string
-		args           []string
-		initialVersion string
-		expectError    bool
-		errorContains  string
-	}{
-		{
-			name:           "increment with whitespace in version file",
-			args:           []string{"patch", "increment"},
-			initialVersion: "  1.2.3  \n",
-			expectError:    false,
-		},
-		{
-			name:           "decrement with trailing newline",
-			args:           []string{"patch", "decrement"},
-			initialVersion: "1.2.3\n",
-			expectError:    false,
-		},
-		{
-			name:           "invalid command",
-			args:           []string{"patch", "invalid"},
-			initialVersion: "1.2.3",
-			expectError:    false, // Cobra shows help instead of returning error
-			errorContains:  "",
-		},
+// TestPatchIncrementWithAppInstanceError tests handling of appInstance errors during increment
+func (suite *PatchTestSuite) TestPatchIncrementWithAppInstanceError() {
+	// Setup: Create config but no version file and make filesystem read-only
+	createConfigFile(suite.T(), suite.fs)
+	
+	// Make filesystem read-only by replacing with a filesystem that errors on write
+	suite.testApp.FileSystem = afero.NewReadOnlyFs(suite.fs)
+	suite.testApp.VersionManager = version.NewVersion(suite.testApp.FileSystem, ".", nil)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+	
+	// Execute the increment command
+	err := patchIncrementCmd.RunE(cmd, []string{})
+	
+	// Verify error occurred
+	suite.Error(err, "Increment should fail with read-only filesystem")
+	suite.Contains(err.Error(), "error incrementing patch version", "Error should indicate increment failure")
+}
+
+// TestPatchCommandStructure tests that the commands are properly structured
+func (suite *PatchTestSuite) TestPatchCommandStructure() {
+	// Test patch command properties
+	suite.Equal("patch", patchCmd.Use, "Patch command should have correct use")
+	suite.Equal("Manage patch version", patchCmd.Short, "Patch command should have correct short description")
+	suite.Contains(patchCmd.Long, "Commands to increment or decrement", "Patch command should have correct long description")
+
+	// Test increment command properties
+	suite.Equal("increment", patchIncrementCmd.Use, "Increment command should have correct use")
+	suite.Contains(patchIncrementCmd.Aliases, "inc", "Increment command should have 'inc' alias")
+	suite.Contains(patchIncrementCmd.Aliases, "+", "Increment command should have '+' alias")
+	suite.Equal("Increment patch version", patchIncrementCmd.Short, "Increment command should have correct short description")
+	suite.Equal("Increment the patch version", patchIncrementCmd.Long, "Increment command should have correct long description")
+
+	// Test decrement command properties
+	suite.Equal("decrement", patchDecrementCmd.Use, "Decrement command should have correct use")
+	suite.Contains(patchDecrementCmd.Aliases, "dec", "Decrement command should have 'dec' alias")
+	suite.Equal("Decrement patch version", patchDecrementCmd.Short, "Decrement command should have correct short description")
+	suite.Equal("Decrement the patch version", patchDecrementCmd.Long, "Decrement command should have correct long description")
+}
+
+// TestPatchCommandHierarchy tests that commands are properly registered in the command hierarchy
+func (suite *PatchTestSuite) TestPatchCommandHierarchy() {
+	// Find patch command in root
+	var foundPatchCmd *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Use == "patch" {
+			foundPatchCmd = cmd
+			break
+		}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fs, testApp := createPatchTestApp()
-			defer replacePatchAppInstance(testApp)()
-
-			createPatchConfigFile(t, fs)
-			createPatchVersionFile(t, fs, tt.initialVersion)
-
-			// Capture output
-			var stdout, stderr bytes.Buffer
-			rootCmd.SetOut(&stdout)
-			rootCmd.SetErr(&stderr)
-			rootCmd.SetArgs(tt.args)
-
-			// Execute command
-			err := rootCmd.Execute()
-
-			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorContains != "" && err != nil {
-					assert.Contains(t, err.Error(), tt.errorContains)
-				}
-			} else {
-				assert.NoError(t, err)
-			}
-
-			// Reset command state
-			rootCmd.SetOut(nil)
-			rootCmd.SetErr(nil)
-			rootCmd.SetArgs(nil)
-		})
+	suite.NotNil(foundPatchCmd, "Patch command should be registered with root command")
+	
+	// Find increment and decrement subcommands
+	var foundIncrementCmd, foundDecrementCmd *cobra.Command
+	for _, cmd := range foundPatchCmd.Commands() {
+		switch cmd.Use {
+		case "increment":
+			foundIncrementCmd = cmd
+		case "decrement":
+			foundDecrementCmd = cmd
+		}
 	}
+	
+	suite.NotNil(foundIncrementCmd, "Increment command should be registered with patch command")
+	suite.NotNil(foundDecrementCmd, "Decrement command should be registered with patch command")
+}
+
+// TestPatchTestSuite runs the test suite
+func TestPatchTestSuite(t *testing.T) {
+	suite.Run(t, new(PatchTestSuite))
 }

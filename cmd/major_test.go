@@ -2,246 +2,217 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 	"versionator/internal/app"
-	"versionator/internal/config"
 	"versionator/internal/version"
-	"versionator/internal/versionator"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/suite"
 )
 
-// Helper functions for DRY test setup
+// MajorTestSuite contains the test suite for major version commands
+type MajorTestSuite struct {
+	suite.Suite
+	testApp      *app.App
+	fs           afero.Fs
+	restoreApp   func()
+	outputBuffer *bytes.Buffer
+}
 
-// createMajorTestApp creates a fresh filesystem and test app instance
-func createMajorTestApp() (afero.Fs, *app.App) {
-	fs := afero.NewMemMapFs()
-	testApp := &app.App{
-		ConfigManager:  config.NewConfigManager(fs),
-		VersionManager: version.NewVersion(fs, ".", nil),
-		Versionator:    versionator.NewVersionator(fs, nil),
-		VCS:            nil,
-		FileSystem:     fs,
+// SetupTest initializes the test environment before each test
+func (suite *MajorTestSuite) SetupTest() {
+	var testApp *app.App
+	suite.fs, testApp = createTestApp()
+	suite.testApp = testApp
+	suite.restoreApp = replaceAppInstance(testApp)
+	suite.outputBuffer = &bytes.Buffer{}
+}
+
+// TearDownTest cleans up after each test
+func (suite *MajorTestSuite) TearDownTest() {
+	suite.restoreApp()
+}
+
+// TestMajorIncrementFromDefaultVersion tests incrementing major version from default 0.0.0
+func (suite *MajorTestSuite) TestMajorIncrementFromDefaultVersion() {
+	// Setup: Create config file (VERSION file will be auto-created)
+	createConfigFile(suite.T(), suite.fs)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the increment command
+	err := majorIncrementCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Major increment should succeed")
+
+	// Verify the version was incremented correctly
+	verifyVersionFile(suite.T(), suite.fs, "1.0.0")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Major version incremented to: 1.0.0", "Output should show incremented version")
+}
+
+// TestMajorIncrementFromExistingVersion tests incrementing major version from an existing version
+func (suite *MajorTestSuite) TestMajorIncrementFromExistingVersion() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.5.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the increment command
+	err := majorIncrementCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Major increment should succeed")
+
+	// Verify the version was incremented correctly (minor and patch should reset to 0)
+	verifyVersionFile(suite.T(), suite.fs, "3.0.0")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Major version incremented to: 3.0.0", "Output should show incremented version")
+}
+
+// TestMajorDecrementFromExistingVersion tests decrementing major version from an existing version
+func (suite *MajorTestSuite) TestMajorDecrementFromExistingVersion() {
+	// Setup: Create config and version files
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "2.5.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the decrement command
+	err := majorDecrementCmd.RunE(cmd, []string{})
+
+	// Verify no error occurred
+	suite.NoError(err, "Major decrement should succeed")
+
+	// Verify the version was decremented correctly (minor and patch should reset to 0)
+	verifyVersionFile(suite.T(), suite.fs, "1.0.0")
+
+	// Verify the output message
+	output := suite.outputBuffer.String()
+	suite.Contains(output, "Major version decremented to: 1.0.0", "Output should show decremented version")
+}
+
+// TestMajorDecrementFromZeroMajorVersion tests error when trying to decrement from 0 major version
+func (suite *MajorTestSuite) TestMajorDecrementFromZeroMajorVersion() {
+	// Setup: Create config and version files with major version = 0
+	createConfigFile(suite.T(), suite.fs)
+	createVersionFile(suite.T(), suite.fs, "0.5.3")
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the decrement command
+	err := majorDecrementCmd.RunE(cmd, []string{})
+
+	// Verify error occurred
+	suite.Error(err, "Major decrement from 0 should fail")
+	suite.Contains(err.Error(), "cannot decrement major version below 0", "Error should indicate major version cannot go below 0")
+
+	// Verify the version file wasn't changed
+	verifyVersionFile(suite.T(), suite.fs, "0.5.3")
+}
+
+// TestMajorDecrementFromDefaultVersion tests error when trying to decrement from default 0.0.0
+func (suite *MajorTestSuite) TestMajorDecrementFromDefaultVersion() {
+	// Setup: Create config file only (VERSION file will be auto-created as 0.0.0)
+	createConfigFile(suite.T(), suite.fs)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the decrement command
+	err := majorDecrementCmd.RunE(cmd, []string{})
+
+	// Verify error occurred
+	suite.Error(err, "Major decrement from default version should fail")
+	suite.Contains(err.Error(), "cannot decrement major version below 0", "Error should indicate major version cannot go below 0")
+}
+
+// TestMajorIncrementWithAppInstanceError tests handling of appInstance errors during increment
+func (suite *MajorTestSuite) TestMajorIncrementWithAppInstanceError() {
+	// Setup: Create config but no version file and make filesystem read-only
+	createConfigFile(suite.T(), suite.fs)
+
+	// Make filesystem read-only by replacing with a filesystem that errors on write
+	suite.testApp.FileSystem = afero.NewReadOnlyFs(suite.fs)
+	suite.testApp.VersionManager = version.NewVersion(suite.testApp.FileSystem, ".", nil)
+
+	// Create and execute the command
+	cmd := &cobra.Command{}
+	cmd.SetOut(suite.outputBuffer)
+
+	// Execute the increment command
+	err := majorIncrementCmd.RunE(cmd, []string{})
+
+	// Verify error occurred
+	suite.Error(err, "Increment should fail with read-only filesystem")
+	suite.Contains(err.Error(), "error incrementing major version", "Error should indicate increment failure")
+}
+
+// TestMajorCommandStructure tests that the commands are properly structured
+func (suite *MajorTestSuite) TestMajorCommandStructure() {
+	// Test major command properties
+	suite.Equal("major", majorCmd.Use, "Major command should have correct use")
+	suite.Equal("Manage major version", majorCmd.Short, "Major command should have correct short description")
+	suite.Contains(majorCmd.Long, "Commands to increment or decrement", "Major command should have correct long description")
+
+	// Test increment command properties
+	suite.Equal("increment", majorIncrementCmd.Use, "Increment command should have correct use")
+	suite.Contains(majorIncrementCmd.Aliases, "inc", "Increment command should have 'inc' alias")
+	suite.Contains(majorIncrementCmd.Aliases, "+", "Increment command should have '+' alias")
+	suite.Equal("Increment major version", majorIncrementCmd.Short, "Increment command should have correct short description")
+	suite.Contains(majorIncrementCmd.Long, "Increment the major version and reset minor and patch to 0", "Increment command should explain reset behavior")
+
+	// Test decrement command properties
+	suite.Equal("decrement", majorDecrementCmd.Use, "Decrement command should have correct use")
+	suite.Contains(majorDecrementCmd.Aliases, "dec", "Decrement command should have 'dec' alias")
+	suite.Equal("Decrement major version", majorDecrementCmd.Short, "Decrement command should have correct short description")
+	suite.Contains(majorDecrementCmd.Long, "Decrement the major version and reset minor and patch to 0", "Decrement command should explain reset behavior")
+}
+
+// TestMajorCommandHierarchy tests that commands are properly registered in the command hierarchy
+func (suite *MajorTestSuite) TestMajorCommandHierarchy() {
+	// Find major command in root
+	var foundMajorCmd *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Use == "major" {
+			foundMajorCmd = cmd
+			break
+		}
 	}
-	return fs, testApp
-}
+	suite.NotNil(foundMajorCmd, "Major command should be registered with root command")
 
-// getMajorStandardConfigContent returns the standard config content used across tests
-func getMajorStandardConfigContent() string {
-	return `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-}
-
-// createMajorConfigFile creates the standard config file in the filesystem
-func createMajorConfigFile(t *testing.T, fs afero.Fs) {
-	err := afero.WriteFile(fs, ".versionator.yaml", []byte(getMajorStandardConfigContent()), 0644)
-	require.NoError(t, err, "Failed to create config file")
-}
-
-// createMajorVersionFile creates a VERSION file with the specified content
-func createMajorVersionFile(t *testing.T, fs afero.Fs, version string) {
-	err := afero.WriteFile(fs, "VERSION", []byte(version), 0644)
-	require.NoError(t, err, "Failed to create VERSION file")
-}
-
-// replaceMajorAppInstance replaces the global app instance and returns a restore function
-func replaceMajorAppInstance(testApp *app.App) func() {
-	originalApp := appInstance
-	appInstance = testApp
-	return func() {
-		appInstance = originalApp
+	// Find increment and decrement subcommands
+	var foundIncrementCmd, foundDecrementCmd *cobra.Command
+	for _, cmd := range foundMajorCmd.Commands() {
+		switch cmd.Use {
+		case "increment":
+			foundIncrementCmd = cmd
+		case "decrement":
+			foundDecrementCmd = cmd
+		}
 	}
+
+	suite.NotNil(foundIncrementCmd, "Increment command should be registered with major command")
+	suite.NotNil(foundDecrementCmd, "Decrement command should be registered with major command")
 }
 
-// verifyMajorVersionFile verifies the VERSION file contains the expected content
-func verifyMajorVersionFile(t *testing.T, fs afero.Fs, expectedVersion string) {
-	content, err := afero.ReadFile(fs, "VERSION")
-	require.NoError(t, err, "Should be able to read VERSION file")
-	require.Equal(t, expectedVersion, strings.TrimSpace(string(content)), "VERSION file should contain '"+expectedVersion+"'")
-}
-
-func TestMajorIncrementCommand(t *testing.T) {
-	defer func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	fs, testApp := createMajorTestApp()
-	defer replaceMajorAppInstance(testApp)()
-
-	createMajorConfigFile(t, fs)
-	createMajorVersionFile(t, fs, "1.2.3")
-
-	// Execute the major increment command
-	rootCmd.SetArgs([]string{"major", "increment"})
-	err := rootCmd.Execute()
-	require.NoError(t, err, "major increment command should succeed")
-
-	verifyMajorVersionFile(t, fs, "2.0.0")
-}
-
-func TestMajorIncrementCommand_Aliases(t *testing.T) {
-	testCases := []string{"inc", "+"}
-
-	for _, alias := range testCases {
-		t.Run("alias_"+alias, func(t *testing.T) {
-			defer func() {
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			fs, testApp := createMajorTestApp()
-			defer replaceMajorAppInstance(testApp)()
-
-			createMajorConfigFile(t, fs)
-			createMajorVersionFile(t, fs, "0.1.0")
-
-			// Execute the major increment command with alias
-			rootCmd.SetArgs([]string{"major", alias})
-			err := rootCmd.Execute()
-			require.NoError(t, err, "major %s command should succeed", alias)
-
-			verifyMajorVersionFile(t, fs, "1.0.0")
-		})
-	}
-}
-
-func TestMajorDecrementCommand(t *testing.T) {
-	defer func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	fs, testApp := createMajorTestApp()
-	defer replaceMajorAppInstance(testApp)()
-
-	createMajorConfigFile(t, fs)
-	createMajorVersionFile(t, fs, "3.5.7")
-
-	// Execute the major decrement command
-	rootCmd.SetArgs([]string{"major", "decrement"})
-	err := rootCmd.Execute()
-	require.NoError(t, err, "major decrement command should succeed")
-
-	verifyMajorVersionFile(t, fs, "2.0.0")
-}
-
-func TestMajorDecrementCommand_Aliases(t *testing.T) {
-	testCases := []string{"dec"}
-
-	for _, alias := range testCases {
-		t.Run("alias_"+alias, func(t *testing.T) {
-			defer func() {
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			fs, testApp := createMajorTestApp()
-			defer replaceMajorAppInstance(testApp)()
-
-			createMajorConfigFile(t, fs)
-			createMajorVersionFile(t, fs, "2.1.0")
-
-			// Execute the major decrement command with alias
-			rootCmd.SetArgs([]string{"major", alias})
-			err := rootCmd.Execute()
-			require.NoError(t, err, "major %s command should succeed", alias)
-
-			verifyMajorVersionFile(t, fs, "1.0.0")
-		})
-	}
-}
-
-func TestMajorIncrementCommand_NoVersionFile(t *testing.T) {
-	defer func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	fs, testApp := createMajorTestApp()
-	defer replaceMajorAppInstance(testApp)()
-
-	// Create only config file (no VERSION file)
-	createMajorConfigFile(t, fs)
-
-	// Execute the major increment command - should succeed with default version
-	rootCmd.SetArgs([]string{"major", "increment"})
-	err := rootCmd.Execute()
-	require.NoError(t, err, "major increment command should succeed with default version")
-
-	verifyMajorVersionFile(t, fs, "1.0.0")
-}
-
-func TestMajorDecrementCommand_AtZero(t *testing.T) {
-	defer func() {
-		// Reset command state
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	}()
-
-	fs, testApp := createMajorTestApp()
-	defer replaceMajorAppInstance(testApp)()
-
-	createMajorConfigFile(t, fs)
-	createMajorVersionFile(t, fs, "0.5.3")
-
-	// Capture stderr
-	var buf bytes.Buffer
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"major", "decrement"})
-
-	// Execute the major decrement command - should fail
-	err := rootCmd.Execute()
-	require.Error(t, err, "Expected major decrement command to fail when major version is at 0")
-}
-
-func TestMajorCommand_InvalidVersionFile(t *testing.T) {
-	// Test both increment and decrement with invalid version
-	testCases := []string{"increment", "decrement"}
-
-	for _, operation := range testCases {
-		t.Run(operation, func(t *testing.T) {
-			defer func() {
-				// Reset command state
-				rootCmd.SetOut(nil)
-				rootCmd.SetErr(nil)
-				rootCmd.SetArgs(nil)
-			}()
-
-			fs, testApp := createMajorTestApp()
-			defer replaceMajorAppInstance(testApp)()
-
-			createMajorConfigFile(t, fs)
-			createMajorVersionFile(t, fs, "invalid.version")
-
-			// Capture stderr
-			var buf bytes.Buffer
-			rootCmd.SetErr(&buf)
-			rootCmd.SetArgs([]string{"major", operation})
-
-			// Execute the command - should fail
-			err := rootCmd.Execute()
-			require.Error(t, err, "Expected major %s command to fail with invalid version file", operation)
-		})
-	}
+// TestMajorTestSuite runs the test suite
+func TestMajorTestSuite(t *testing.T) {
+	suite.Run(t, new(MajorTestSuite))
 }
