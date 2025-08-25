@@ -145,7 +145,8 @@ build-all:
     echo "Building for Windows arm64..."
     CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags="-s -w -X main.VERSION=$VERSION" -trimpath -o bin/versionator-windows-arm64.exe .
     echo "Compressing Windows arm64 binary with UPX..."
-    upx --best --lzma bin/versionator-windows-arm64.exe
+    # Windows ARM64 is not supported
+    # upx --best --lzma bin/versionator-windows-arm64.exe
 
     # FreeBSD amd64
     echo "Building for FreeBSD amd64..."
