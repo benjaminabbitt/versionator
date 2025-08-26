@@ -39,6 +39,10 @@ jobs:
           # Build for all platforms
           just build-all
 
+          # Copy shell scripts to bin directory
+          cp get-versionator.sh bin/
+          cp get-versionator-windows.bat bin/
+
           # Create release directory
           mkdir -p release
 
@@ -59,6 +63,10 @@ jobs:
           cp bin/versionator-windows-amd64.exe release/versionator-windows-amd64.exe
           cp bin/versionator-windows-arm64.exe release/versionator-windows-arm64.exe
           cp bin/versionator-freebsd-amd64 release/versionator-freebsd-amd64
+
+          # Copy shell scripts to release directory
+          cp bin/get-versionator.sh release/
+          cp bin/get-versionator-windows.bat release/
 
           # Create checksums
           cd release
