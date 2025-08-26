@@ -226,6 +226,24 @@ status:
     @echo "Build status:"
     @ls -la bin/ 2>/dev/null || echo "No build artifacts found"
 
+# Download versionator binary for Windows
+get-versionator-windows:
+    @echo "Creating bin directory..."
+    @mkdir -p bin
+    @echo "Downloading versionator for Windows amd64..."
+    @curl -L "https://github.com/benjaminabbitt/versionator/releases/latest/download/versionator-windows-amd64.exe" -o "bin\\versionator.exe"
+    @echo "Successfully downloaded versionator for Windows"
+    @echo "Binary saved as: bin\\versionator.exe"
+
+# Download versionator binary (default for Unix-like systems)
 get-versionator:
-    mkdir -p bin
-    curl https://github.com/benjaminabbitt/versionator/releases/latest/versionator-windows-amd64.exe -o bin/versionator.exe
+    @echo "Creating bin directory..."
+    @mkdir -p bin
+    @echo "Detecting platform..."
+    @echo "For Windows, use: just get-versionator-windows"
+    @echo "Downloading versionator for Linux amd64 (default)..."
+    @curl -L "https://github.com/benjaminabbitt/versionator/releases/latest/download/versionator-linux-amd64" -o "bin/versionator"
+    @chmod +x "bin/versionator" 2>/dev/null || echo "Note: chmod not available on this platform"
+    @echo "Successfully downloaded versionator for Linux amd64"
+    @echo "Binary saved as: bin/versionator"
+    
