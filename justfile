@@ -54,28 +54,28 @@ deps: fix-perms
     GO111MODULE=on go mod tidy
     echo "Dependencies downloaded successfully!"
 
-# Build the application
+# Build the application (static binary)
 build: fix-git-dubious-ownership-warning
     #!/bin/zsh
     set -e
     just fix-perms
     mkdir -p bin/
-    echo "Building versionator..."
-    GO111MODULE=on go build -o bin/versionator .
+    echo "Building versionator (static binary)..."
+    CGO_ENABLED=0 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator .
     echo "Build completed: bin/versionator"
 
-# Build with verbose output for debugging
+# Build with verbose output for debugging (static binary)
 build-verbose: fix-git-dubious-ownership-warning
     #!/bin/zsh
     set -e
     just fix-perms
     mkdir -p bin/
-    echo "Building versionator (verbose)..."
-    GO111MODULE=on go build -v -o bin/versionator .
+    echo "Building versionator (verbose, static binary)..."
+    CGO_ENABLED=0 GO111MODULE=on go build -v -ldflags='-s -w' -trimpath -o bin/versionator .
 
 # Run the application with arguments
 run *args:
-    @just buildfix-git-dubious-ownership-warning
+    @just build
     ./bin/versionator {{args}}
 
 # Install the binary to /usr/local/bin

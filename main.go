@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"versionator/cmd"
+	"github.com/benjaminabbitt/versionator/cmd"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"versionator/internal/vcs/mock"
+	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
 )
 
 func TestVCSRegistry_RegisterVCS(t *testing.T) {

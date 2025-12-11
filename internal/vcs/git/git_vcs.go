@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"versionator/internal/vcs"
+	"github.com/benjaminabbitt/versionator/internal/vcs"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"

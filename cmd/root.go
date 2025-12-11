@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"versionator/internal/config"
-	"versionator/internal/logging"
-	"versionator/internal/versionator"
+	"github.com/benjaminabbitt/versionator/internal/config"
+	"github.com/benjaminabbitt/versionator/internal/logging"
+	"github.com/benjaminabbitt/versionator/internal/versionator"
 
 	"github.com/spf13/cobra"
 )

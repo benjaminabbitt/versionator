@@ -1,0 +1,17 @@
+Package: versionator
+Version: $VERSION$
+Section: devel
+Priority: optional
+Architecture: $ARCH$
+Maintainer: Benjamin Abbitt <benjaminabbitt@users.noreply.github.com>
+Homepage: https://github.com/benjaminabbitt/versionator
+Description: A semantic version management CLI tool
+ Versionator is a CLI tool for managing semantic versions.
+ It allows you to increment and decrement major, minor, and patch versions
+ stored in a VERSION file in the current directory.
+ .
+ Features:
+  - Increment/decrement major, minor, and patch versions
+  - Support for version prefixes and suffixes
+  - Git integration for version tagging
+  - Configurable via YAML

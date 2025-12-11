@@ -7,8 +7,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
-	"versionator/internal/vcs"
-	"versionator/internal/vcs/mock"
+	"github.com/benjaminabbitt/versionator/internal/vcs"
+	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
 )
 
 // CommitTestSuite defines the test suite for commit command tests

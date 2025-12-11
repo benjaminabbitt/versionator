@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"versionator/internal/vcs"
-	"versionator/internal/version"
+	"github.com/benjaminabbitt/versionator/internal/vcs"
+	"github.com/benjaminabbitt/versionator/internal/version"
 
 	"github.com/spf13/cobra"
 )

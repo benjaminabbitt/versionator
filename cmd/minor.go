@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"versionator/internal/version"
+	"github.com/benjaminabbitt/versionator/internal/version"
 
 	"github.com/spf13/cobra"
 )
