@@ -1,4 +1,4 @@
-module versionator
+module github.com/benjaminabbitt/versionator
 
 go 1.21
 

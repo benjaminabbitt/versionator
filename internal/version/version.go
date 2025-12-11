@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"versionator/internal/vcs"
+	"github.com/benjaminabbitt/versionator/internal/vcs"
 
 	"github.com/Masterminds/semver/v3"
 )

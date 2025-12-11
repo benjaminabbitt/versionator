@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-	"versionator/internal/config"
-	"versionator/internal/vcs"
-	"versionator/internal/vcs/mock"
+	"github.com/benjaminabbitt/versionator/internal/config"
+	"github.com/benjaminabbitt/versionator/internal/vcs"
+	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
 )
 
 func TestSuffixEnableCommand(t *testing.T) {

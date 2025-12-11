@@ -1,0 +1,34 @@
+VERIFICATION
+
+Verification is intended to assist the Chocolatey moderators and community
+in verifying that this package's contents are trustworthy.
+
+This package downloads the versionator binary from the official GitHub releases:
+https://github.com/benjaminabbitt/versionator/releases
+
+The binary is built from source code available at:
+https://github.com/benjaminabbitt/versionator
+
+To verify the download:
+
+1. Go to the releases page:
+   https://github.com/benjaminabbitt/versionator/releases/tag/v$version$
+
+2. Download the Windows binary:
+   versionator-windows-amd64.exe
+
+3. Download the checksums file:
+   checksums.txt
+
+4. Verify the SHA256 checksum matches:
+   - The checksum in this package: $checksum64$
+   - The checksum in checksums.txt for versionator-windows-amd64.exe
+
+5. Verify using PowerShell:
+   Get-FileHash versionator-windows-amd64.exe -Algorithm SHA256
+
+The package maintainer (benjaminabbitt) is the same as the software author,
+ensuring the binary is obtained from the official source.
+
+License: BSD-3-Clause
+License URL: https://github.com/benjaminabbitt/versionator/blob/master/LICENSE

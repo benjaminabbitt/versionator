@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>versionator</id>
+    <version>$version$</version>
+    <title>Versionator</title>
+    <authors>Benjamin Abbitt</authors>
+    <owners>benjaminabbitt</owners>
+    <copyright>Copyright (c) 2024 Benjamin Abbitt</copyright>
+    <projectUrl>https://github.com/benjaminabbitt/versionator</projectUrl>
+    <licenseUrl>https://github.com/benjaminabbitt/versionator/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/benjaminabbitt/versionator</projectSourceUrl>
+    <packageSourceUrl>https://github.com/benjaminabbitt/versionator/tree/master/packaging/chocolatey</packageSourceUrl>
+    <docsUrl>https://github.com/benjaminabbitt/versionator#readme</docsUrl>
+    <bugTrackerUrl>https://github.com/benjaminabbitt/versionator/issues</bugTrackerUrl>
+    <tags>versionator semver semantic-version cli version-management devops golang</tags>
+    <summary>A semantic version management CLI tool</summary>
+    <description>Versionator is a CLI tool for managing semantic versions stored in a VERSION file.
+
+## Features
+
+- Increment and decrement major, minor, and patch versions
+- Support for version prefixes (e.g., "v1.0.0") and suffixes (e.g., "1.0.0-beta")
+- Git integration for automatic version tagging
+- Configurable via YAML configuration file
+- Cross-platform support (Windows, macOS, Linux)
+
+## Usage
+
+```
+versionator version           # Show current version
+versionator major increment   # Increment major version (1.0.0 -> 2.0.0)
+versionator minor increment   # Increment minor version (1.0.0 -> 1.1.0)
+versionator patch increment   # Increment patch version (1.0.0 -> 1.0.1)
+versionator commit            # Create git tag for current version
+```
+
+## Quick Start
+
+1. Create a VERSION file in your project: `echo 1.0.0 > VERSION`
+2. Run `versionator version` to verify
+3. Use `versionator patch increment` to bump the version
+
+## Documentation
+
+For full documentation, visit: https://github.com/benjaminabbitt/versionator
+    </description>
+    <releaseNotes>https://github.com/benjaminabbitt/versionator/releases/tag/v$version$</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
