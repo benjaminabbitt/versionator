@@ -1,0 +1,30 @@
+# Docker Compose for running acceptance tests
+# Usage: docker-compose -f tests/acceptance/docker-compose.yml up --build
+
+version: '3.8'
+
+services:
+  acceptance-tests:
+    build:
+      context: ../..
+      dockerfile: tests/acceptance/Dockerfile
+    volumes:
+      # Mount test workspace as tmpfs for speed
+      - type: tmpfs
+        target: /test-workspace
+    environment:
+      - VERSIONATOR_PROJECT_ROOT=/app
+      - GO_TEST_FLAGS=-v
+    command: ["go", "test", "-v", "/app/tests/acceptance/..."]
+
+  acceptance-tests-slow:
+    build:
+      context: ../..
+      dockerfile: tests/acceptance/Dockerfile
+    volumes:
+      - type: tmpfs
+        target: /test-workspace
+    environment:
+      - VERSIONATOR_PROJECT_ROOT=/app
+    # Run slow tests separately
+    command: ["go", "test", "-v", "-run", "TestSlowFeatures", "/app/tests/acceptance/..."]
