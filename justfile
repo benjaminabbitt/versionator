@@ -60,8 +60,9 @@ build: fix-git-dubious-ownership-warning
     set -e
     just fix-perms
     mkdir -p bin/
-    echo "Building versionator (static binary)..."
-    CGO_ENABLED=0 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator .
+    VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+    echo "Building versionator $VERSION (static binary)..."
+    CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w -X github.com/benjaminabbitt/versionator/internal/buildinfo.Version=$VERSION" -trimpath -o bin/versionator .
     echo "Build completed: bin/versionator"
 
 # Build with verbose output for debugging (static binary)
@@ -70,8 +71,9 @@ build-verbose: fix-git-dubious-ownership-warning
     set -e
     just fix-perms
     mkdir -p bin/
-    echo "Building versionator (verbose, static binary)..."
-    CGO_ENABLED=0 GO111MODULE=on go build -v -ldflags='-s -w' -trimpath -o bin/versionator .
+    VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+    echo "Building versionator $VERSION (verbose, static binary)..."
+    CGO_ENABLED=0 GO111MODULE=on go build -v -ldflags="-s -w -X github.com/benjaminabbitt/versionator/internal/buildinfo.Version=$VERSION" -trimpath -o bin/versionator .
 
 # Run the application with arguments
 run *args:
@@ -139,36 +141,38 @@ dev-setup:
 build-all: fix-perms fix-git-dubious-ownership-warning
     #!/bin/zsh
     set -e
-    echo "Building for all platforms with static linking..."
+    VERSION=$(cat VERSION 2>/dev/null || echo "dev")
+    LDFLAGS="-s -w -X github.com/benjaminabbitt/versionator/internal/buildinfo.Version=$VERSION"
+    echo "Building versionator $VERSION for all platforms with static linking..."
     mkdir -p bin/
 
     # Linux amd64
     echo "Building for Linux amd64..."
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-amd64 .
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-linux-amd64 .
 
     # Linux arm64
     echo "Building for Linux arm64..."
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-linux-arm64 .
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-linux-arm64 .
 
     # macOS amd64 (Intel)
     echo "Building for macOS amd64..."
-    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-amd64 .
+    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-darwin-amd64 .
 
     # macOS arm64 (Apple Silicon)
     echo "Building for macOS arm64..."
-    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-darwin-arm64 .
+    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-darwin-arm64 .
 
     # Windows amd64
     echo "Building for Windows amd64..."
-    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-amd64.exe .
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-windows-amd64.exe .
 
     # Windows arm64
     echo "Building for Windows arm64..."
-    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-windows-arm64.exe .
+    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-windows-arm64.exe .
 
     # FreeBSD amd64
     echo "Building for FreeBSD amd64..."
-    CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags='-s -w' -trimpath -o bin/versionator-freebsd-amd64 .
+    CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-freebsd-amd64 .
 
     echo "All builds completed successfully!"
     echo "Build artifacts:"
@@ -206,4 +210,62 @@ rebuild:
 
 fix-git-dubious-ownership-warning:
     git config --global --add safe.directory /workspace
+
+# Run Claude Code with permissions bypassed
+claude:
+    claude --dangerously-skip-permissions
+
+# Run acceptance tests locally (requires versionator in PATH or bin/)
+acceptance-test: build
+    #!/bin/zsh
+    set -e
+    echo "Running acceptance tests locally..."
+    # Tests look for $VERSIONATOR_PROJECT_ROOT/versionator
+    export VERSIONATOR_PROJECT_ROOT=$(pwd)/bin
+    GO111MODULE=on go test -v ./tests/acceptance/...
+
+# Build acceptance test container image
+acceptance-test-build:
+    #!/bin/zsh
+    set -e
+    echo "Building acceptance test container..."
+    docker build -f tests/acceptance/Dockerfile -t versionator-acceptance:latest .
+
+# Run acceptance tests in container (fast tests only)
+acceptance-test-container: acceptance-test-build
+    #!/bin/zsh
+    set -e
+    echo "Running acceptance tests in container..."
+    docker run --rm \
+      -v "$(pwd)/tests:/app/tests:ro" \
+      -e VERSIONATOR_PROJECT_ROOT=/usr/local/bin \
+      versionator-acceptance:latest \
+      sh -c "cd /app && go test -v ./tests/acceptance/..."
+
+# Run ALL acceptance tests in container (including slow)
+acceptance-test-container-all: acceptance-test-build
+    #!/bin/zsh
+    set -e
+    echo "Running ALL acceptance tests in container (including slow)..."
+    docker run --rm \
+      -v "$(pwd)/tests:/app/tests:ro" \
+      -e VERSIONATOR_PROJECT_ROOT=/usr/local/bin \
+      versionator-acceptance:latest \
+      sh -c "cd /app && go test -v ./tests/acceptance/... -run '.*'"
+
+# Run acceptance tests via docker-compose
+acceptance-test-compose:
+    #!/bin/zsh
+    set -e
+    echo "Running acceptance tests via docker-compose..."
+    docker compose -f tests/acceptance/docker-compose.yml up --build --abort-on-container-exit
+    docker compose -f tests/acceptance/docker-compose.yml down
+
+# Run slow acceptance tests via docker-compose
+acceptance-test-compose-slow:
+    #!/bin/zsh
+    set -e
+    echo "Running slow acceptance tests via docker-compose..."
+    docker compose -f tests/acceptance/docker-compose.yml run --build acceptance-tests-slow
+    docker compose -f tests/acceptance/docker-compose.yml down
 
