@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
+	"github.com/golang/mock/gomock"
 )
 
 func TestGetCurrentVersion_NoVersionFile_NoVCS(t *testing.T) {
@@ -79,7 +79,7 @@ func TestGetCurrentVersion_ExistingValidVersion(t *testing.T) {
 	defer os.Chdir(originalDir)
 	os.Chdir(tempDir)
 
-	// Create a VERSION file with valid content
+	// Create a legacy VERSION file with valid content (will be migrated)
 	versionContent := "1.2.3"
 	err := os.WriteFile(versionFile, []byte(versionContent), 0644)
 	if err != nil {
@@ -104,13 +104,13 @@ func TestGetCurrentVersion_EmptyVersionFile(t *testing.T) {
 	defer os.Chdir(originalDir)
 	os.Chdir(tempDir)
 
-	// Create an empty VERSION file
+	// Create an empty legacy VERSION file (will be migrated as 0.0.0)
 	err := os.WriteFile(versionFile, []byte(""), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create empty VERSION file: %v", err)
 	}
 
-	// Test getting version from empty file
+	// Test getting version from empty file - empty version parses as 0.0.0
 	version, err := GetCurrentVersion()
 	if err != nil {
 		t.Fatalf("Expected no error reading empty version file, got: %v", err)
@@ -128,13 +128,13 @@ func TestGetCurrentVersion_WhitespaceVersionFile(t *testing.T) {
 	defer os.Chdir(originalDir)
 	os.Chdir(tempDir)
 
-	// Create a VERSION file with whitespace
+	// Create a legacy VERSION file with whitespace (will be migrated as 0.0.0)
 	err := os.WriteFile(versionFile, []byte("  \n\t  \n"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create whitespace VERSION file: %v", err)
 	}
 
-	// Test getting version from whitespace file
+	// Test getting version from whitespace file - parses as 0.0.0
 	version, err := GetCurrentVersion()
 	if err != nil {
 		t.Fatalf("Expected no error reading whitespace version file, got: %v", err)
@@ -145,27 +145,29 @@ func TestGetCurrentVersion_WhitespaceVersionFile(t *testing.T) {
 	}
 }
 
-func TestGetCurrentVersion_InvalidVersion(t *testing.T) {
+func TestGetCurrentVersion_UnparseableVersion(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer os.Chdir(originalDir)
 	os.Chdir(tempDir)
 
-	// Create a VERSION file with invalid content
-	err := os.WriteFile(versionFile, []byte("invalid-version"), 0644)
+	// Create a VERSION file with content that doesn't parse as a valid semver
+	// The parser is lenient - unparseable strings result in 0.0.0
+	err := os.WriteFile(versionFile, []byte("not a version"), 0644)
 	if err != nil {
-		t.Fatalf("Failed to create invalid VERSION file: %v", err)
+		t.Fatalf("Failed to create VERSION file: %v", err)
 	}
 
-	// Test getting invalid version
-	_, err = GetCurrentVersion()
-	if err == nil {
-		t.Error("Expected error reading invalid version, got nil")
+	// Test getting unparseable version - should return 0.0.0 (no error)
+	version, err := GetCurrentVersion()
+	if err != nil {
+		t.Errorf("Expected no error for unparseable version, got: %v", err)
 	}
 
-	if !contains(err.Error(), "invalid version format") {
-		t.Errorf("Expected invalid version format error, got: %v", err)
+	// Unparseable versions default to 0.0.0
+	if version != "0.0.0" {
+		t.Errorf("Expected version '0.0.0' for unparseable content, got '%s'", version)
 	}
 }
 
@@ -506,7 +508,7 @@ func TestDecrement_InvalidLevel(t *testing.T) {
 	}
 }
 
-func TestGetVersionFilePath_WithVCS(t *testing.T) {
+func TestGetVersionJSONPath_WithVCS(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -520,8 +522,8 @@ func TestGetVersionFilePath_WithVCS(t *testing.T) {
 	vcs.RegisterVCS(mockVCS)
 	defer vcs.UnregisterVCS("mock-git-path")
 
-	// Test getting version file path with VCS
-	path, err := getVersionFilePath()
+	// Test getting version JSON path with VCS
+	path, err := getVersionPath()
 	if err != nil {
 		t.Fatalf("Expected no error getting version file path, got: %v", err)
 	}
@@ -532,10 +534,10 @@ func TestGetVersionFilePath_WithVCS(t *testing.T) {
 	}
 }
 
-func TestGetVersionFilePath_NoVCS(t *testing.T) {
-	// Test getting version file path without VCS
+func TestGetVersionJSONPath_NoVCS(t *testing.T) {
+	// Test getting version JSON path without VCS
 	// This test assumes no active VCS is registered that would interfere
-	path, err := getVersionFilePath()
+	path, err := getVersionPath()
 	if err != nil {
 		t.Fatalf("Expected no error getting version file path, got: %v", err)
 	}

@@ -22,14 +22,8 @@ func TestReadConfig_DefaultConfig(t *testing.T) {
 	if config.Prefix != "v" {
 		t.Errorf("Expected default prefix 'v', got '%s'", config.Prefix)
 	}
-	if config.Suffix.Type != "git" {
-		t.Errorf("Expected default suffix type 'git', got '%s'", config.Suffix.Type)
-	}
-	if config.Suffix.Enabled != false {
-		t.Errorf("Expected default suffix enabled false, got %t", config.Suffix.Enabled)
-	}
-	if config.Suffix.Git.HashLength != 7 {
-		t.Errorf("Expected default hash length 7, got %d", config.Suffix.Git.HashLength)
+	if config.Metadata.Git.HashLength != 12 {
+		t.Errorf("Expected default hash length 12, got %d", config.Metadata.Git.HashLength)
 	}
 	if config.Logging.Output != "console" {
 		t.Errorf("Expected default logging output 'console', got '%s'", config.Logging.Output)
@@ -45,9 +39,10 @@ func TestReadConfig_ValidConfigFile(t *testing.T) {
 
 	// Create a valid config file
 	configContent := `prefix: "version-"
-suffix:
-  type: "git"
-  enabled: true
+prerelease:
+  template: "alpha-{{CommitsSinceTag}}"
+metadata:
+  template: "{{BuildDateTimeCompact}}.{{MediumHash}}"
   git:
     hashLength: 10
 logging:
@@ -68,14 +63,14 @@ logging:
 	if config.Prefix != "version-" {
 		t.Errorf("Expected prefix 'version-', got '%s'", config.Prefix)
 	}
-	if config.Suffix.Type != "git" {
-		t.Errorf("Expected suffix type 'git', got '%s'", config.Suffix.Type)
+	if config.PreRelease.Template != "alpha-{{CommitsSinceTag}}" {
+		t.Errorf("Expected prerelease template 'alpha-{{CommitsSinceTag}}', got '%s'", config.PreRelease.Template)
 	}
-	if config.Suffix.Enabled != true {
-		t.Errorf("Expected suffix enabled true, got %t", config.Suffix.Enabled)
+	if config.Metadata.Template != "{{BuildDateTimeCompact}}.{{MediumHash}}" {
+		t.Errorf("Expected metadata template '{{BuildDateTimeCompact}}.{{MediumHash}}', got '%s'", config.Metadata.Template)
 	}
-	if config.Suffix.Git.HashLength != 10 {
-		t.Errorf("Expected hash length 10, got %d", config.Suffix.Git.HashLength)
+	if config.Metadata.Git.HashLength != 10 {
+		t.Errorf("Expected hash length 10, got %d", config.Metadata.Git.HashLength)
 	}
 	if config.Logging.Output != "json" {
 		t.Errorf("Expected logging output 'json', got '%s'", config.Logging.Output)
@@ -91,7 +86,7 @@ func TestReadConfig_InvalidYAML(t *testing.T) {
 
 	// Create an invalid YAML file
 	invalidYAML := `prefix: "test"
-suffix:
+metadata:
   type: git
   enabled: true
   git:
@@ -153,9 +148,11 @@ func TestWriteConfig_Success(t *testing.T) {
 	// Create a config to write
 	config := &Config{
 		Prefix: "v",
-		Suffix: SuffixConfig{
-			Type:    "git",
-			Enabled: true,
+		PreRelease: PreReleaseConfig{
+			Template: "alpha-1",
+		},
+		Metadata: MetadataConfig{
+			Template: "{{BuildDateTimeCompact}}.{{MediumHash}}",
 			Git: GitConfig{
 				HashLength: 8,
 			},
@@ -189,9 +186,6 @@ func TestWriteConfig_Success(t *testing.T) {
 	if !contains(content, "prefix: v") {
 		t.Error("Expected prefix in written config")
 	}
-	if !contains(content, "enabled: true") {
-		t.Error("Expected enabled: true in written config")
-	}
 	if !contains(content, "hashLength: 8") {
 		t.Error("Expected hashLength: 8 in written config")
 	}
@@ -207,9 +201,11 @@ func TestWriteConfig_ReadBack(t *testing.T) {
 	// Create a config to write
 	originalConfig := &Config{
 		Prefix: "version-",
-		Suffix: SuffixConfig{
-			Type:    "git",
-			Enabled: true,
+		PreRelease: PreReleaseConfig{
+			Template: "beta-2",
+		},
+		Metadata: MetadataConfig{
+			Template: "{{ShortHash}}",
 			Git: GitConfig{
 				HashLength: 12,
 			},
@@ -235,14 +231,14 @@ func TestWriteConfig_ReadBack(t *testing.T) {
 	if readConfig.Prefix != originalConfig.Prefix {
 		t.Errorf("Prefix mismatch: expected '%s', got '%s'", originalConfig.Prefix, readConfig.Prefix)
 	}
-	if readConfig.Suffix.Type != originalConfig.Suffix.Type {
-		t.Errorf("Suffix type mismatch: expected '%s', got '%s'", originalConfig.Suffix.Type, readConfig.Suffix.Type)
+	if readConfig.PreRelease.Template != originalConfig.PreRelease.Template {
+		t.Errorf("PreRelease template mismatch: expected '%s', got '%s'", originalConfig.PreRelease.Template, readConfig.PreRelease.Template)
 	}
-	if readConfig.Suffix.Enabled != originalConfig.Suffix.Enabled {
-		t.Errorf("Suffix enabled mismatch: expected %t, got %t", originalConfig.Suffix.Enabled, readConfig.Suffix.Enabled)
+	if readConfig.Metadata.Template != originalConfig.Metadata.Template {
+		t.Errorf("Metadata template mismatch: expected '%s', got '%s'", originalConfig.Metadata.Template, readConfig.Metadata.Template)
 	}
-	if readConfig.Suffix.Git.HashLength != originalConfig.Suffix.Git.HashLength {
-		t.Errorf("Hash length mismatch: expected %d, got %d", originalConfig.Suffix.Git.HashLength, readConfig.Suffix.Git.HashLength)
+	if readConfig.Metadata.Git.HashLength != originalConfig.Metadata.Git.HashLength {
+		t.Errorf("Hash length mismatch: expected %d, got %d", originalConfig.Metadata.Git.HashLength, readConfig.Metadata.Git.HashLength)
 	}
 	if readConfig.Logging.Output != originalConfig.Logging.Output {
 		t.Errorf("Logging output mismatch: expected '%s', got '%s'", originalConfig.Logging.Output, readConfig.Logging.Output)
@@ -265,9 +261,7 @@ func TestWriteConfig_PermissionError(t *testing.T) {
 
 	config := &Config{
 		Prefix: "v",
-		Suffix: SuffixConfig{
-			Type:    "git",
-			Enabled: false,
+		Metadata: MetadataConfig{
 			Git: GitConfig{
 				HashLength: 7,
 			},
@@ -304,11 +298,119 @@ func TestWriteConfig_InvalidConfig(t *testing.T) {
 	}
 }
 
+func TestValidateTemplate_ValidTemplate(t *testing.T) {
+	tests := []string{
+		"",                                     // empty is valid
+		"alpha",                                // no mustache tags
+		"{{Major}}",                            // single tag
+		"{{Major}}.{{Minor}}.{{Patch}}",        // multiple tags
+		"alpha-{{CommitsSinceTag}}",            // mixed
+		"{{BuildDateTimeCompact}}.{{MediumHash}}", // typical metadata
+	}
+
+	for _, template := range tests {
+		err := ValidateTemplate(template)
+		if err != nil {
+			t.Errorf("ValidateTemplate(%q) returned error: %v", template, err)
+		}
+	}
+}
+
+func TestValidateTemplate_InvalidTemplate(t *testing.T) {
+	tests := []string{
+		"{{",           // unclosed tag
+		"{{Major",      // unclosed tag
+		"{{#section}}", // section without end
+	}
+
+	for _, template := range tests {
+		err := ValidateTemplate(template)
+		if err == nil {
+			t.Errorf("ValidateTemplate(%q) expected error, got nil", template)
+		}
+	}
+}
+
+func TestConfig_Validate_ValidConfig(t *testing.T) {
+	config := &Config{
+		PreRelease: PreReleaseConfig{
+			Template: "alpha-{{Major}}",
+		},
+		Metadata: MetadataConfig{
+			Template: "{{BuildDateTimeCompact}}.{{ShortHash}}",
+		},
+	}
+
+	err := config.Validate()
+	if err != nil {
+		t.Errorf("Config.Validate() returned error for valid config: %v", err)
+	}
+}
+
+func TestConfig_Validate_InvalidPreReleaseTemplate(t *testing.T) {
+	config := &Config{
+		PreRelease: PreReleaseConfig{
+			Template: "{{unclosed",
+		},
+	}
+
+	err := config.Validate()
+	if err == nil {
+		t.Error("Config.Validate() expected error for invalid prerelease template, got nil")
+	}
+	if !contains(err.Error(), "prerelease template") {
+		t.Errorf("Expected error to mention prerelease template, got: %v", err)
+	}
+}
+
+func TestConfig_Validate_InvalidMetadataTemplate(t *testing.T) {
+	config := &Config{
+		Metadata: MetadataConfig{
+			Template: "{{#section}}",
+		},
+	}
+
+	err := config.Validate()
+	if err == nil {
+		t.Error("Config.Validate() expected error for invalid metadata template, got nil")
+	}
+	if !contains(err.Error(), "metadata template") {
+		t.Errorf("Expected error to mention metadata template, got: %v", err)
+	}
+}
+
+func TestWriteConfig_InvalidTemplateRejected(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	config := &Config{
+		Prefix: "v",
+		PreRelease: PreReleaseConfig{
+			Template: "{{unclosed tag",
+		},
+	}
+
+	err := WriteConfig(config)
+	if err == nil {
+		t.Error("WriteConfig() expected error for invalid template, got nil")
+	}
+	if !contains(err.Error(), "invalid config") {
+		t.Errorf("Expected error to mention invalid config, got: %v", err)
+	}
+
+	// Verify file was NOT created
+	if _, err := os.Stat(configFile); !os.IsNotExist(err) {
+		t.Error("Config file should not be created when validation fails")
+	}
+}
+
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		containsAt(s, substr))))
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			containsAt(s, substr))))
 }
 
 func containsAt(s, substr string) bool {

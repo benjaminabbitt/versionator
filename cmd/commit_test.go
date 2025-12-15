@@ -5,10 +5,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/suite"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/suite"
 )
 
 // CommitTestSuite defines the test suite for commit command tests
@@ -84,9 +84,8 @@ func (suite *CommitTestSuite) createTestFiles(version string) {
 
 	// Create a minimal config file
 	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
+metadata:
+  template: ""
   git:
     hashLength: 7
 logging:
@@ -287,9 +286,8 @@ func (suite *CommitTestSuite) TestCommitCommand_TagExists_WithForce() {
 func (suite *CommitTestSuite) TestCommitCommand_NoVersionFile() {
 	// Create only config file (no VERSION file)
 	configContent := `prefix: ""
-suffix:
-  enabled: false
-  type: "git"
+metadata:
+  template: ""
   git:
     hashLength: 7
 logging:

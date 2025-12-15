@@ -1,0 +1,64 @@
+# Build the sample TypeScript package with version from versionator
+
+VERSIONATOR := "../../bin/versionator"
+
+# Generate version.ts from versionator
+version-file:
+    #!/bin/bash
+    set -e
+    echo "Generating version.ts using versionator emit..."
+    {{VERSIONATOR}} emit ts --output src/version.ts
+
+# Build the package (generates version.ts first)
+build: version-file
+    #!/bin/bash
+    set -e
+    echo "Building TypeScript package..."
+    npx tsc
+    echo "Build completed!"
+
+# Install dependencies
+install:
+    npm install
+
+# Run the sample application
+run: build
+    node dist/index.js
+
+# Clean build artifacts
+clean:
+    rm -f src/version.ts
+    rm -rf dist
+    rm -rf node_modules
+
+# Show the version that would be used
+show-version:
+    #!/bin/bash
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
+    echo "Version from versionator: $VERSION"
+
+# Generate using custom template file
+version-file-template:
+    #!/bin/bash
+    set -e
+    echo "Generating version.ts using template file..."
+    {{VERSIONATOR}} emit --template-file src/version.tmpl.ts --output src/version.ts
+
+# Release helpers
+release-patch:
+    #!/bin/bash
+    set -e
+    {{VERSIONATOR}} patch increment
+    just build
+
+release-minor:
+    #!/bin/bash
+    set -e
+    {{VERSIONATOR}} minor increment
+    just build
+
+release-major:
+    #!/bin/bash
+    set -e
+    {{VERSIONATOR}} major increment
+    just build

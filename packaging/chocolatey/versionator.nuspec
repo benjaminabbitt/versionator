@@ -21,7 +21,7 @@
 ## Features
 
 - Increment and decrement major, minor, and patch versions
-- Support for version prefixes (e.g., "v1.0.0") and suffixes (e.g., "1.0.0-beta")
+- Support for version prefixes (e.g., "v1.0.0"), pre-release (e.g., "1.0.0-beta"), and build metadata
 - Git integration for automatic version tagging
 - Configurable via YAML configuration file
 - Cross-platform support (Windows, macOS, Linux)

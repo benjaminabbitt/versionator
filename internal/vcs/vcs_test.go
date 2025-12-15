@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
+	"github.com/golang/mock/gomock"
 )
 
 func TestVCSRegistry_RegisterVCS(t *testing.T) {

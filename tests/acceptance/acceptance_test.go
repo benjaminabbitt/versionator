@@ -3,7 +3,6 @@ package acceptance
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -78,11 +77,11 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	// Background steps
 	sc.Step(`^a clean git repository$`, aCleanGitRepository)
 	sc.Step(`^versionator is installed$`, versionatorIsInstalled)
-	sc.Step(`^a VERSION\.json file with version "([^"]*)"$`, aVersionJSONFileWithVersion)
-	sc.Step(`^a VERSION\.json file with prefix "([^"]*)" and version "([^"]*)"$`, aVersionJSONFileWithPrefixAndVersion)
-	sc.Step(`^a VERSION\.json file with prefix "([^"]*)", version "([^"]*)" and prerelease "([^"]*)"$`, aVersionJSONFileWithPrefixVersionAndPrerelease)
-	sc.Step(`^a VERSION\.json file with prefix "([^"]*)", version "([^"]*)" and metadata "([^"]*)"$`, aVersionJSONFileWithPrefixVersionAndMetadata)
-	sc.Step(`^a VERSION\.json file with version "([^"]*)" and custom variable "([^"]*)" set to "([^"]*)"$`, aVersionJSONFileWithCustomVariable)
+	sc.Step(`^a VERSION file with version "([^"]*)"$`, aVersionFileWithVersion)
+	sc.Step(`^a VERSION file with prefix "([^"]*)" and version "([^"]*)"$`, aVersionFileWithPrefixAndVersion)
+	sc.Step(`^a VERSION file with prefix "([^"]*)", version "([^"]*)" and prerelease "([^"]*)"$`, aVersionFileWithPrefixVersionAndPrerelease)
+	sc.Step(`^a VERSION file with prefix "([^"]*)", version "([^"]*)" and metadata "([^"]*)"$`, aVersionFileWithPrefixVersionAndMetadata)
+	sc.Step(`^a VERSION file with version "([^"]*)" and custom variable "([^"]*)" set to "([^"]*)"$`, aVersionFileWithCustomVariable)
 	sc.Step(`^a committed file "([^"]*)" with content "([^"]*)"$`, aCommittedFileWithContent)
 	sc.Step(`^a file "([^"]*)" with content "([^"]*)"$`, aFileWithContent)
 	sc.Step(`^a template file "([^"]*)" with content "([^"]*)"$`, aFileWithContent) // Same implementation
@@ -92,13 +91,14 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	// Action steps
 	sc.Step(`^I run "([^"]*)"$`, iRun)
 	sc.Step(`^I commit a file "([^"]*)" with content "([^"]*)"$`, iCommitAFileWithContent)
-	sc.Step(`^I commit the VERSION\.json changes$`, iCommitTheVersionJSONChanges)
+	sc.Step(`^I commit the VERSION changes$`, iCommitTheVersionChanges)
 	sc.Step(`^I create (\d+) commits with message prefix "([^"]*)"$`, iCreateCommitsWithMessagePrefix)
 
 	// Assertion steps
 	sc.Step(`^the output should be "([^"]*)"$`, theOutputShouldBe)
 	sc.Step(`^the output should contain "([^"]*)"$`, theOutputShouldContain)
-	sc.Step(`^the output should contain '([^']*)'$`, theOutputShouldContain) // Single-quoted variant
+	sc.Step(`^the output should contain '([^']*)'$`, theOutputShouldContain)  // Single-quoted variant
+	sc.Step(`^the output should contain ""([^"]*)""$`, theOutputShouldContain) // Double-quoted variant (for values with embedded quotes)
 	sc.Step(`^the output should match pattern "([^"]*)"$`, theOutputShouldMatchPattern)
 	sc.Step(`^the exit code should be (\d+)$`, theExitCodeShouldBe)
 	sc.Step(`^the exit code should not be (\d+)$`, theExitCodeShouldNotBe)
@@ -106,8 +106,10 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the tag "([^"]*)" should point to HEAD$`, theTagShouldPointToHEAD)
 	sc.Step(`^the tag "([^"]*)" should have message "([^"]*)"$`, theTagShouldHaveMessage)
 	sc.Step(`^the tag "([^"]*)" should be (\d+) commits ahead of "([^"]*)"$`, theTagShouldBeCommitsAheadOf)
-	sc.Step(`^the VERSION\.json should have version "([^"]*)"$`, theVersionJSONShouldHaveVersion)
-	sc.Step(`^the VERSION\.json should have prefix "([^"]*)"$`, theVersionJSONShouldHavePrefix)
+	sc.Step(`^the VERSION should have version "([^"]*)"$`, theVersionShouldHaveVersion)
+	sc.Step(`^the VERSION should have prefix "([^"]*)"$`, theVersionShouldHavePrefix)
+	sc.Step(`^the VERSION should have prerelease "([^"]*)"$`, theVersionShouldHavePrerelease)
+	sc.Step(`^the VERSION should have metadata "([^"]*)"$`, theVersionShouldHaveMetadata)
 	sc.Step(`^the file "([^"]*)" should exist$`, theFileShouldExist)
 	sc.Step(`^the file "([^"]*)" should contain "([^"]*)"$`, theFileShouldContain)
 	sc.Step(`^the file "([^"]*)" should contain '([^']*)'$`, theFileShouldContain) // Single-quoted variant
@@ -123,6 +125,9 @@ func setupTestContext(c context.Context) (context.Context, error) {
 		return c, fmt.Errorf("failed to get current directory: %w", err)
 	}
 
+	// Find versionator binary BEFORE changing to temp directory
+	ctx.versionator = findVersionatorBinary()
+
 	// Create temp directory
 	ctx.workDir, err = os.MkdirTemp("", "versionator-test-*")
 	if err != nil {
@@ -133,9 +138,6 @@ func setupTestContext(c context.Context) (context.Context, error) {
 	if err := os.Chdir(ctx.workDir); err != nil {
 		return c, fmt.Errorf("failed to change to temp directory: %w", err)
 	}
-
-	// Find versionator binary - look in project root first
-	ctx.versionator = findVersionatorBinary()
 
 	return c, nil
 }
@@ -160,10 +162,30 @@ func teardownTestContext(c context.Context) (context.Context, error) {
 }
 
 func findVersionatorBinary() string {
-	// First try the project's built binary
-	projectBinary := filepath.Join(os.Getenv("VERSIONATOR_PROJECT_ROOT"), "versionator")
-	if _, err := os.Stat(projectBinary); err == nil {
-		return projectBinary
+	// First try the project's built binary from env var
+	if root := os.Getenv("VERSIONATOR_PROJECT_ROOT"); root != "" {
+		projectBinary := filepath.Join(root, "versionator")
+		if _, err := os.Stat(projectBinary); err == nil {
+			return projectBinary
+		}
+	}
+
+	// Try to find project root by going up from current directory
+	// This works when running tests from the project directory
+	if wd, err := os.Getwd(); err == nil {
+		// Look for versionator binary in parent directories
+		dir := wd
+		for i := 0; i < 5; i++ { // Limit depth
+			binary := filepath.Join(dir, "versionator")
+			if _, err := os.Stat(binary); err == nil {
+				return binary
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
 	}
 
 	// Try go install location
@@ -208,82 +230,73 @@ func versionatorIsInstalled() error {
 	return nil
 }
 
-func aVersionJSONFileWithVersion(version string) error {
-	if err := writeVersionJSON("", version, "", ""); err != nil {
+func aVersionFileWithVersion(version string) error {
+	if err := writeVersion("", version, "", ""); err != nil {
 		return err
 	}
-	// Commit VERSION.json to ensure clean working directory for commit commands
-	if err := runCommand("git", "add", "VERSION.json"); err != nil {
+	// Commit VERSION to ensure clean working directory for commit commands
+	if err := runCommand("git", "add", "VERSION"); err != nil {
 		return err
 	}
-	return runCommand("git", "commit", "-m", "Add VERSION.json")
+	return runCommand("git", "commit", "-m", "Add VERSION")
 }
 
-func aVersionJSONFileWithPrefixAndVersion(prefix, version string) error {
-	if err := writeVersionJSON(prefix, version, "", ""); err != nil {
+func aVersionFileWithPrefixAndVersion(prefix, version string) error {
+	if err := writeVersion(prefix, version, "", ""); err != nil {
 		return err
 	}
-	// Commit VERSION.json to ensure clean working directory for commit commands
-	if err := runCommand("git", "add", "VERSION.json"); err != nil {
+	// Commit VERSION to ensure clean working directory for commit commands
+	if err := runCommand("git", "add", "VERSION"); err != nil {
 		return err
 	}
-	return runCommand("git", "commit", "-m", "Add VERSION.json")
+	return runCommand("git", "commit", "-m", "Add VERSION")
 }
 
-func aVersionJSONFileWithPrefixVersionAndPrerelease(prefix, version, prerelease string) error {
-	if err := writeVersionJSON(prefix, version, prerelease, ""); err != nil {
+func aVersionFileWithPrefixVersionAndPrerelease(prefix, version, prerelease string) error {
+	if err := writeVersion(prefix, version, prerelease, ""); err != nil {
 		return err
 	}
-	// Commit VERSION.json to ensure clean working directory for commit commands
-	if err := runCommand("git", "add", "VERSION.json"); err != nil {
+	// Commit VERSION to ensure clean working directory for commit commands
+	if err := runCommand("git", "add", "VERSION"); err != nil {
 		return err
 	}
-	return runCommand("git", "commit", "-m", "Add VERSION.json")
+	return runCommand("git", "commit", "-m", "Add VERSION")
 }
 
-func aVersionJSONFileWithPrefixVersionAndMetadata(prefix, version, metadata string) error {
-	if err := writeVersionJSON(prefix, version, "", metadata); err != nil {
+func aVersionFileWithPrefixVersionAndMetadata(prefix, version, metadata string) error {
+	if err := writeVersion(prefix, version, "", metadata); err != nil {
 		return err
 	}
-	// Commit VERSION.json to ensure clean working directory for commit commands
-	if err := runCommand("git", "add", "VERSION.json"); err != nil {
+	// Commit VERSION to ensure clean working directory for commit commands
+	if err := runCommand("git", "add", "VERSION"); err != nil {
 		return err
 	}
-	return runCommand("git", "commit", "-m", "Add VERSION.json")
+	return runCommand("git", "commit", "-m", "Add VERSION")
 }
 
-func aVersionJSONFileWithCustomVariable(version, key, value string) error {
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return fmt.Errorf("invalid version format: %s", version)
-	}
-
-	major, _ := strconv.Atoi(parts[0])
-	minor, _ := strconv.Atoi(parts[1])
-	patch, _ := strconv.Atoi(parts[2])
-
-	data := map[string]interface{}{
-		"major": major,
-		"minor": minor,
-		"patch": patch,
-		"custom": map[string]string{
-			key: value,
-		},
-	}
-
-	content, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
+func aVersionFileWithCustomVariable(version, key, value string) error {
+	// Custom variables are now stored in config file, not VERSION file
+	// Write the VERSION file
+	if err := writeVersion("", version, "", ""); err != nil {
 		return err
 	}
 
-	if err := os.WriteFile("VERSION.json", content, 0644); err != nil {
+	// Write custom variable to config file
+	configContent := fmt.Sprintf(`custom:
+  %s: "%s"
+`, key, value)
+	if err := os.WriteFile(".versionator.yaml", []byte(configContent), 0644); err != nil {
 		return err
 	}
-	// Commit VERSION.json to ensure clean working directory
-	if err := runCommand("git", "add", "VERSION.json"); err != nil {
+
+	// Commit VERSION to ensure clean working directory
+	if err := runCommand("git", "add", "VERSION"); err != nil {
 		return err
 	}
-	return runCommand("git", "commit", "-m", "Add VERSION.json")
+	if err := runCommand("git", "add", ".versionator.yaml"); err != nil {
+		return err
+	}
+	return runCommand("git", "commit", "-m", "Add VERSION and config")
 }
 
 func aCommittedFileWithContent(filename, content string) error {
@@ -410,13 +423,13 @@ func iCommitAFileWithContent(filename, content string) error {
 	return runCommand("git", "commit", "-m", fmt.Sprintf("Update %s", filename))
 }
 
-func iCommitTheVersionJSONChanges() error {
-	// Add VERSION.json to staging
-	if err := runCommand("git", "add", "VERSION.json"); err != nil {
+func iCommitTheVersionChanges() error {
+	// Add VERSION to staging
+	if err := runCommand("git", "add", "VERSION"); err != nil {
 		return err
 	}
 	// Try to commit - allow failure if nothing to commit
-	cmd := exec.Command("git", "commit", "-m", "Update VERSION.json")
+	cmd := exec.Command("git", "commit", "-m", "Update VERSION")
 	cmd.Dir = ctx.workDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -548,43 +561,102 @@ func theTagShouldBeCommitsAheadOf(tag string, count int, baseTag string) error {
 	return nil
 }
 
-func theVersionJSONShouldHaveVersion(expected string) error {
-	data, err := os.ReadFile("VERSION.json")
+func theVersionShouldHaveVersion(expected string) error {
+	data, err := os.ReadFile("VERSION")
 	if err != nil {
-		return fmt.Errorf("failed to read VERSION.json: %w", err)
+		return fmt.Errorf("failed to read VERSION: %w", err)
 	}
 
-	var v struct {
-		Major int `json:"major"`
-		Minor int `json:"minor"`
-		Patch int `json:"patch"`
-	}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return fmt.Errorf("failed to parse VERSION.json: %w", err)
+	versionStr := strings.TrimSpace(string(data))
+
+	// Find first digit - everything after is the version (including pre-release/metadata)
+	stripped := versionStr
+	for i, c := range versionStr {
+		if c >= '0' && c <= '9' {
+			stripped = versionStr[i:]
+			break
+		}
 	}
 
-	actual := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
-	if actual != expected {
-		return fmt.Errorf("expected version %q, got %q", expected, actual)
+	// Extract just the core version part (before any - or +)
+	versionPart := stripped
+	if idx := strings.Index(versionPart, "-"); idx != -1 {
+		versionPart = versionPart[:idx]
+	}
+	if idx := strings.Index(versionPart, "+"); idx != -1 {
+		versionPart = versionPart[:idx]
+	}
+
+	if versionPart != expected {
+		return fmt.Errorf("expected version %q, got %q (from VERSION: %q)", expected, versionPart, versionStr)
 	}
 	return nil
 }
 
-func theVersionJSONShouldHavePrefix(expected string) error {
-	data, err := os.ReadFile("VERSION.json")
+func theVersionShouldHavePrefix(expected string) error {
+	data, err := os.ReadFile("VERSION")
 	if err != nil {
-		return fmt.Errorf("failed to read VERSION.json: %w", err)
+		return fmt.Errorf("failed to read VERSION: %w", err)
 	}
 
-	var v struct {
-		Prefix string `json:"prefix"`
-	}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return fmt.Errorf("failed to parse VERSION.json: %w", err)
+	versionStr := strings.TrimSpace(string(data))
+
+	// Extract prefix as everything before the first digit
+	prefix := ""
+	for i, c := range versionStr {
+		if c >= '0' && c <= '9' {
+			prefix = versionStr[:i]
+			break
+		}
 	}
 
-	if v.Prefix != expected {
-		return fmt.Errorf("expected prefix %q, got %q", expected, v.Prefix)
+	if prefix != expected {
+		return fmt.Errorf("expected prefix %q, got %q (from VERSION: %q)", expected, prefix, versionStr)
+	}
+	return nil
+}
+
+func theVersionShouldHavePrerelease(expected string) error {
+	data, err := os.ReadFile("VERSION")
+	if err != nil {
+		return fmt.Errorf("failed to read VERSION: %w", err)
+	}
+
+	versionStr := strings.TrimSpace(string(data))
+
+	// Extract prerelease (after - but before +)
+	prerelease := ""
+	if idx := strings.Index(versionStr, "-"); idx != -1 {
+		rest := versionStr[idx+1:]
+		if plusIdx := strings.Index(rest, "+"); plusIdx != -1 {
+			prerelease = rest[:plusIdx]
+		} else {
+			prerelease = rest
+		}
+	}
+
+	if prerelease != expected {
+		return fmt.Errorf("expected prerelease %q, got %q (from VERSION: %q)", expected, prerelease, versionStr)
+	}
+	return nil
+}
+
+func theVersionShouldHaveMetadata(expected string) error {
+	data, err := os.ReadFile("VERSION")
+	if err != nil {
+		return fmt.Errorf("failed to read VERSION: %w", err)
+	}
+
+	versionStr := strings.TrimSpace(string(data))
+
+	// Extract metadata (after +)
+	metadata := ""
+	if idx := strings.Index(versionStr, "+"); idx != -1 {
+		metadata = versionStr[idx+1:]
+	}
+
+	if metadata != expected {
+		return fmt.Errorf("expected metadata %q, got %q (from VERSION: %q)", expected, metadata, versionStr)
 	}
 	return nil
 }
@@ -609,38 +681,17 @@ func theFileShouldContain(filename, substring string) error {
 
 // Helper functions
 
-func writeVersionJSON(prefix, version, prerelease, metadata string) error {
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return fmt.Errorf("invalid version format: %s", version)
-	}
-
-	major, _ := strconv.Atoi(parts[0])
-	minor, _ := strconv.Atoi(parts[1])
-	patch, _ := strconv.Atoi(parts[2])
-
-	data := map[string]interface{}{
-		"major": major,
-		"minor": minor,
-		"patch": patch,
-	}
-
-	if prefix != "" {
-		data["prefix"] = prefix
-	}
+func writeVersion(prefix, version, prerelease, metadata string) error {
+	// Build full version string: [prefix]major.minor.patch[-prerelease][+metadata]
+	versionStr := prefix + version
 	if prerelease != "" {
-		data["prerelease"] = prerelease
+		versionStr += "-" + prerelease
 	}
 	if metadata != "" {
-		data["metadata"] = metadata
+		versionStr += "+" + metadata
 	}
 
-	content, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile("VERSION.json", content, 0644)
+	return os.WriteFile("VERSION", []byte(versionStr+"\n"), 0644)
 }
 
 func runCommand(name string, args ...string) error {

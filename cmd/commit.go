@@ -37,20 +37,23 @@ The command will fail if there are uncommitted changes or if the tag already exi
 			return fmt.Errorf("working directory is not clean. Please commit or stash your changes first")
 		}
 
-		// Get current version
-		version, err := version.GetCurrentVersion()
+		// Get current version data (includes prefix)
+		vd, err := version.Load()
 		if err != nil {
 			return fmt.Errorf("error getting current version: %w", err)
 		}
 
-		// Create tag name with 'v' prefix
-		tagName := "v" + version
-
-		// Check if custom tag prefix is specified
-		prefix, _ := cmd.Flags().GetString("prefix")
-		if prefix != "" {
-			tagName = prefix + version
+		// Use VERSION file prefix by default, or command-line override
+		prefix := vd.Prefix
+		if cmdPrefix, _ := cmd.Flags().GetString("prefix"); cmdPrefix != "" {
+			prefix = cmdPrefix
 		}
+		// If no prefix configured anywhere, default to "v"
+		if prefix == "" {
+			prefix = "v"
+		}
+
+		tagName := prefix + vd.String()
 
 		// Check if tag already exists
 		exists, err := vcs.TagExists(tagName)
@@ -68,7 +71,7 @@ The command will fail if there are uncommitted changes or if the tag already exi
 		// Get custom message or use default
 		message, _ := cmd.Flags().GetString("message")
 		if message == "" {
-			message = fmt.Sprintf("Release %s", version)
+			message = fmt.Sprintf("Release %s", vd.String())
 		}
 
 		// Create the tag
@@ -76,7 +79,7 @@ The command will fail if there are uncommitted changes or if the tag already exi
 			return fmt.Errorf("error creating tag: %w", err)
 		}
 
-		cmd.Printf("✓ Successfully created tag '%s' for version %s using %s\n", tagName, version, vcs.Name())
+		cmd.Printf("Successfully created tag '%s' for version %s using %s\n", tagName, vd.String(), vcs.Name())
 
 		// Show additional information if requested
 		verbose, _ := cmd.Flags().GetBool("verbose")

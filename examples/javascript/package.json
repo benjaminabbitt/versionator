@@ -1,0 +1,17 @@
+{
+  "name": "mypackage",
+  "version": "0.0.0",
+  "description": "Sample package demonstrating versionator integration",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "version": "../../bin/versionator emit js --output src/version.js",
+    "prestart": "npm run version",
+    "start": "node src/index.js",
+    "prebuild": "npm run version",
+    "build": "echo 'Build completed'",
+    "clean": "rm -f src/version.js"
+  },
+  "keywords": ["versionator", "example"],
+  "license": "MIT"
+}

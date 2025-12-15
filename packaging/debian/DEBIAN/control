@@ -12,6 +12,6 @@ Description: A semantic version management CLI tool
  .
  Features:
   - Increment/decrement major, minor, and patch versions
-  - Support for version prefixes and suffixes
+  - Support for version prefixes, pre-release, and build metadata
   - Git integration for version tagging
   - Configurable via YAML

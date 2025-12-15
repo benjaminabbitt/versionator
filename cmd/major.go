@@ -2,9 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"github.com/benjaminabbitt/versionator/internal/version"
 
+	"github.com/benjaminabbitt/versionator/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -19,19 +18,18 @@ var majorIncrementCmd = &cobra.Command{
 	Aliases: []string{"inc", "+"},
 	Short:   "Increment major version",
 	Long:    "Increment the major version and reset minor and patch to 0",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := version.Increment(version.MajorLevel); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
-		version, err := version.GetCurrentVersion()
+		ver, err := version.GetCurrentVersion()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading updated version: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading updated version: %w", err)
 		}
 
-		fmt.Printf("Major version incremented to: %s\n", version)
+		fmt.Printf("Major version incremented to: %s\n", ver)
+		return nil
 	},
 }
 
@@ -40,19 +38,18 @@ var majorDecrementCmd = &cobra.Command{
 	Aliases: []string{"dec", "-"},
 	Short:   "Decrement major version",
 	Long:    "Decrement the major version and reset minor and patch to 0",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := version.Decrement(version.MajorLevel); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
-		version, err := version.GetCurrentVersion()
+		ver, err := version.GetCurrentVersion()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading updated version: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error reading updated version: %w", err)
 		}
 
-		fmt.Printf("Major version decremented to: %s\n", version)
+		fmt.Printf("Major version decremented to: %s\n", ver)
+		return nil
 	},
 }
 

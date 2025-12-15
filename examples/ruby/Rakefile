@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+require "bundler/gem_tasks"
+require "rspec/core/rake_task"
+
+RSpec::Core::RakeTask.new(:spec)
+
+task default: :spec
+
+desc "Generate version.rb from versionator"
+task :version do
+  sh "../../bin/versionator emit ruby --output lib/mypackage/version.rb"
+end
+
+desc "Build gem (generates version.rb first)"
+task build: :version
+
+desc "Run the application"
+task run: :version do
+  ruby "bin/mypackage"
+end
