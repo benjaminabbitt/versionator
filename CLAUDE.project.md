@@ -1,0 +1,1 @@
+Ensure that all outputs are strictly compatible with SEMVER 2.0 (resources/semver-2.md)

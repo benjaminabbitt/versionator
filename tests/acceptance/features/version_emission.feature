@@ -5,7 +5,7 @@ Feature: Version Emission
 
   Background:
     Given a clean git repository
-    And a VERSION.json file with prefix "v" and version "2.3.4"
+    And a VERSION file with prefix "v" and version "2.3.4"
 
   Scenario: Emit Python format
     When I run "versionator emit python"

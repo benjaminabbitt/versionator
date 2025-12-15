@@ -1,7 +1,0 @@
-# Versionator Configuration
-prefix: beta-
-suffix:
-    type: git
-    enabled: false
-    git:
-        hashLength: 7

@@ -3,7 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+
 	"github.com/benjaminabbitt/versionator/cmd"
+
+	// Import VCS implementations for auto-registration
+	// Git VCS also registers as a TemplateProvider plugin
+	_ "github.com/benjaminabbitt/versionator/internal/vcs/git"
 )
 
 func main() {

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mypackage"
+dynamic = ["version"]
+description = "Sample package demonstrating versionator integration"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "BSD-3-Clause"}
+
+[project.scripts]
+mypackage = "mypackage.main:main"
+
+# Option 1: Read version from VERSION file directly
+# Uncomment this if you want setuptools to read the VERSION file
+# [tool.setuptools.dynamic]
+# version = {file = "VERSION"}
+
+# Option 2: Read version from generated _version.py (default)
+[tool.setuptools.dynamic]
+version = {attr = "mypackage._version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]

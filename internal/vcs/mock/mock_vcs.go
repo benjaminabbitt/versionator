@@ -6,6 +6,7 @@ package mock
 
 import (
 	reflect "reflect"
+	"time"
 
 	gomock "github.com/golang/mock/gomock"
 )
@@ -134,3 +135,124 @@ func (mr *MockVersionControlSystemMockRecorder) TagExists(tagName interface{}) *
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagExists", reflect.TypeOf((*MockVersionControlSystem)(nil).TagExists), tagName)
 }
+
+// GetBranchName mock base method.
+func (m *MockVersionControlSystem) GetBranchName() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBranchName")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBranchName indicates an expected call of GetBranchName.
+func (mr *MockVersionControlSystemMockRecorder) GetBranchName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBranchName", reflect.TypeOf((*MockVersionControlSystem)(nil).GetBranchName))
+}
+
+// GetCommitDate mock base method.
+func (m *MockVersionControlSystem) GetCommitDate() (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCommitDate")
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCommitDate indicates an expected call of GetCommitDate.
+func (mr *MockVersionControlSystemMockRecorder) GetCommitDate() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitDate", reflect.TypeOf((*MockVersionControlSystem)(nil).GetCommitDate))
+}
+
+// GetCommitsSinceTag mock base method.
+func (m *MockVersionControlSystem) GetCommitsSinceTag() (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCommitsSinceTag")
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCommitsSinceTag indicates an expected call of GetCommitsSinceTag.
+func (mr *MockVersionControlSystemMockRecorder) GetCommitsSinceTag() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitsSinceTag", reflect.TypeOf((*MockVersionControlSystem)(nil).GetCommitsSinceTag))
+}
+
+// GetUncommittedChanges mock base method.
+func (m *MockVersionControlSystem) GetUncommittedChanges() (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUncommittedChanges")
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUncommittedChanges indicates an expected call of GetUncommittedChanges.
+func (mr *MockVersionControlSystemMockRecorder) GetUncommittedChanges() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUncommittedChanges", reflect.TypeOf((*MockVersionControlSystem)(nil).GetUncommittedChanges))
+}
+
+// GetLastTag mock base method.
+func (m *MockVersionControlSystem) GetLastTag() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastTag")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastTag indicates an expected call of GetLastTag.
+func (mr *MockVersionControlSystemMockRecorder) GetLastTag() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastTag", reflect.TypeOf((*MockVersionControlSystem)(nil).GetLastTag))
+}
+
+// GetLastTagCommit mock base method.
+func (m *MockVersionControlSystem) GetLastTagCommit() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastTagCommit")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetLastTagCommit indicates an expected call of GetLastTagCommit.
+func (mr *MockVersionControlSystemMockRecorder) GetLastTagCommit() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastTagCommit", reflect.TypeOf((*MockVersionControlSystem)(nil).GetLastTagCommit))
+}
+
+// GetCommitAuthor mock base method.
+func (m *MockVersionControlSystem) GetCommitAuthor() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCommitAuthor")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCommitAuthor indicates an expected call of GetCommitAuthor.
+func (mr *MockVersionControlSystemMockRecorder) GetCommitAuthor() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitAuthor", reflect.TypeOf((*MockVersionControlSystem)(nil).GetCommitAuthor))
+}
+
+// GetCommitAuthorEmail mock base method.
+func (m *MockVersionControlSystem) GetCommitAuthorEmail() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCommitAuthorEmail")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCommitAuthorEmail indicates an expected call of GetCommitAuthorEmail.
+func (mr *MockVersionControlSystemMockRecorder) GetCommitAuthorEmail() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitAuthorEmail", reflect.TypeOf((*MockVersionControlSystem)(nil).GetCommitAuthorEmail))
+}
+

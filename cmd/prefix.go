@@ -2,47 +2,44 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/benjaminabbitt/versionator/internal/config"
-	"github.com/benjaminabbitt/versionator/internal/logging"
 	"github.com/benjaminabbitt/versionator/internal/version"
-	"github.com/benjaminabbitt/versionator/internal/versionator"
 
 	"github.com/spf13/cobra"
 )
 
 var prefixCmd = &cobra.Command{
 	Use:   "prefix",
-	Short: "Manage version prefix behavior",
-	Long:  "Commands to enable, disable, or set version prefix",
+	Short: "Manage version prefix",
+	Long:  "Commands to enable, disable, or set version prefix in VERSION file",
 }
 
 var prefixEnableCmd = &cobra.Command{
 	Use:   "enable",
 	Short: "Enable version prefix",
-	Long:  "Enable version prefix with default value 'v'",
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
-
-		cfg, err := config.ReadConfig()
-		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+	Long:  "Enable version prefix using config value if set, otherwise 'v'",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Use config prefix if set, otherwise default to "v"
+		prefix := "v"
+		if cfg, err := config.ReadConfig(); err == nil && cfg.Prefix != "" {
+			prefix = cfg.Prefix
 		}
 
-		cfg.Prefix = "v"
-
-		if err := config.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
+		if err := version.SetPrefix(prefix); err != nil {
+			return fmt.Errorf("error setting prefix: %w", err)
 		}
 
-		fmt.Println("Version prefix enabled with default value 'v'")
+		fmt.Fprintf(cmd.OutOrStdout(), "Version prefix enabled with value '%s'\n", prefix)
 
 		// Show current version with prefix
-		version, err := versionator.GetVersionWithSuffix()
+		vd, err := version.Load()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			return fmt.Errorf("error getting version: %w", err)
 		}
 
-		fmt.Printf("Current version: %s\n", version)
+		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
+		return nil
 	},
 }
 
@@ -50,94 +47,97 @@ var prefixDisableCmd = &cobra.Command{
 	Use:   "disable",
 	Short: "Disable version prefix",
 	Long:  "Disable version prefix by setting it to empty string",
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
-
-		cfg, err := config.ReadConfig()
-		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := version.SetPrefix(""); err != nil {
+			return fmt.Errorf("error setting prefix: %w", err)
 		}
 
-		cfg.Prefix = ""
-
-		if err := config.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
-		}
-
-		fmt.Println("Version prefix disabled")
+		fmt.Fprintln(cmd.OutOrStdout(), "Version prefix disabled")
 
 		// Show current version without prefix
-		version, err := version.GetCurrentVersion()
+		v, err := version.GetCurrentVersion()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			return fmt.Errorf("error getting version: %w", err)
 		}
 
-		fmt.Printf("Current version: %s\n", version)
+		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", v)
+		return nil
 	},
 }
 
 var prefixSetCmd = &cobra.Command{
 	Use:   "set <prefix>",
 	Short: "Set version prefix",
-	Long:  "Set a custom version prefix",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
+	Long: `Set a custom version prefix in both config and VERSION file.
+
+This updates:
+1. The config file (.versionator.yaml) - so 'prefix enable' can restore it
+2. The VERSION file - the source of truth for the current version`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		prefix := args[0]
 
+		// Update config with new prefix
 		cfg, err := config.ReadConfig()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			return fmt.Errorf("error reading config: %w", err)
+		}
+		cfg.Prefix = prefix
+		if err := config.WriteConfig(cfg); err != nil {
+			return fmt.Errorf("error writing config: %w", err)
 		}
 
-		cfg.Prefix = prefix
-
-		if err := config.WriteConfig(cfg); err != nil {
-			logger.Fatalw("Error writing config", "error", err)
+		// Update VERSION file
+		if err := version.SetPrefix(prefix); err != nil {
+			return fmt.Errorf("error setting prefix: %w", err)
 		}
 
 		if prefix == "" {
-			fmt.Println("Version prefix disabled (set to empty)")
+			fmt.Fprintln(cmd.OutOrStdout(), "Version prefix disabled (set to empty)")
 		} else {
-			fmt.Printf("Version prefix set to: %s\n", prefix)
+			fmt.Fprintf(cmd.OutOrStdout(), "Version prefix set to: %s\n", prefix)
 		}
 
 		// Show current version with new prefix
-		version, err := versionator.GetVersionWithSuffix()
+		vd, err := version.Load()
 		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+			return fmt.Errorf("error getting version: %w", err)
 		}
 
-		fmt.Printf("Current version: %s\n", version)
+		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
+		return nil
 	},
 }
 
 var prefixStatusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Show prefix configuration status",
-	Long:  "Show current version prefix configuration",
-	Run: func(cmd *cobra.Command, args []string) {
-		logger := logging.GetSugaredLogger()
+	Short: "Show prefix status",
+	Long: `Show current prefix status from VERSION file (source of truth).
 
-		cfg, err := config.ReadConfig()
+Also shows the configured prefix from .versionator.yaml that will be used on 'prefix enable'.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Load version - VERSION file is source of truth
+		vd, err := version.Load()
 		if err != nil {
-			logger.Fatalw("Error reading config", "error", err)
+			return fmt.Errorf("error reading version: %w", err)
 		}
 
-		if cfg.Prefix == "" {
-			fmt.Println("Version prefix: DISABLED")
+		if vd.Prefix == "" {
+			fmt.Fprintln(cmd.OutOrStdout(), "Prefix: DISABLED")
 		} else {
-			fmt.Printf("Version prefix: ENABLED\n")
-			fmt.Printf("Prefix value: %s\n", cfg.Prefix)
+			fmt.Fprintln(cmd.OutOrStdout(), "Prefix: ENABLED")
+			fmt.Fprintf(cmd.OutOrStdout(), "Value: %s\n", vd.Prefix)
 		}
 
-		// Show current version
-		version, err := versionator.GetVersionWithSuffix()
-		if err != nil {
-			logger.Fatalw("Error getting version", "error", err)
+		// Show config prefix (what will be restored on enable)
+		configPrefix := "v" // default
+		if cfg, err := config.ReadConfig(); err == nil && cfg.Prefix != "" {
+			configPrefix = cfg.Prefix
 		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Config prefix (for enable): %s\n", configPrefix)
 
-		fmt.Printf("Current version: %s\n", version)
+		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
+		return nil
 	},
 }
 

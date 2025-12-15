@@ -5,11 +5,20 @@ import (
 	"os"
 	"testing"
 
+	"github.com/benjaminabbitt/versionator/internal/config"
+	"github.com/benjaminabbitt/versionator/internal/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-	"github.com/benjaminabbitt/versionator/internal/config"
 )
+
+func createPrefixVersionString(ver string) string {
+	return createPrefixVersionStringWithPrefix(ver, "")
+}
+
+func createPrefixVersionStringWithPrefix(ver, prefix string) string {
+	return prefix + ver
+}
 
 func TestPrefixEnableCommand(t *testing.T) {
 	tests := []struct {
@@ -23,10 +32,8 @@ func TestPrefixEnableCommand(t *testing.T) {
 			name: "enable prefix with default config",
 			initialConfig: &config.Config{
 				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -35,18 +42,16 @@ func TestPrefixEnableCommand(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name: "enable prefix when already enabled",
+			name: "enable prefix uses config value when set",
 			initialConfig: &config.Config{
 				Prefix: "release-",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
 			initialVersion: "2.0.0",
-			expectedPrefix: "v",
+			expectedPrefix: "release-",
 			expectError:    false,
 		},
 	}
@@ -64,7 +69,7 @@ func TestPrefixEnableCommand(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			err = os.WriteFile("VERSION", []byte(createPrefixVersionString(tt.initialVersion)+"\n"), 0644)
 			require.NoError(t, err)
 
 			// Create initial config file
@@ -86,15 +91,15 @@ func TestPrefixEnableCommand(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				// Verify config was updated
-				cfg, err := config.ReadConfig()
+				// Verify VERSION prefix was updated
+				vd, err := version.Load()
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedPrefix, cfg.Prefix)
+				assert.Equal(t, tt.expectedPrefix, vd.Prefix)
 
 				// Verify output
 				output := stdout.String()
-				assert.Contains(t, output, "Version prefix enabled with default value 'v'")
-				assert.Contains(t, output, "Current version: v"+tt.initialVersion)
+				assert.Contains(t, output, "Version prefix enabled with value '"+tt.expectedPrefix+"'")
+				assert.Contains(t, output, "Current version: "+tt.expectedPrefix+tt.initialVersion)
 			}
 
 			// Reset command state
@@ -115,10 +120,8 @@ func TestPrefixDisableCommand(t *testing.T) {
 			name: "disable prefix when enabled",
 			initialConfig: &config.Config{
 				Prefix: "v",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -129,10 +132,8 @@ func TestPrefixDisableCommand(t *testing.T) {
 			name: "disable prefix when already disabled",
 			initialConfig: &config.Config{
 				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -154,7 +155,7 @@ func TestPrefixDisableCommand(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			err = os.WriteFile("VERSION", []byte(createPrefixVersionString(tt.initialVersion)+"\n"), 0644)
 			require.NoError(t, err)
 
 			// Create initial config file
@@ -176,10 +177,10 @@ func TestPrefixDisableCommand(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				// Verify config was updated
-				cfg, err := config.ReadConfig()
+				// Verify VERSION prefix was updated
+				vd, err := version.Load()
 				require.NoError(t, err)
-				assert.Equal(t, "", cfg.Prefix)
+				assert.Equal(t, "", vd.Prefix)
 
 				// Verify output
 				output := stdout.String()
@@ -205,19 +206,17 @@ func TestPrefixSetCommand(t *testing.T) {
 		errorContains  string
 	}{
 		{
-			name: "set custom prefix",
-			args: []string{"prefix", "set", "release-"},
+			name: "set v prefix",
+			args: []string{"prefix", "set", "v"},
 			initialConfig: &config.Config{
 				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
 			initialVersion: "1.2.3",
-			expectedPrefix: "release-",
+			expectedPrefix: "v",
 			expectError:    false,
 		},
 		{
@@ -225,10 +224,8 @@ func TestPrefixSetCommand(t *testing.T) {
 			args: []string{"prefix", "set", ""},
 			initialConfig: &config.Config{
 				Prefix: "v",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -237,19 +234,17 @@ func TestPrefixSetCommand(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name: "set prefix with special characters",
-			args: []string{"prefix", "set", "v2.0-"},
+			name: "set custom release prefix",
+			args: []string{"prefix", "set", "release-"},
 			initialConfig: &config.Config{
 				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
 			initialVersion: "1.0.0",
-			expectedPrefix: "v2.0-",
+			expectedPrefix: "release-",
 			expectError:    false,
 		},
 		{
@@ -257,10 +252,8 @@ func TestPrefixSetCommand(t *testing.T) {
 			args: []string{"prefix", "set"},
 			initialConfig: &config.Config{
 				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -284,7 +277,7 @@ func TestPrefixSetCommand(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			err = os.WriteFile("VERSION", []byte(createPrefixVersionString(tt.initialVersion)+"\n"), 0644)
 			require.NoError(t, err)
 
 			// Create initial config file
@@ -303,16 +296,16 @@ func TestPrefixSetCommand(t *testing.T) {
 
 			if tt.expectError {
 				assert.Error(t, err)
-				if tt.errorContains != "" {
+				if tt.errorContains != "" && err != nil {
 					assert.Contains(t, err.Error(), tt.errorContains)
 				}
 			} else {
 				assert.NoError(t, err)
 
-				// Verify config was updated
-				cfg, err := config.ReadConfig()
+				// Verify VERSION prefix was updated
+				vd, err := version.Load()
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedPrefix, cfg.Prefix)
+				assert.Equal(t, tt.expectedPrefix, vd.Prefix)
 
 				// Verify output
 				output := stdout.String()
@@ -343,10 +336,8 @@ func TestPrefixStatusCommand(t *testing.T) {
 			name: "status with prefix enabled",
 			initialConfig: &config.Config{
 				Prefix: "v",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -357,10 +348,8 @@ func TestPrefixStatusCommand(t *testing.T) {
 			name: "status with prefix disabled",
 			initialConfig: &config.Config{
 				Prefix: "",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -368,13 +357,11 @@ func TestPrefixStatusCommand(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name: "status with custom prefix",
+			name: "status with custom release prefix",
 			initialConfig: &config.Config{
 				Prefix: "release-",
-				Suffix: config.SuffixConfig{
-					Enabled: false,
-					Type:    "git",
-					Git:     config.GitConfig{HashLength: 7},
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
@@ -395,8 +382,8 @@ func TestPrefixStatusCommand(t *testing.T) {
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)
 
-			// Create VERSION file
-			err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+			// Create VERSION file with prefix included
+			err = os.WriteFile("VERSION", []byte(createPrefixVersionStringWithPrefix(tt.initialVersion, tt.initialConfig.Prefix)+"\n"), 0644)
 			require.NoError(t, err)
 
 			// Create initial config file
@@ -421,11 +408,11 @@ func TestPrefixStatusCommand(t *testing.T) {
 				// Verify output
 				output := stdout.String()
 				if tt.initialConfig.Prefix == "" {
-					assert.Contains(t, output, "Version prefix: DISABLED")
+					assert.Contains(t, output, "Prefix: DISABLED")
 					assert.Contains(t, output, "Current version: "+tt.initialVersion)
 				} else {
-					assert.Contains(t, output, "Version prefix: ENABLED")
-					assert.Contains(t, output, "Prefix value: "+tt.initialConfig.Prefix)
+					assert.Contains(t, output, "Prefix: ENABLED")
+					assert.Contains(t, output, "Value: "+tt.initialConfig.Prefix)
 					assert.Contains(t, output, "Current version: "+tt.initialConfig.Prefix+tt.initialVersion)
 				}
 			}
@@ -495,23 +482,12 @@ func TestPrefixCommandConfigErrors(t *testing.T) {
 			args: []string{"prefix", "enable"},
 			setupFunc: func(tempDir string) error {
 				// Create VERSION file but no config file
-				return os.WriteFile("VERSION", []byte("1.0.0"), 0644)
+				return os.WriteFile("VERSION", []byte(createPrefixVersionString("1.0.0")+"\n"), 0644)
 			},
-			expectError: false, // Should create default config
+			expectError: false, // Should work - prefix commands read from VERSION
 		},
-		{
-			name: "invalid config file",
-			args: []string{"prefix", "status"},
-			setupFunc: func(tempDir string) error {
-				// Create invalid YAML config
-				err := os.WriteFile("VERSION", []byte("1.0.0"), 0644)
-				if err != nil {
-					return err
-				}
-				return os.WriteFile(".versionator.yaml", []byte("invalid: yaml: content: ["), 0644)
-			},
-			expectError: true,
-		},
+		// Note: "invalid config file" test removed - prefix commands read from VERSION,
+		// not from the config file, so an invalid config doesn't cause errors for prefix operations.
 	}
 
 	for _, tt := range tests {

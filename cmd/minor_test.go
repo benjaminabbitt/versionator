@@ -12,54 +12,54 @@ import (
 
 func TestMinorCommand(t *testing.T) {
 	tests := []struct {
-		name           string
-		args           []string
-		initialVersion string
+		name            string
+		args            []string
+		initialVersion  string
 		expectedVersion string
-		expectError    bool
-		errorContains  string
+		expectError     bool
+		errorContains   string
 	}{
 		{
-			name:           "increment from 1.2.3",
-			args:           []string{"minor", "increment"},
-			initialVersion: "1.2.3",
+			name:            "increment from 1.2.3",
+			args:            []string{"minor", "increment"},
+			initialVersion:  "1.2.3",
 			expectedVersion: "1.3.0",
-			expectError:    false,
+			expectError:     false,
 		},
 		{
-			name:           "increment with inc alias",
-			args:           []string{"minor", "inc"},
-			initialVersion: "0.5.7",
+			name:            "increment with inc alias",
+			args:            []string{"minor", "inc"},
+			initialVersion:  "0.5.7",
 			expectedVersion: "0.6.0",
-			expectError:    false,
+			expectError:     false,
 		},
 		{
-			name:           "increment with + alias",
-			args:           []string{"minor", "+"},
-			initialVersion: "2.1.9",
+			name:            "increment with + alias",
+			args:            []string{"minor", "+"},
+			initialVersion:  "2.1.9",
 			expectedVersion: "2.2.0",
-			expectError:    false,
+			expectError:     false,
 		},
 		{
-			name:           "decrement from 1.3.5",
-			args:           []string{"minor", "decrement"},
-			initialVersion: "1.3.5",
+			name:            "decrement from 1.3.5",
+			args:            []string{"minor", "decrement"},
+			initialVersion:  "1.3.5",
 			expectedVersion: "1.2.0",
-			expectError:    false,
+			expectError:     false,
 		},
 		{
-			name:           "decrement with dec alias",
-			args:           []string{"minor", "dec"},
-			initialVersion: "2.5.1",
+			name:            "decrement with dec alias",
+			args:            []string{"minor", "dec"},
+			initialVersion:  "2.5.1",
 			expectedVersion: "2.4.0",
-			expectError:    false,
+			expectError:     false,
 		},
 		{
-			name:           "increment from default version",
-			args:           []string{"minor", "increment"},
-			initialVersion: "", // No VERSION file
+			name:            "increment from default version",
+			args:            []string{"minor", "increment"},
+			initialVersion:  "", // No VERSION file
 			expectedVersion: "0.1.0",
-			expectError:    false,
+			expectError:     false,
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestMinorCommand(t *testing.T) {
 
 			// Create config file
 			configContent := `prefix: ""
-suffix:
+metadata:
   enabled: false
   type: "git"
   git:
@@ -90,7 +90,7 @@ logging:
 
 			// Create VERSION file if initial version is provided
 			if tt.initialVersion != "" {
-				err = os.WriteFile("VERSION", []byte(tt.initialVersion), 0644)
+				err = os.WriteFile("VERSION", []byte(tt.initialVersion+"\n"), 0644)
 				require.NoError(t, err)
 			}
 
@@ -114,11 +114,7 @@ logging:
 				// Verify VERSION file content
 				content, err := os.ReadFile("VERSION")
 				require.NoError(t, err)
-				actualVersion := strings.TrimSpace(string(content))
-				assert.Equal(t, tt.expectedVersion, actualVersion)
-
-				// The main behavior we care about is that the VERSION file was updated correctly
-				// Output message testing is less important and more brittle
+				assert.Equal(t, tt.expectedVersion, strings.TrimSpace(string(content)))
 			}
 
 			// Reset command state

@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+bin/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+*_test.go
+tests/
+
+# Examples
+examples/
+
+# Packaging (not needed in container)
+packaging/
+
+# CI/CD configs
+.github/
+
+# Development files
+.env
+.env.*
+*.log

@@ -1,4 +1,8 @@
-# Golang Development Guidelines
+# Go Development Guidelines
+
+If `CLAUDE.project.md` exists, it supplements/overrides these guidelines.
+
+---
 
 ## TDD
 - Red → Green → Refactor
@@ -8,6 +12,7 @@
 - Integration tests: `tests/integration/` or build tags
 - Acceptance tests: `tests/acceptance/features/*.feature` (godog)
 - Mark slow tests: `//go:build slow`
+- Build and run actual binaries for acceptance tests
 
 ## Tooling
 - Test: `testing` (stdlib)
@@ -99,11 +104,17 @@ func NewUserServiceDefault(db *Database) *UserService { // nolint:unused
 }
 ```
 
+- Define interfaces for dependencies
+- Testing constructor accepts all deps
+- Default factory excluded from coverage (tested via integration)
+
 ## Error Handling
 - Return `error` as last value
 - Wrap: `fmt.Errorf("context: %w", err)`
 - Check immediately, fail fast
 - Specific error types
+- Log with context, not just message
+- Document expected errors
 
 ## Concurrency
 - Channels for communication
@@ -111,12 +122,15 @@ func NewUserServiceDefault(db *Database) *UserService { // nolint:unused
 - `sync.WaitGroup` for goroutine coordination
 - `context.Context` for cancellation
 - Document lock ordering
+- Minimal lock hold times
 
 ## Code Quality
 - Fix all golangci-lint warnings
 - Low coupling, high cohesion
 - Small, focused functions
+- Composition over inheritance
 - Markers: `TODO`, `FIXME`, `NOTE`, `HACK`
+- Coverage target: >80%
 - No file creation unless necessary
 - No progress docs in code
 
@@ -139,12 +153,33 @@ func NewUserServiceDefault(db *Database) *UserService { // nolint:unused
 - Keep deps updated
 - Least privilege
 
+## Performance
+- Profile before optimizing
+- Document requirements in tests
+- Use appropriate data structures
+- State algorithmic complexity
+- Consider allocation patterns
+
+## Workarounds
+When stuck, present options:
+1. Fix properly (estimate effort)
+2. Workaround (document trade-offs)
+3. Disable test (document why)
+4. Alternative approach
+
+Document decision and reasoning.
+
 ## Communication
 - State limitations immediately
 - Ask when ambiguous
 - Lead with key info
 - Test before complete
 - Direct, no sycophancy
+
+## Questions to Ask
+New feature: acceptance criteria? performance reqs? error cases? security? logging? dependencies? testing?
+Design: dependencies? interfaces? context to log? error conditions?
+Problems: fix vs workaround? pros/cons? tech debt impact?
 
 ## MCP Servers
 - mcp-tasks: task tracking (`CLAUDE.todo.md`)
