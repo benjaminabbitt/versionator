@@ -80,10 +80,18 @@ run *args:
     @just build
     ./bin/versionator {{args}}
 
-# Install the binary to /usr/local/bin
+# Install the binary to ~/.local/bin
 install:
     @just build
-    sudo cp bin/versionator /usr/local/bin/
+    mkdir -p ~/.local/bin
+    cp bin/versionator ~/.local/bin/
+    @echo "Installed to ~/.local/bin/versionator"
+    @echo "Ensure ~/.local/bin is in your PATH"
+
+# Uninstall the binary from ~/.local/bin
+uninstall:
+    rm -f ~/.local/bin/versionator
+    @echo "Removed ~/.local/bin/versionator"
 
 # Clean build artifacts
 clean:
