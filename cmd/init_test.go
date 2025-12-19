@@ -150,6 +150,43 @@ func (suite *InitTestSuite) TestInitCommand_OutputsExistsStatus() {
 	suite.Contains(output, "Already initialized", "output should indicate already initialized")
 }
 
+func (suite *InitTestSuite) TestInitCommand_GoFlag_EnablesPrerelease() {
+	// Execute init command with --go flag
+	var stdout bytes.Buffer
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetArgs([]string{"init", "--go"})
+	err := rootCmd.Execute()
+	suite.Require().NoError(err, "init command should succeed")
+
+	// Verify config has prerelease template set
+	data, err := os.ReadFile(".versionator.yaml")
+	suite.Require().NoError(err, "failed to read config")
+
+	content := string(data)
+	// Should have prerelease template with CommitsSinceTag for Go pseudo-versions
+	suite.Contains(content, "template:", "config should contain template setting")
+	suite.Contains(content, "CommitsSinceTag", "Go config should use CommitsSinceTag in prerelease")
+
+	output := stdout.String()
+	suite.Contains(output, "Go", "output should mention Go mode")
+}
+
+func (suite *InitTestSuite) TestInitCommand_NoGoFlag_DefaultPrerelease() {
+	// Execute init command without --go flag
+	var stdout bytes.Buffer
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetArgs([]string{"init"})
+	err := rootCmd.Execute()
+	suite.Require().NoError(err, "init command should succeed")
+
+	// Verify config exists with default settings
+	data, err := os.ReadFile(".versionator.yaml")
+	suite.Require().NoError(err, "failed to read config")
+
+	content := string(data)
+	suite.Contains(content, "prerelease:", "config should contain prerelease section")
+}
+
 // TestInitTestSuite runs the init test suite
 func TestInitTestSuite(t *testing.T) {
 	suite.Run(t, new(InitTestSuite))

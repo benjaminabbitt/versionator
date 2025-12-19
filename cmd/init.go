@@ -11,6 +11,8 @@ import (
 
 const configFileName = ".versionator.yaml"
 
+var initGoMode bool
+
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize versionator in the current directory",
@@ -19,6 +21,10 @@ var initCmd = &cobra.Command{
 This command creates:
   - VERSION file with initial version 0.0.0 (or v0.0.0 if prefix configured)
   - .versionator.yaml configuration file with documented defaults
+
+Flags:
+  --go    Configure for Go projects with prerelease versioning enabled
+          (uses CommitsSinceTag for pseudo-version compatibility)
 
 Existing files are not overwritten.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -45,12 +51,18 @@ Existing files are not overwritten.`,
 		// Check if config file exists
 		configExists := fileExists(configFileName)
 		if !configExists {
-			// Write default config
-			if err := os.WriteFile(configFileName, []byte(config.DefaultConfigYAML()), 0644); err != nil {
+			var configContent string
+			if initGoMode {
+				configContent = goConfigYAML()
+				fmt.Fprintf(cmd.OutOrStdout(), "Created %s with Go project configuration\n", configFileName)
+			} else {
+				configContent = config.DefaultConfigYAML()
+				fmt.Fprintf(cmd.OutOrStdout(), "Created %s with default configuration\n", configFileName)
+			}
+			if err := os.WriteFile(configFileName, []byte(configContent), 0644); err != nil {
 				return fmt.Errorf("failed to create config file: %w", err)
 			}
 			createdConfig = true
-			fmt.Fprintf(cmd.OutOrStdout(), "Created %s with default configuration\n", configFileName)
 		} else {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s exists\n", configFileName)
 		}
@@ -70,6 +82,35 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+// goConfigYAML returns a config optimized for Go projects with prerelease enabled
+func goConfigYAML() string {
+	return `# Versionator Configuration for Go Projects
+# See https://github.com/benjaminabbitt/versionator for documentation
+
+# Version prefix (Go modules use "v" prefix)
+prefix: "v"
+
+# Pre-release configuration (enabled for Go pseudo-version compatibility)
+# Pre-release follows SemVer 2.0.0: appended with dash (-)
+# Example output: v1.2.3-alpha-5
+prerelease:
+  # Mustache template string for pre-release identifier
+  # Uses CommitsSinceTag for Go pseudo-version compatibility
+  template: "{{CommitsSinceTag}}.{{BuildDateTimeCompact}}.{{ShortHash}}"
+
+# Build metadata configuration
+metadata:
+  template: ""
+  git:
+    hashLength: 12
+
+# Logging configuration
+logging:
+  output: "console"
+`
+}
+
 func init() {
+	initCmd.Flags().BoolVar(&initGoMode, "go", false, "Configure for Go projects with prerelease versioning enabled")
 	rootCmd.AddCommand(initCmd)
 }
