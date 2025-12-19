@@ -15,7 +15,7 @@ var minorCmd = &cobra.Command{
 
 var minorIncrementCmd = &cobra.Command{
 	Use:     "increment",
-	Aliases: []string{"inc", "+"},
+	Aliases: []string{"inc", "bump", "+"},
 	Short:   "Increment minor version",
 	Long:    "Increment the minor version and reset patch to 0",
 	RunE: func(cmd *cobra.Command, args []string) error {

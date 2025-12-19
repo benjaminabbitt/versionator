@@ -80,8 +80,11 @@ All binaries are statically compiled - no dependencies required.
 ## Quick Start
 
 ```bash
-# Initialize (creates VERSION file automatically on first use)
-versionator version           # Creates VERSION with 0.0.0
+# Initialize a new project
+versionator init              # Creates VERSION and .versionator.yaml
+
+# Initialize a Go project (enables prerelease for pseudo-version compatibility)
+versionator init --go         # Creates VERSION and Go-optimized config
 
 # Increment versions
 versionator major increment   # 0.0.0 -> 1.0.0
@@ -267,6 +270,73 @@ custom:
 ```
 
 See [docs/VERSION_TEMPLATES.md](docs/VERSION_TEMPLATES.md) for complete documentation on pre-release and metadata configuration.
+
+## Go Projects
+
+Go modules have unique versioning requirements that differ from other ecosystems. While SemVer 2.0.0 defines `+metadata` suffixes for build information, **Go ignores build metadata entirely** and instead uses **pseudo-versions** that embed commit information in the pre-release field.
+
+### Why Go Uses Pre-release Instead of Metadata
+
+Per SemVer 2.0.0, build metadata (`+suffix`) is ignored for version precedence—meaning `1.0.0+build1` and `1.0.0+build2` are considered equal. Go needs commit information to participate in version ordering for proper dependency resolution, so it places this data in the pre-release field instead:
+
+```
+v0.0.0-20231215120000-abc123def456
+       │              │
+       │              └── 12-character commit hash
+       └── UTC timestamp (YYYYMMDDHHmmss)
+```
+
+This format ensures versions sort chronologically, which is essential for Go's module system.
+
+### Initializing for Go Projects
+
+Use the `--go` flag to configure versionator for Go module compatibility:
+
+```bash
+versionator init --go
+```
+
+This creates a `.versionator.yaml` with a pre-release template optimized for Go:
+
+```yaml
+prefix: "v"
+prerelease:
+  template: "{{CommitsSinceTag}}.{{BuildDateTimeCompact}}.{{ShortHash}}"
+```
+
+### Generating Go-Compatible Versions
+
+After initializing with `--go`, generate versions with pre-release information:
+
+```bash
+# Output version with prerelease (Go pseudo-version style)
+versionator version -t "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}" --prerelease
+# Example output: v1.2.3-5.20241215143052.abc1234
+
+# For development builds (similar to Go pseudo-versions)
+versionator version -t "{{Prefix}}{{MajorMinorPatch}}-{{CommitsSinceTag}}.{{BuildDateTimeCompact}}.{{MediumHash}}"
+# Example output: v1.2.3-42.20241215143052.abc1234def012
+```
+
+### Go's Reserved Metadata Suffixes
+
+Go reserves the `+` suffix for special markers only:
+- `+incompatible` — for v2+ modules without proper go.mod
+- `+dirty` — builds with uncommitted changes (Go 1.24+)
+
+For build traceability in Go projects, always use pre-release identifiers rather than build metadata.
+
+### Comparison with Other Ecosystems
+
+| Ecosystem | Build Metadata (`+suffix`) | Recommendation |
+|-----------|---------------------------|----------------|
+| **Go** | Ignored; use pre-release | `versionator init --go` |
+| **npm** | Stripped on publish | Use pre-release tags |
+| **PyPI** | Rejected (local versions) | Strip before publish |
+| **Cargo** | Preserved | Full support |
+| **NuGet** | Normalized | Preserved but deduplicated |
+
+See [resources/semver-suffixes.md](resources/semver-suffixes.md) for detailed ecosystem comparison.
 
 ## Source of Truth Architecture
 

@@ -15,7 +15,7 @@ var majorCmd = &cobra.Command{
 
 var majorIncrementCmd = &cobra.Command{
 	Use:     "increment",
-	Aliases: []string{"inc", "+"},
+	Aliases: []string{"inc", "bump", "+"},
 	Short:   "Increment major version",
 	Long:    "Increment the major version and reset minor and patch to 0",
 	RunE: func(cmd *cobra.Command, args []string) error {

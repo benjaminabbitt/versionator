@@ -15,7 +15,7 @@ var patchCmd = &cobra.Command{
 
 var patchIncrementCmd = &cobra.Command{
 	Use:     "increment",
-	Aliases: []string{"inc", "+"},
+	Aliases: []string{"inc", "bump", "+"},
 	Short:   "Increment patch version",
 	Long:    "Increment the patch version",
 	RunE: func(cmd *cobra.Command, args []string) error {
