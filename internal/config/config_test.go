@@ -40,9 +40,9 @@ func TestReadConfig_ValidConfigFile(t *testing.T) {
 	// Create a valid config file
 	configContent := `prefix: "version-"
 prerelease:
-  template: "alpha-{{CommitsSinceTag}}"
+  elements: ["alpha", "CommitsSinceTag"]
 metadata:
-  template: "{{BuildDateTimeCompact}}.{{MediumHash}}"
+  elements: ["BuildDateTimeCompact", "MediumHash"]
   git:
     hashLength: 10
 logging:
@@ -63,11 +63,11 @@ logging:
 	if config.Prefix != "version-" {
 		t.Errorf("Expected prefix 'version-', got '%s'", config.Prefix)
 	}
-	if config.PreRelease.Template != "alpha-{{CommitsSinceTag}}" {
-		t.Errorf("Expected prerelease template 'alpha-{{CommitsSinceTag}}', got '%s'", config.PreRelease.Template)
+	if len(config.PreRelease.Elements) != 2 || config.PreRelease.Elements[0] != "alpha" {
+		t.Errorf("Expected prerelease elements ['alpha', 'CommitsSinceTag'], got %v", config.PreRelease.Elements)
 	}
-	if config.Metadata.Template != "{{BuildDateTimeCompact}}.{{MediumHash}}" {
-		t.Errorf("Expected metadata template '{{BuildDateTimeCompact}}.{{MediumHash}}', got '%s'", config.Metadata.Template)
+	if len(config.Metadata.Elements) != 2 || config.Metadata.Elements[0] != "BuildDateTimeCompact" {
+		t.Errorf("Expected metadata elements ['BuildDateTimeCompact', 'MediumHash'], got %v", config.Metadata.Elements)
 	}
 	if config.Metadata.Git.HashLength != 10 {
 		t.Errorf("Expected hash length 10, got %d", config.Metadata.Git.HashLength)
@@ -149,10 +149,10 @@ func TestWriteConfig_Success(t *testing.T) {
 	config := &Config{
 		Prefix: "v",
 		PreRelease: PreReleaseConfig{
-			Template: "alpha-1",
+			Elements: []string{"alpha", "1"},
 		},
 		Metadata: MetadataConfig{
-			Template: "{{BuildDateTimeCompact}}.{{MediumHash}}",
+			Elements: []string{"BuildDateTimeCompact", "MediumHash"},
 			Git: GitConfig{
 				HashLength: 8,
 			},
@@ -202,10 +202,10 @@ func TestWriteConfig_ReadBack(t *testing.T) {
 	originalConfig := &Config{
 		Prefix: "version-",
 		PreRelease: PreReleaseConfig{
-			Template: "beta-2",
+			Elements: []string{"beta", "2"},
 		},
 		Metadata: MetadataConfig{
-			Template: "{{ShortHash}}",
+			Elements: []string{"ShortHash"},
 			Git: GitConfig{
 				HashLength: 12,
 			},
@@ -231,11 +231,11 @@ func TestWriteConfig_ReadBack(t *testing.T) {
 	if readConfig.Prefix != originalConfig.Prefix {
 		t.Errorf("Prefix mismatch: expected '%s', got '%s'", originalConfig.Prefix, readConfig.Prefix)
 	}
-	if readConfig.PreRelease.Template != originalConfig.PreRelease.Template {
-		t.Errorf("PreRelease template mismatch: expected '%s', got '%s'", originalConfig.PreRelease.Template, readConfig.PreRelease.Template)
+	if len(readConfig.PreRelease.Elements) != len(originalConfig.PreRelease.Elements) {
+		t.Errorf("PreRelease elements length mismatch: expected %d, got %d", len(originalConfig.PreRelease.Elements), len(readConfig.PreRelease.Elements))
 	}
-	if readConfig.Metadata.Template != originalConfig.Metadata.Template {
-		t.Errorf("Metadata template mismatch: expected '%s', got '%s'", originalConfig.Metadata.Template, readConfig.Metadata.Template)
+	if len(readConfig.Metadata.Elements) != len(originalConfig.Metadata.Elements) {
+		t.Errorf("Metadata elements length mismatch: expected %d, got %d", len(originalConfig.Metadata.Elements), len(readConfig.Metadata.Elements))
 	}
 	if readConfig.Metadata.Git.HashLength != originalConfig.Metadata.Git.HashLength {
 		t.Errorf("Hash length mismatch: expected %d, got %d", originalConfig.Metadata.Git.HashLength, readConfig.Metadata.Git.HashLength)
@@ -334,10 +334,10 @@ func TestValidateTemplate_InvalidTemplate(t *testing.T) {
 func TestConfig_Validate_ValidConfig(t *testing.T) {
 	config := &Config{
 		PreRelease: PreReleaseConfig{
-			Template: "alpha-{{Major}}",
+			Elements: []string{"alpha", "Major"},
 		},
 		Metadata: MetadataConfig{
-			Template: "{{BuildDateTimeCompact}}.{{ShortHash}}",
+			Elements: []string{"BuildDateTimeCompact", "ShortHash"},
 		},
 	}
 
@@ -347,62 +347,20 @@ func TestConfig_Validate_ValidConfig(t *testing.T) {
 	}
 }
 
-func TestConfig_Validate_InvalidPreReleaseTemplate(t *testing.T) {
+func TestConfig_Validate_EmptyElements(t *testing.T) {
+	// Empty elements lists are valid - they just produce empty output
 	config := &Config{
 		PreRelease: PreReleaseConfig{
-			Template: "{{unclosed",
+			Elements: []string{},
 		},
-	}
-
-	err := config.Validate()
-	if err == nil {
-		t.Error("Config.Validate() expected error for invalid prerelease template, got nil")
-	}
-	if !contains(err.Error(), "prerelease template") {
-		t.Errorf("Expected error to mention prerelease template, got: %v", err)
-	}
-}
-
-func TestConfig_Validate_InvalidMetadataTemplate(t *testing.T) {
-	config := &Config{
 		Metadata: MetadataConfig{
-			Template: "{{#section}}",
+			Elements: []string{},
 		},
 	}
 
 	err := config.Validate()
-	if err == nil {
-		t.Error("Config.Validate() expected error for invalid metadata template, got nil")
-	}
-	if !contains(err.Error(), "metadata template") {
-		t.Errorf("Expected error to mention metadata template, got: %v", err)
-	}
-}
-
-func TestWriteConfig_InvalidTemplateRejected(t *testing.T) {
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
-
-	config := &Config{
-		Prefix: "v",
-		PreRelease: PreReleaseConfig{
-			Template: "{{unclosed tag",
-		},
-	}
-
-	err := WriteConfig(config)
-	if err == nil {
-		t.Error("WriteConfig() expected error for invalid template, got nil")
-	}
-	if !contains(err.Error(), "invalid config") {
-		t.Errorf("Expected error to mention invalid config, got: %v", err)
-	}
-
-	// Verify file was NOT created
-	if _, err := os.Stat(configFile); !os.IsNotExist(err) {
-		t.Error("Config file should not be created when validation fails")
+	if err != nil {
+		t.Errorf("Config.Validate() returned error for empty elements: %v", err)
 	}
 }
 

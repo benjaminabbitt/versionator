@@ -1,0 +1,7 @@
+{
+  "name": "testapp",
+  "version": "0.0.0",
+  "description": "Test application for versionator patch testing",
+  "main": "main.js",
+  "type": "module"
+}

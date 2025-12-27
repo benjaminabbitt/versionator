@@ -84,6 +84,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^a VERSION file with version "([^"]*)" and custom variable "([^"]*)" set to "([^"]*)"$`, aVersionFileWithCustomVariable)
 	sc.Step(`^a committed file "([^"]*)" with content "([^"]*)"$`, aCommittedFileWithContent)
 	sc.Step(`^a file "([^"]*)" with content "([^"]*)"$`, aFileWithContent)
+	sc.Step(`^a file "([^"]*)" with content:$`, aFileWithDocString)
 	sc.Step(`^a template file "([^"]*)" with content "([^"]*)"$`, aFileWithContent) // Same implementation
 	sc.Step(`^a config file with prerelease enabled and template "([^"]*)"$`, aConfigFileWithPrereleaseTemplate)
 	sc.Step(`^a config file with:$`, aConfigFileWithDocString)
@@ -318,6 +319,10 @@ func aFileWithContent(filename, content string) error {
 		}
 	}
 	return os.WriteFile(filename, []byte(content), 0644)
+}
+
+func aFileWithDocString(filename string, doc *godog.DocString) error {
+	return aFileWithContent(filename, doc.Content)
 }
 
 func aConfigFileWithPrereleaseTemplate(template string) error {

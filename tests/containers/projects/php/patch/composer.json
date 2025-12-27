@@ -1,0 +1,9 @@
+{
+  "name": "test/testapp",
+  "version": "0.0.0",
+  "description": "Test application for versionator patch testing",
+  "type": "project",
+  "require": {
+    "php": ">=8.0"
+  }
+}

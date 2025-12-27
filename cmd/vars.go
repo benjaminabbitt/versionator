@@ -63,9 +63,11 @@ creating custom templates for version, prerelease, or metadata output.`,
 			},
 			"VCS/Git": {
 				"Hash", "ShortHash", "MediumHash",
+				"ShortHashWithDot", "MediumHashWithDot",
+				"ShortHashWithDash", "MediumHashWithDash",
 				"BranchName", "EscapedBranchName",
 				"CommitsSinceTag", "BuildNumber", "BuildNumberPadded",
-				"UncommittedChanges", "Dirty",
+				"UncommittedChanges", "Dirty", "DirtyWithDot", "DirtyWithDash",
 				"VersionSourceHash",
 			},
 			"Commit Author": {
@@ -76,8 +78,9 @@ creating custom templates for version, prerelease, or metadata output.`,
 				"CommitYear", "CommitMonth", "CommitDay",
 			},
 			"Build Timestamps": {
-				"BuildDateTimeUTC", "BuildDateTimeCompact", "BuildDateUTC",
-				"BuildYear", "BuildMonth", "BuildDay",
+				"BuildDateTimeUTC", "BuildDateTimeCompact",
+				"BuildDateTimeCompactWithDot", "BuildDateTimeCompactWithDash",
+				"BuildDateUTC", "BuildYear", "BuildMonth", "BuildDay",
 			},
 		}
 

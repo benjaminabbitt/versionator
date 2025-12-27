@@ -4,8 +4,10 @@ namespace Version;
 public static class VersionInfo
 {
     public const string Version = "{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}";
+    public const string AssemblyVersion = "{{AssemblyVersion}}";
     public const int Major = {{Major}};
     public const int Minor = {{Minor}};
     public const int Patch = {{Patch}};
+    public const int Revision = {{Revision}};
     public const string GitHash = "{{ShortHash}}";
 }

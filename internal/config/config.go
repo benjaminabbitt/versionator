@@ -15,40 +15,62 @@ type Config struct {
 	Prefix     string            `yaml:"prefix"`
 	PreRelease PreReleaseConfig  `yaml:"prerelease"`
 	Metadata   MetadataConfig    `yaml:"metadata"`
+	Emit       EmitConfig        `yaml:"emit,omitempty"`
+	Link       LinkConfig        `yaml:"link,omitempty"`
+	Patch      PatchConfig       `yaml:"patch,omitempty"`
 	Logging    LoggingConfig     `yaml:"logging"`
 	Custom     map[string]string `yaml:"custom,omitempty"`
+}
+
+// EmitConfig holds configuration for version file emission
+type EmitConfig struct {
+	Language    string `yaml:"language,omitempty"`    // Target language (go, python, java-maven, etc.)
+	OutputPath  string `yaml:"outputPath,omitempty"`  // Override: path to write the generated version file
+	PackageName string `yaml:"packageName,omitempty"` // Override: package/module name for the generated code
+}
+
+// LinkConfig holds configuration for link-time variable injection
+type LinkConfig struct {
+	VariablePath string `yaml:"variablePath,omitempty"` // Override: variable path (e.g., "main.Version")
+	FlagTemplate string `yaml:"flagTemplate,omitempty"` // Override: flag template (e.g., "-X {{Variable}}={{Value}}")
+}
+
+// PatchConfig holds configuration for manifest/config file patching
+type PatchConfig struct {
+	FilePath    string `yaml:"filePath,omitempty"`    // Override: path to file to patch
+	VersionPath string `yaml:"versionPath,omitempty"` // Override: path to version field in file
 }
 
 // PreReleaseConfig holds pre-release identifier configuration
 // Pre-release follows SemVer 2.0.0: appended with - (dash)
 //
-// IMPORTANT: The Template is a Mustache template string.
-// Use DASHES (-) to separate pre-release identifiers per SemVer 2.0.0.
-// Example: "alpha-{{CommitsSinceTag}}" → "alpha-5"
+// Elements are template variable names that will be rendered and joined with dashes.
+// Example: ["CommitsSinceTag", "BuildDateTimeCompact", "ShortHash", "Dirty"]
+// Produces: "5-20241211103045-abc1234-dirty"
 //
-// The leading dash (-) is automatically prepended when using {{PreReleaseWithDash}}
-// Do NOT include the leading dash in your template.
+// Empty values are automatically skipped (no dangling dashes).
+// The leading dash (-) is automatically prepended when using {{PreReleaseWithDash}}.
 //
 // The VERSION file is the source of truth for current pre-release value.
-// This template is stored for use with 'prerelease enable' and '--prerelease' flag.
+// This config is stored for use with 'prerelease enable' and '--prerelease' flag.
 type PreReleaseConfig struct {
-	Template string `yaml:"template"` // Mustache template with DASHES as separators: "alpha-{{CommitsSinceTag}}" → "alpha-5"
+	Elements []string `yaml:"elements"` // Variable names joined with dashes: ["CommitsSinceTag", "BuildDateTimeCompact"] → "5-20241211103045"
 }
 
 // MetadataConfig holds build metadata configuration
 // Metadata follows SemVer 2.0.0: appended with + (plus)
 //
-// IMPORTANT: The Template is a Mustache template string.
-// Use DOTS (.) to separate metadata identifiers per SemVer 2.0.0.
-// Example: "{{BuildDateTimeCompact}}.{{ShortHash}}" → "20241211103045.abc1234"
+// Elements are template variable names that will be rendered and joined with dots.
+// Example: ["BuildDateTimeCompact", "ShortHash", "Dirty"]
+// Produces: "20241211103045.abc1234.dirty"
 //
-// The leading plus (+) is automatically prepended when using {{MetadataWithPlus}}
-// Do NOT include the leading plus in your template.
+// Empty values are automatically skipped (no dangling dots).
+// The leading plus (+) is automatically prepended when using {{MetadataWithPlus}}.
 //
 // The VERSION file is the source of truth for current metadata value.
-// This template is stored for use with 'metadata enable' and '--metadata' flag.
+// This config is stored for use with 'metadata enable' and '--metadata' flag.
 type MetadataConfig struct {
-	Template string    `yaml:"template"` // Mustache template with DOTS as separators: "{{BuildDateTimeCompact}}.{{ShortHash}}" → "20241211.abc1234"
+	Elements []string  `yaml:"elements"` // Variable names joined with dots: ["BuildDateTimeCompact", "ShortHash"] → "20241211103045.abc1234"
 	Git      GitConfig `yaml:"git"`
 }
 
@@ -67,10 +89,10 @@ func ReadConfig() (*Config, error) {
 	config := &Config{
 		Prefix: "v", // default prefix
 		PreRelease: PreReleaseConfig{
-			Template: "", // empty by default, user must configure
+			Elements: nil, // empty by default, user must configure
 		},
 		Metadata: MetadataConfig{
-			Template: "", // empty by default, user must configure
+			Elements: nil, // empty by default, user must configure
 			Git: GitConfig{
 				HashLength: 12, // default hash length for MediumHash
 			},
@@ -109,18 +131,9 @@ func ValidateTemplate(template string) error {
 	return nil
 }
 
-// Validate checks if the config is valid, including template syntax
+// Validate checks if the config is valid
 func (c *Config) Validate() error {
-	if c.PreRelease.Template != "" {
-		if err := ValidateTemplate(c.PreRelease.Template); err != nil {
-			return fmt.Errorf("prerelease template: %w", err)
-		}
-	}
-	if c.Metadata.Template != "" {
-		if err := ValidateTemplate(c.Metadata.Template); err != nil {
-			return fmt.Errorf("metadata template: %w", err)
-		}
-	}
+	// Elements are simple variable names, no complex validation needed
 	return nil
 }
 
@@ -234,32 +247,34 @@ prefix: "v"
 
 # Pre-release configuration
 # Pre-release follows SemVer 2.0.0: appended with dash (-)
-# Example output: 1.2.3-alpha-5
+# Elements are joined with DASHES automatically.
+# Example: ["alpha", "CommitsSinceTag"] → "alpha-5"
+#
+# CANONICAL USE CASE: Go projects
+# Pre-release is the canonical versioning feature for Go modules.
+# Go ignores build metadata (+suffix) and uses pre-release for commit info.
+# Use 'versionator init --go' for Go-optimized configuration.
+# Other ecosystems can also use pre-release for Go-compatible versioning.
 prerelease:
-  # Set to true to enable pre-release in version output
-  enabled: false
-
-  # Mustache template string for pre-release identifier
-  # IMPORTANT: Use DASHES (-) to separate identifiers per SemVer 2.0.0
-  # Example: "alpha-{{CommitsSinceTag}}" → "alpha-5"
-  # The leading dash is added automatically - do NOT include it here
-  template: "alpha-{{CommitsSinceTag}}"
+  # List of elements to include in pre-release (joined with dashes)
+  # Each element can be a variable name (e.g., "CommitsSinceTag") or a literal (e.g., "alpha")
+  # Standard: ["alpha", "CommitsSinceTag"]
+  # Go-style: ["CommitsSinceTag", "BuildDateTimeCompact", "ShortHash", "Dirty"]
+  elements: []
 
 # Build metadata configuration
 # Metadata follows SemVer 2.0.0: appended with plus (+)
-# Example output: 1.2.3+20241211103045.abc1234def5
+# Elements are joined with DOTS automatically.
+# Example: ["BuildDateTimeCompact", "ShortHash"] → "20241211103045.abc1234"
+#
+# NOTE: Go projects should NOT use metadata (Go ignores +suffix).
+# Use pre-release instead for Go. See 'versionator init --go'.
+# Metadata is appropriate for ecosystems that preserve it (Cargo, etc.).
 metadata:
-  # Set to true to enable metadata in version output
-  enabled: false
-
-  # Metadata type (currently only "git" supported)
-  type: "git"
-
-  # Mustache template string for build metadata
-  # IMPORTANT: Use DOTS (.) to separate identifiers per SemVer 2.0.0
-  # Example: "{{BuildDateTimeCompact}}.{{MediumHash}}" → "20241211103045.abc1234def5"
-  # The leading plus is added automatically - do NOT include it here
-  template: "{{BuildDateTimeCompact}}.{{MediumHash}}"
+  # List of elements to include in metadata (joined with dots)
+  # Each element can be a variable name (e.g., "ShortHash") or a literal (e.g., "build")
+  # Example: ["BuildDateTimeCompact", "ShortHash", "Dirty"]
+  elements: []
 
   # Git-specific configuration
   git:
@@ -272,56 +287,44 @@ logging:
   output: "console"
 
 # =============================================================================
-# AVAILABLE TEMPLATE VARIABLES
+# AVAILABLE ELEMENT VARIABLES
 # =============================================================================
+# Use these variable names in the elements lists above.
+# Literals (like "alpha" or "build") are also supported and used as-is.
 #
 # Version Components:
-#   {{Major}}, {{Minor}}, {{Patch}}  - Version numbers
-#   {{MajorMinorPatch}}              - Core version (1.2.3)
-#   {{MajorMinor}}                   - Major.Minor (1.2)
-#   {{Prefix}}                       - Version prefix (v)
-#
-# Pre-release (from VERSION file):
-#   {{PreRelease}}                   - Full pre-release string
-#   {{PreReleaseWithDash}}           - With dash prefix (-alpha.5)
-#   {{PreReleaseLabel}}              - Label only (alpha from alpha.5)
-#   {{PreReleaseNumber}}             - Number only (5 from alpha.5)
-#
-# Metadata (from VERSION file):
-#   {{Metadata}}                     - Full metadata string
-#   {{MetadataWithPlus}}             - With plus prefix (+build.123)
+#   Major, Minor, Patch        - Version numbers
+#   MajorMinorPatch            - Core version (1.2.3)
+#   MajorMinor                 - Major.Minor (1.2)
+#   Prefix                     - Version prefix (v)
 #
 # VCS/Git Information:
-#   {{Hash}}                         - Full commit hash (40 chars for git)
-#   {{ShortHash}}                    - Short hash (7 chars)
-#   {{MediumHash}}                   - Medium hash (12 chars)
-#   {{BranchName}}                   - Current branch name
-#   {{EscapedBranchName}}            - Branch with / replaced by -
-#   {{CommitsSinceTag}}              - Commits since last tag
-#   {{BuildNumber}}                  - Alias for CommitsSinceTag
-#   {{BuildNumberPadded}}            - Padded to 4 digits (0042)
-#   {{UncommittedChanges}}           - Count of dirty files
-#   {{Dirty}}                        - "dirty" if uncommitted changes
-#   {{VersionSourceHash}}            - Hash of last tag's commit
+#   Hash                       - Full commit hash (40 chars for git)
+#   ShortHash                  - Short hash (7 chars)
+#   MediumHash                 - Medium hash (12 chars)
+#   BranchName                 - Current branch name
+#   EscapedBranchName          - Branch with / replaced by -
+#   CommitsSinceTag            - Commits since last tag
+#   BuildNumber                - Alias for CommitsSinceTag
+#   BuildNumberPadded          - Padded to 4 digits (0042)
+#   UncommittedChanges         - Count of dirty files
+#   Dirty                      - "dirty" if uncommitted changes, empty otherwise
+#   VersionSourceHash          - Hash of last tag's commit
 #
 # Commit Author:
-#   {{CommitAuthor}}                 - Commit author name
-#   {{CommitAuthorEmail}}            - Commit author email
+#   CommitAuthor               - Commit author name
+#   CommitAuthorEmail          - Commit author email
 #
 # Commit Timestamps (UTC):
-#   {{CommitDate}}                   - ISO 8601 (2024-01-15T10:30:00Z)
-#   {{CommitDateCompact}}            - Compact (20240115103045)
-#   {{CommitDateShort}}              - Date only (2024-01-15)
-#   {{CommitYear}}, {{CommitMonth}}, {{CommitDay}}
+#   CommitDate                 - ISO 8601 (2024-01-15T10:30:00Z)
+#   CommitDateCompact          - Compact (20240115103045)
+#   CommitDateShort            - Date only (2024-01-15)
+#   CommitYear, CommitMonth, CommitDay
 #
 # Build Timestamps (UTC):
-#   {{BuildDateTimeUTC}}             - ISO 8601 (2024-01-15T10:30:00Z)
-#   {{BuildDateTimeCompact}}         - Compact (20240115103045)
-#   {{BuildDateUTC}}                 - Date only (2024-01-15)
-#   {{BuildYear}}, {{BuildMonth}}, {{BuildDay}}
-#
-# Plugin Variables (git plugin):
-#   {{GitShortHash}}                 - Prefixed short hash (git.abc1234)
-#   {{ShaShortHash}}                 - Prefixed short hash (sha.abc1234)
+#   BuildDateTimeUTC           - ISO 8601 (2024-01-15T10:30:00Z)
+#   BuildDateTimeCompact       - Compact (20240115103045)
+#   BuildDateUTC               - Date only (2024-01-15)
+#   BuildYear, BuildMonth, BuildDay
 `
 }

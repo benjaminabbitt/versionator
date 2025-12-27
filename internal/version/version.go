@@ -25,6 +25,7 @@ type Version struct {
 	Major         int    // Major version
 	Minor         int    // Minor version
 	Patch         int    // Patch version
+	Revision      int    // Revision version (4th component, primarily for .NET: Major.Minor.Build.Revision)
 	PreRelease    string // Pre-release identifier (e.g., "alpha.1")
 	BuildMetadata string // Build metadata (e.g., "build.123")
 	Raw           string // Original parsed string
@@ -37,12 +38,14 @@ const (
 	MajorLevel VersionLevel = iota
 	MinorLevel
 	PatchLevel
+	RevisionLevel
 )
 
 // semverRegex matches semantic versions with optional pre-release and build metadata
 // Based on SemVer 2.0.0 specification (see resources/semver-2.md)
+// Extended to support 4-component versions for .NET (Major.Minor.Patch.Revision)
 // Note: prefix is extracted separately before applying this regex
-var semverRegex = regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?(?:\+([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?$`)
+var semverRegex = regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?(?:\+([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?$`)
 
 // Parse parses a version string into a Version struct
 // Extracts prefix as all characters (letters, dashes) before the first digit
@@ -73,7 +76,7 @@ func Parse(version string) Version {
 		return v
 	}
 
-	// Capture groups: [0]=full match, [1]=major, [2]=minor, [3]=patch, [4]=prerelease, [5]=metadata
+	// Capture groups: [0]=full match, [1]=major, [2]=minor, [3]=patch, [4]=revision, [5]=prerelease, [6]=metadata
 
 	// Major version (required)
 	if matches[1] != "" {
@@ -102,8 +105,17 @@ func Parse(version string) Version {
 		v.Patch = patch
 	}
 
-	v.PreRelease = matches[4]
-	v.BuildMetadata = matches[5]
+	// Revision version (optional, defaults to 0, primarily for .NET)
+	if matches[4] != "" {
+		revision, err := strconv.Atoi(matches[4])
+		if err != nil {
+			return Version{Raw: version}
+		}
+		v.Revision = revision
+	}
+
+	v.PreRelease = matches[5]
+	v.BuildMetadata = matches[6]
 
 	return v
 }
@@ -158,7 +170,7 @@ func Load() (*Version, error) {
 			defaultPrefix = cfg.Prefix
 		}
 
-		v := &Version{Major: 0, Minor: 0, Patch: 0, Prefix: defaultPrefix}
+		v := &Version{Major: 0, Minor: 0, Patch: 0, Revision: 0, Prefix: defaultPrefix}
 		logger.Info(LogVersionCreated,
 			zap.String("path", path),
 			zap.String("version", v.String()))
@@ -201,9 +213,13 @@ func Save(v *Version) error {
 }
 
 // String returns the SemVer 2.0.0 compliant string (no prefix)
-// Format: Major.Minor.Patch[-PreRelease][+BuildMetadata]
+// Format: Major.Minor.Patch[.Revision][-PreRelease][+BuildMetadata]
+// Revision is only included when non-zero (for .NET compatibility)
 func (v *Version) String() string {
 	result := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+	if v.Revision != 0 {
+		result += fmt.Sprintf(".%d", v.Revision)
+	}
 	if v.PreRelease != "" {
 		result += "-" + v.PreRelease
 	}
@@ -213,9 +229,19 @@ func (v *Version) String() string {
 	return result
 }
 
-// CoreVersion returns just Major.Minor.Patch
+// CoreVersion returns just Major.Minor.Patch (standard SemVer)
 func (v *Version) CoreVersion() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+}
+
+// CoreVersionWithRevision returns Major.Minor.Patch.Revision (for .NET)
+func (v *Version) CoreVersionWithRevision() string {
+	return fmt.Sprintf("%d.%d.%d.%d", v.Major, v.Minor, v.Patch, v.Revision)
+}
+
+// HasRevision returns true if the version has a non-zero revision
+func (v *Version) HasRevision() bool {
+	return v.Revision != 0
 }
 
 // FullString returns the full version string with prefix
@@ -242,6 +268,11 @@ func (v *Version) MinorString() string {
 // PatchString returns the patch version as a string
 func (v *Version) PatchString() string {
 	return strconv.Itoa(v.Patch)
+}
+
+// RevisionString returns the revision version as a string
+func (v *Version) RevisionString() string {
+	return strconv.Itoa(v.Revision)
 }
 
 // SemVer returns Major.Minor.Patch[-PreRelease] (no metadata)
@@ -327,9 +358,10 @@ func (v *Version) PreReleaseLabelWithDash() string {
 	return ""
 }
 
-// AssemblyVersion returns an assembly-compatible version (Major.Minor.Patch.0)
+// AssemblyVersion returns an assembly-compatible version (Major.Minor.Patch.Revision)
+// This is the standard .NET assembly version format
 func (v *Version) AssemblyVersion() string {
-	return v.CoreVersion() + ".0"
+	return v.CoreVersionWithRevision()
 }
 
 // PrefixedString returns the version with prefix (Major.Minor.Patch)
@@ -377,6 +409,7 @@ func (v *Version) OriginalFullSemVer() string {
 }
 
 // Validate checks if the version is valid according to SemVer 2.0.0
+// Extended to support 4-component versions for .NET
 func (v *Version) Validate() error {
 	if v.Major < 0 {
 		return errors.New(ErrMajorVersionNegative)
@@ -386,6 +419,9 @@ func (v *Version) Validate() error {
 	}
 	if v.Patch < 0 {
 		return errors.New(ErrPatchVersionNegative)
+	}
+	if v.Revision < 0 {
+		return errors.New(ErrRevisionVersionNegative)
 	}
 
 	if v.PreRelease != "" {
@@ -418,24 +454,33 @@ func validateIdentifier(id string) error {
 	return nil
 }
 
-// IncrementMajor increments the major version, resets minor and patch
+// IncrementMajor increments the major version, resets minor, patch, and revision
 func (v *Version) IncrementMajor() {
 	v.Major++
 	v.Minor = 0
 	v.Patch = 0
+	v.Revision = 0
 	v.PreRelease = ""
 }
 
-// IncrementMinor increments the minor version, resets patch
+// IncrementMinor increments the minor version, resets patch and revision
 func (v *Version) IncrementMinor() {
 	v.Minor++
 	v.Patch = 0
+	v.Revision = 0
 	v.PreRelease = ""
 }
 
 // IncrementPatch increments the patch version
 func (v *Version) IncrementPatch() {
 	v.Patch++
+	v.Revision = 0
+	v.PreRelease = ""
+}
+
+// IncrementRevision increments the revision version (4th component for .NET)
+func (v *Version) IncrementRevision() {
+	v.Revision++
 	v.PreRelease = ""
 }
 
@@ -447,6 +492,7 @@ func (v *Version) DecrementMajor() error {
 	v.Major--
 	v.Minor = 0
 	v.Patch = 0
+	v.Revision = 0
 	return nil
 }
 
@@ -457,6 +503,7 @@ func (v *Version) DecrementMinor() error {
 	}
 	v.Minor--
 	v.Patch = 0
+	v.Revision = 0
 	return nil
 }
 
@@ -466,6 +513,16 @@ func (v *Version) DecrementPatch() error {
 		return errors.New(ErrCannotDecrementPatch)
 	}
 	v.Patch--
+	v.Revision = 0
+	return nil
+}
+
+// DecrementRevision decrements the revision version, returns error if already 0
+func (v *Version) DecrementRevision() error {
+	if v.Revision == 0 {
+		return errors.New(ErrCannotDecrementRevision)
+	}
+	v.Revision--
 	return nil
 }
 
@@ -498,6 +555,8 @@ func Increment(level VersionLevel) error {
 		v.IncrementMinor()
 	case PatchLevel:
 		v.IncrementPatch()
+	case RevisionLevel:
+		v.IncrementRevision()
 	default:
 		return fmt.Errorf("%s: %d", ErrInvalidVersionLevel, level)
 	}
@@ -529,6 +588,8 @@ func Decrement(level VersionLevel) error {
 		decrementErr = v.DecrementMinor()
 	case PatchLevel:
 		decrementErr = v.DecrementPatch()
+	case RevisionLevel:
+		decrementErr = v.DecrementRevision()
 	default:
 		return fmt.Errorf("%s: %d", ErrInvalidVersionLevel, level)
 	}
@@ -553,6 +614,8 @@ func levelString(level VersionLevel) string {
 		return "minor"
 	case PatchLevel:
 		return "patch"
+	case RevisionLevel:
+		return "revision"
 	default:
 		return "unknown"
 	}

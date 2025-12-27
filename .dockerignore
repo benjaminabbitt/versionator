@@ -18,7 +18,8 @@ dist/
 
 # Tests
 *_test.go
-tests/
+tests/acceptance/
+# Keep tests/containers/ for container builds
 
 # Examples
 examples/

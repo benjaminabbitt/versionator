@@ -12,18 +12,20 @@ const (
 
 // Error messages
 const (
-	ErrMajorVersionNegative  = "major version cannot be negative"
-	ErrMinorVersionNegative  = "minor version cannot be negative"
-	ErrPatchVersionNegative  = "patch version cannot be negative"
-	ErrCannotDecrementMajor  = "cannot decrement major version below 0"
-	ErrCannotDecrementMinor  = "cannot decrement minor version below 0"
-	ErrCannotDecrementPatch  = "cannot decrement patch version below 0"
-	ErrInvalidVersionLevel   = "invalid version level"
-	ErrInvalidPreRelease     = "invalid pre-release identifier"
-	ErrInvalidMetadata       = "invalid build metadata"
-	ErrEmptyIdentifierPart   = "identifier part cannot be empty"
-	ErrInvalidIdentifierChar = "invalid character in identifier"
-	ErrCustomKeyNotFound     = "custom key not found"
+	ErrMajorVersionNegative     = "major version cannot be negative"
+	ErrMinorVersionNegative     = "minor version cannot be negative"
+	ErrPatchVersionNegative     = "patch version cannot be negative"
+	ErrRevisionVersionNegative  = "revision version cannot be negative"
+	ErrCannotDecrementMajor     = "cannot decrement major version below 0"
+	ErrCannotDecrementMinor     = "cannot decrement minor version below 0"
+	ErrCannotDecrementPatch     = "cannot decrement patch version below 0"
+	ErrCannotDecrementRevision  = "cannot decrement revision version below 0"
+	ErrInvalidVersionLevel      = "invalid version level"
+	ErrInvalidPreRelease        = "invalid pre-release identifier"
+	ErrInvalidMetadata          = "invalid build metadata"
+	ErrEmptyIdentifierPart      = "identifier part cannot be empty"
+	ErrInvalidIdentifierChar    = "invalid character in identifier"
+	ErrCustomKeyNotFound        = "custom key not found"
 )
 
 // Log messages for structured logging

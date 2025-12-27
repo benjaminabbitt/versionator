@@ -43,7 +43,7 @@ Feature: End-to-End Integration
     Given a config file with:
       """
       metadata:
-        template: "{{BuildDateUTC}}"
+        elements: ["BuildDateUTC"]
       """
     And a VERSION file with version "3.0.0"
     When I run "versionator version -t '{{Prefix}}{{MajorMinorPatch}}{{MetadataWithPlus}}' --prefix --metadata"

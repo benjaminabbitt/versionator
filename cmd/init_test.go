@@ -163,8 +163,8 @@ func (suite *InitTestSuite) TestInitCommand_GoFlag_EnablesPrerelease() {
 	suite.Require().NoError(err, "failed to read config")
 
 	content := string(data)
-	// Should have prerelease template with CommitsSinceTag for Go pseudo-versions
-	suite.Contains(content, "template:", "config should contain template setting")
+	// Should have prerelease elements with CommitsSinceTag for Go pseudo-versions
+	suite.Contains(content, "elements:", "config should contain elements setting")
 	suite.Contains(content, "CommitsSinceTag", "Go config should use CommitsSinceTag in prerelease")
 
 	output := stdout.String()

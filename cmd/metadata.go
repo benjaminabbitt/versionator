@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/benjaminabbitt/versionator/internal/config"
-	"github.com/benjaminabbitt/versionator/internal/emit"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/version"
+	"github.com/benjaminabbitt/versionator/internal/versionator"
 
 	"github.com/spf13/cobra"
 )
@@ -27,32 +28,22 @@ Example output: 1.2.3+20241211103045.abc1234def5`,
 var metadataEnableCmd = &cobra.Command{
 	Use:   "enable",
 	Short: "Enable build metadata",
-	Long: `Enable build metadata by rendering the config template and setting it in VERSION file.
+	Long: `Enable build metadata by rendering the config elements and setting it in VERSION file.
 
-If a template is configured in .versionator.yaml, it will be rendered and set as a static value.
-If no template is configured, defaults to the git short hash.
+If elements are configured in .versionator.yaml, they will be rendered and joined with dots.
+If no elements are configured, defaults to the git short hash.
 
 The VERSION file is the source of truth - this command writes to it directly.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load current version
-		vd, err := version.Load()
+		// Determine metadata value: use config elements if set, else default to git hash
+		metadata, err := versionator.RenderMetadata()
 		if err != nil {
-			return fmt.Errorf("error getting version: %w", err)
+			return fmt.Errorf("error rendering metadata: %w", err)
 		}
 
-		// Determine metadata value: use config template if set, else default to git hash
-		metadata := ""
-		cfg, _ := config.ReadConfig()
-		if cfg != nil && cfg.Metadata.Template != "" {
-			templateData := emit.BuildTemplateDataFromVersion(vd)
-			rendered, err := emit.RenderTemplateWithData(cfg.Metadata.Template, templateData)
-			if err == nil && rendered != "" {
-				metadata = rendered
-			}
-		}
-
-		// If no template or render failed, use git hash as default
+		// If no elements or render empty, use git hash as default
 		if metadata == "" {
+			cfg, _ := config.ReadConfig()
 			gitVCS := vcs.GetVCS("git")
 			hashLength := 7
 			if cfg != nil && cfg.Metadata.Git.HashLength > 0 {
@@ -78,7 +69,7 @@ The VERSION file is the source of truth - this command writes to it directly.`,
 		fmt.Fprintf(cmd.OutOrStdout(), "Metadata enabled with value '%s'\n", metadata)
 
 		// Show current version
-		vd, err = version.Load()
+		vd, err := version.Load()
 		if err != nil {
 			return fmt.Errorf("error getting version: %w", err)
 		}
@@ -118,7 +109,7 @@ var metadataStatusCmd = &cobra.Command{
 	Short: "Show metadata status",
 	Long: `Show current metadata status from VERSION file (source of truth).
 
-Also shows the configured template from .versionator.yaml if set.`,
+Also shows the configured elements from .versionator.yaml if set.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Load version - VERSION file is source of truth
 		vd, err := version.Load()
@@ -133,9 +124,9 @@ Also shows the configured template from .versionator.yaml if set.`,
 			fmt.Fprintln(cmd.OutOrStdout(), "Metadata: DISABLED")
 		}
 
-		// Show config template if set
-		if cfg, err := config.ReadConfig(); err == nil && cfg.Metadata.Template != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "Config template: %s\n", cfg.Metadata.Template)
+		// Show config elements if set
+		if cfg, err := config.ReadConfig(); err == nil && len(cfg.Metadata.Elements) > 0 {
+			fmt.Fprintf(cmd.OutOrStdout(), "Config elements: [%s]\n", strings.Join(cfg.Metadata.Elements, ", "))
 		}
 
 		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
@@ -154,7 +145,7 @@ var metadataConfigureCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Current configuration:\n")
-		fmt.Printf("  Metadata template: %s\n", cfg.Metadata.Template)
+		fmt.Printf("  Metadata elements: [%s]\n", strings.Join(cfg.Metadata.Elements, ", "))
 		fmt.Printf("  Git hash length: %d\n", cfg.Metadata.Git.HashLength)
 		fmt.Printf("\nConfiguration is stored in .versionator.yaml\n")
 		fmt.Printf("Note: VERSION file is the source of truth for current metadata value.\n")
@@ -165,13 +156,9 @@ var metadataConfigureCmd = &cobra.Command{
 var metadataSetCmd = &cobra.Command{
 	Use:   "set <value>",
 	Short: "Set metadata value",
-	Long: `Set a static metadata value in both config and VERSION file.
+	Long: `Set a static metadata value in VERSION file.
 
-This updates:
-1. The config file (.versionator.yaml) - so 'metadata enable' can restore it
-2. The VERSION file - the source of truth for the current version
-
-Use 'metadata template' for dynamic values with variables like {{ShortHash}}.
+Use 'metadata elements' for dynamic values with variables like ShortHash.
 
 The value must follow SemVer 2.0.0:
 - Only alphanumerics and hyphens [0-9A-Za-z-]
@@ -184,16 +171,6 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		value := args[0]
-
-		// Update config with static value as template
-		cfg, err := config.ReadConfig()
-		if err != nil {
-			return fmt.Errorf("error reading config: %w", err)
-		}
-		cfg.Metadata.Template = value
-		if err := config.WriteConfig(cfg); err != nil {
-			return fmt.Errorf("error writing config: %w", err)
-		}
 
 		// Update VERSION file
 		if err := version.SetMetadata(value); err != nil {
@@ -235,34 +212,36 @@ var metadataClearCmd = &cobra.Command{
 	},
 }
 
-var metadataTemplateCmd = &cobra.Command{
-	Use:   "template [template-string]",
-	Short: "Get or set the metadata template",
-	Long: `Get or set the metadata template used for build metadata.
+var metadataElementsCmd = &cobra.Command{
+	Use:   "elements [element1,element2,...]",
+	Short: "Get or set the metadata elements",
+	Long: `Get or set the metadata elements used for build metadata.
 
-When setting a template, it is saved to .versionator.yaml config AND rendered
+Elements are variable names that will be rendered and joined with dots (.)
+per SemVer 2.0.0 specification. The leading plus (+) is added automatically.
+
+When setting elements, provide a comma-separated list of variable names.
+The elements are saved to .versionator.yaml config AND rendered
 immediately to set the metadata value in VERSION file.
 
-IMPORTANT: Use DOTS (.) to separate metadata identifiers per SemVer 2.0.0.
-The leading plus (+) is added automatically - do NOT include it in your template.
+Available variables:
+  ShortHash            - Short git commit hash, 7 chars (e.g., "abc1234")
+  MediumHash           - Medium git commit hash, 12 chars (e.g., "abc1234def01")
+  Hash                 - Full git commit hash (40 chars)
+  BranchName           - Current branch name
+  EscapedBranchName    - Branch name with / replaced by -
+  CommitsSinceTag      - Commits since last tag
+  BuildDateTimeCompact - Compact timestamp (20241211103045)
+  BuildDateUTC         - Date only (2024-12-11)
+  Dirty                - "dirty" if uncommitted changes
 
-The template uses Mustache syntax. Available variables:
-  {{ShortHash}}            - Short git commit hash, 7 chars (e.g., "abc1234")
-  {{MediumHash}}           - Medium git commit hash, 12 chars (e.g., "abc1234def01")
-  {{Hash}}                 - Full git commit hash (40 chars)
-  {{BranchName}}           - Current branch name
-  {{EscapedBranchName}}    - Branch name with / replaced by -
-  {{CommitsSinceTag}}      - Commits since last tag
-  {{BuildDateTimeCompact}} - Compact timestamp (20241211103045)
-  {{BuildDateUTC}}         - Date only (2024-12-11)
-  {{CommitDate}}           - Commit date ISO 8601
-  {{CommitDateCompact}}    - Commit date compact (20241211103045)
+Literal values are also supported - they are used as-is.
 
 Examples:
-  versionator metadata template                                              # Show current
-  versionator metadata template "{{BuildDateTimeCompact}}.{{MediumHash}}"    # Timestamp.hash
-  versionator metadata template "{{ShortHash}}"                              # Just git hash
-  versionator metadata template "{{CommitsSinceTag}}.{{ShortHash}}"          # Build number.hash`,
+  versionator metadata elements                                        # Show current
+  versionator metadata elements "BuildDateTimeCompact,ShortHash"       # Timestamp.hash
+  versionator metadata elements "ShortHash"                            # Just git hash
+  versionator metadata elements "BuildDateTimeCompact,ShortHash,Dirty" # Timestamp.hash.dirty`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.ReadConfig()
@@ -270,42 +249,38 @@ Examples:
 			return fmt.Errorf("error reading config: %w", err)
 		}
 
-		// If no argument, show current template
+		// If no argument, show current elements
 		if len(args) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "Current metadata template: %s\n", cfg.Metadata.Template)
+			fmt.Fprintf(cmd.OutOrStdout(), "Current metadata elements: [%s]\n", strings.Join(cfg.Metadata.Elements, ", "))
 
 			// Show what it would render to
-			if cfg.Metadata.Template != "" {
-				vd, err := version.Load()
-				if err == nil {
-					templateData := emit.BuildTemplateDataFromVersion(vd)
-					result, err := emit.RenderTemplateWithData(cfg.Metadata.Template, templateData)
-					if err == nil && result != "" {
-						fmt.Fprintf(cmd.OutOrStdout(), "Rendered value: %s\n", result)
-					}
+			if len(cfg.Metadata.Elements) > 0 {
+				result, err := versionator.RenderMetadata()
+				if err == nil && result != "" {
+					fmt.Fprintf(cmd.OutOrStdout(), "Rendered value: %s\n", result)
 				}
 			}
 			return nil
 		}
 
-		// Set new template in config
-		cfg.Metadata.Template = args[0]
+		// Parse comma-separated elements
+		elements := strings.Split(args[0], ",")
+		for i, e := range elements {
+			elements[i] = strings.TrimSpace(e)
+		}
+
+		// Set new elements in config
+		cfg.Metadata.Elements = elements
 		if err := config.WriteConfig(cfg); err != nil {
 			return fmt.Errorf("error writing config: %w", err)
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "Metadata template set to: %s\n", cfg.Metadata.Template)
+		fmt.Fprintf(cmd.OutOrStdout(), "Metadata elements set to: [%s]\n", strings.Join(elements, ", "))
 
-		// Render template and set in VERSION file
-		vd, err := version.Load()
+		// Render elements and set in VERSION file
+		result, err := versionator.RenderMetadata()
 		if err != nil {
-			return fmt.Errorf("error loading version: %w", err)
-		}
-
-		templateData := emit.BuildTemplateDataFromVersion(vd)
-		result, err := emit.RenderTemplateWithData(cfg.Metadata.Template, templateData)
-		if err != nil {
-			return fmt.Errorf("error rendering template: %w", err)
+			return fmt.Errorf("error rendering metadata: %w", err)
 		}
 
 		// Set the rendered value in VERSION file
@@ -316,7 +291,7 @@ Examples:
 		fmt.Fprintf(cmd.OutOrStdout(), "Metadata set to: %s\n", result)
 
 		// Show updated version
-		vd, err = version.Load()
+		vd, err := version.Load()
 		if err != nil {
 			return fmt.Errorf("error loading version: %w", err)
 		}
@@ -333,5 +308,5 @@ func init() {
 	metadataCmd.AddCommand(metadataConfigureCmd)
 	metadataCmd.AddCommand(metadataSetCmd)
 	metadataCmd.AddCommand(metadataClearCmd)
-	metadataCmd.AddCommand(metadataTemplateCmd)
+	metadataCmd.AddCommand(metadataElementsCmd)
 }

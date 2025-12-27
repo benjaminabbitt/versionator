@@ -248,17 +248,17 @@ versionator config dump --output .versionator.yaml
 # .versionator.yaml
 prefix: "v"
 
-# Pre-release template (Mustache syntax)
-# Use DASHES (-) to separate identifiers per SemVer 2.0.0
+# Pre-release configuration (SemVer: appended with dash)
+# Elements are variable names joined with DASHES automatically
 prerelease:
-  template: "alpha-{{CommitsSinceTag}}"   # e.g., "alpha-5"
+  elements: ["alpha", "CommitsSinceTag"]   # → "alpha-5"
 
-# Metadata template (Mustache syntax)
-# Use DOTS (.) to separate identifiers per SemVer 2.0.0
+# Metadata configuration (SemVer: appended with plus)
+# Elements are variable names joined with DOTS automatically
 metadata:
-  template: "{{BuildDateTimeCompact}}.{{ShortHash}}"   # e.g., "20241211103045.abc1234"
+  elements: ["BuildDateTimeCompact", "ShortHash", "Dirty"]   # → "20241211103045.abc1234.dirty"
   git:
-    hashLength: 12    # Length for {{MediumHash}}
+    hashLength: 12    # Length for MediumHash variable
 
 logging:
   output: "console"   # console, json, or development
@@ -269,9 +269,13 @@ custom:
   Environment: "production"
 ```
 
+**Element Lists vs Templates**: The `elements` list approach automatically handles joining (dashes for prerelease, dots for metadata) and skips empty values. Each element can be a variable name (e.g., `"CommitsSinceTag"`) or a literal string (e.g., `"alpha"`).
+
 See [docs/VERSION_TEMPLATES.md](docs/VERSION_TEMPLATES.md) for complete documentation on pre-release and metadata configuration.
 
-## Go Projects
+## Go Projects (Pre-release Canonical Use Case)
+
+**Pre-release is the canonical versioning feature for Go projects.** While pre-release can be used in any ecosystem, it was designed primarily to address Go's unique versioning requirements.
 
 Go modules have unique versioning requirements that differ from other ecosystems. While SemVer 2.0.0 defines `+metadata` suffixes for build information, **Go ignores build metadata entirely** and instead uses **pseudo-versions** that embed commit information in the pre-release field.
 
@@ -296,12 +300,16 @@ Use the `--go` flag to configure versionator for Go module compatibility:
 versionator init --go
 ```
 
-This creates a `.versionator.yaml` with a pre-release template optimized for Go:
+This creates a `.versionator.yaml` with elements optimized for Go:
 
 ```yaml
 prefix: "v"
 prerelease:
-  template: "{{CommitsSinceTag}}.{{BuildDateTimeCompact}}.{{ShortHash}}"
+  elements: ["CommitsSinceTag", "BuildDateTimeCompact", "ShortHash", "Dirty"]
+  # → "5-20241215143052-abc1234-dirty"
+metadata:
+  elements: ["BuildDateTimeCompact", "ShortHash", "Dirty"]
+  # → "20241215143052.abc1234.dirty"
 ```
 
 ### Generating Go-Compatible Versions
@@ -330,13 +338,30 @@ For build traceability in Go projects, always use pre-release identifiers rather
 
 | Ecosystem | Build Metadata (`+suffix`) | Recommendation |
 |-----------|---------------------------|----------------|
-| **Go** | Ignored; use pre-release | `versionator init --go` |
+| **Go** | Ignored; use pre-release | `versionator init --go` (canonical) |
 | **npm** | Stripped on publish | Use pre-release tags |
 | **PyPI** | Rejected (local versions) | Strip before publish |
 | **Cargo** | Preserved | Full support |
 | **NuGet** | Normalized | Preserved but deduplicated |
 
 See [resources/semver-suffixes.md](resources/semver-suffixes.md) for detailed ecosystem comparison.
+
+### Using Pre-release in Non-Go Projects
+
+While pre-release is canonical for Go, you can use it in any project that benefits from Go-style version ordering. Use the `--go` flag with any language:
+
+```bash
+# Rust project with Go-compatible versioning
+versionator init rust --go
+
+# Python project with Go-compatible versioning
+versionator init python --go
+```
+
+This is useful when:
+- Your project is consumed by Go modules (e.g., a library with Go bindings)
+- You prefer commit-sortable versions over metadata-based traceability
+- Your ecosystem strips or ignores build metadata (npm, PyPI)
 
 ## Source of Truth Architecture
 
@@ -413,6 +438,8 @@ Templates use Mustache syntax. Use `versionator vars` to see all variables with 
 | `{{Hash}}` | `abc1234...` | Full commit hash (40 chars for git) |
 | `{{ShortHash}}` | `abc1234` | Short hash (7 chars) |
 | `{{MediumHash}}` | `abc1234def01` | Medium hash (12 chars) |
+| `{{ShortHashWithDot}}` | `.abc1234` | Short hash with leading dot (Go prerelease) |
+| `{{MediumHashWithDot}}` | `.abc1234def01` | Medium hash with leading dot (Go prerelease) |
 | `{{BranchName}}` | `feature/foo` | Current branch |
 | `{{EscapedBranchName}}` | `feature-foo` | Branch with `/` → `-` |
 | `{{CommitsSinceTag}}` | `42` | Commits since last tag |
@@ -420,6 +447,7 @@ Templates use Mustache syntax. Use `versionator vars` to see all variables with 
 | `{{BuildNumberPadded}}` | `0042` | Padded to 4 digits |
 | `{{UncommittedChanges}}` | `3` | Count of dirty files |
 | `{{Dirty}}` | `dirty` | Non-empty if uncommitted changes |
+| `{{DirtyWithDot}}` | `.dirty` | With leading dot (Go prerelease) |
 | `{{VersionSourceHash}}` | `abc1234...` | Hash of last tag's commit |
 | **Commit Author** | | |
 | `{{CommitAuthor}}` | `John Doe` | Commit author name |
@@ -435,6 +463,7 @@ Templates use Mustache syntax. Use `versionator vars` to see all variables with 
 | **Build Timestamp (UTC)** | | |
 | `{{BuildDateTimeUTC}}` | `2024-01-15T10:30:00Z` | ISO 8601 |
 | `{{BuildDateTimeCompact}}` | `20240115103045` | YYYYMMDDHHmmss |
+| `{{BuildDateTimeCompactWithDot}}` | `.20240115103045` | With leading dot (Go prerelease) |
 | `{{BuildDateUTC}}` | `2024-01-15` | Date only |
 | **Plugin Variables (git)** | | |
 | `{{GitShortHash}}` | `git.abc1234` | Prefixed short hash |

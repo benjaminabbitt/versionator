@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/benjaminabbitt/versionator/internal/config"
-	"github.com/benjaminabbitt/versionator/internal/emit"
 	"github.com/benjaminabbitt/versionator/internal/version"
+	"github.com/benjaminabbitt/versionator/internal/versionator"
 
 	"github.com/spf13/cobra"
 )
@@ -26,27 +27,22 @@ Example output: 1.2.3-alpha-5`,
 var prereleaseEnableCmd = &cobra.Command{
 	Use:   "enable",
 	Short: "Enable pre-release identifier",
-	Long: `Enable pre-release identifier by rendering the config template and setting it in VERSION file.
+	Long: `Enable pre-release identifier by rendering the config elements and setting it in VERSION file.
 
-If a template is configured in .versionator.yaml, it will be rendered and set as a static value.
-If no template is configured, defaults to "alpha".
+If elements are configured in .versionator.yaml, they will be rendered and joined with dashes.
+If no elements are configured, defaults to "alpha".
 
 The VERSION file is the source of truth - this command writes to it directly.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load current version
-		vd, err := version.Load()
+		// Determine prerelease value: use config elements if set, else default to "alpha"
+		prerelease, err := versionator.RenderPreRelease()
 		if err != nil {
-			return fmt.Errorf("error getting version: %w", err)
+			return fmt.Errorf("error rendering prerelease: %w", err)
 		}
 
-		// Determine prerelease value: use config template if set, else default to "alpha"
-		prerelease := "alpha"
-		if cfg, err := config.ReadConfig(); err == nil && cfg.PreRelease.Template != "" {
-			templateData := emit.BuildTemplateDataFromVersion(vd)
-			rendered, err := emit.RenderTemplateWithData(cfg.PreRelease.Template, templateData)
-			if err == nil && rendered != "" {
-				prerelease = rendered
-			}
+		// If no elements or render empty, default to "alpha"
+		if prerelease == "" {
+			prerelease = "alpha"
 		}
 
 		// Set prerelease in VERSION file
@@ -57,7 +53,7 @@ The VERSION file is the source of truth - this command writes to it directly.`,
 		fmt.Fprintf(cmd.OutOrStdout(), "Pre-release enabled with value '%s'\n", prerelease)
 
 		// Show current version
-		vd, err = version.Load()
+		vd, err := version.Load()
 		if err != nil {
 			return fmt.Errorf("error getting version: %w", err)
 		}
@@ -97,7 +93,7 @@ var prereleaseStatusCmd = &cobra.Command{
 	Short: "Show pre-release status",
 	Long: `Show current pre-release status from VERSION file (source of truth).
 
-Also shows the configured template from .versionator.yaml if set.`,
+Also shows the configured elements from .versionator.yaml if set.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Load version - VERSION file is source of truth
 		vd, err := version.Load()
@@ -112,9 +108,9 @@ Also shows the configured template from .versionator.yaml if set.`,
 			fmt.Fprintln(cmd.OutOrStdout(), "Pre-release: DISABLED")
 		}
 
-		// Show config template if set
-		if cfg, err := config.ReadConfig(); err == nil && cfg.PreRelease.Template != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "Config template: %s\n", cfg.PreRelease.Template)
+		// Show config elements if set
+		if cfg, err := config.ReadConfig(); err == nil && len(cfg.PreRelease.Elements) > 0 {
+			fmt.Fprintf(cmd.OutOrStdout(), "Config elements: [%s]\n", strings.Join(cfg.PreRelease.Elements, ", "))
 		}
 
 		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
@@ -125,35 +121,21 @@ Also shows the configured template from .versionator.yaml if set.`,
 var prereleaseSetCmd = &cobra.Command{
 	Use:   "set <value>",
 	Short: "Set pre-release value",
-	Long: `Set a static pre-release value in both config and VERSION file.
+	Long: `Set a static pre-release value in VERSION file.
 
-This updates:
-1. The config file (.versionator.yaml) - so 'prerelease enable' can restore it
-2. The VERSION file - the source of truth for the current version
-
-Use 'prerelease template' for dynamic values with variables like {{CommitsSinceTag}}.
+Use 'prerelease elements' for dynamic values with variables like CommitsSinceTag.
 
 The value must follow SemVer 2.0.0:
 - Only alphanumerics and hyphens [0-9A-Za-z-]
-- Separate identifiers with dots (e.g., "alpha.1")
+- Separate identifiers with dashes (e.g., "alpha-1")
 
 Examples:
   versionator prerelease set alpha
-  versionator prerelease set beta.1
-  versionator prerelease set rc.2`,
+  versionator prerelease set beta-1
+  versionator prerelease set rc-2`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		value := args[0]
-
-		// Update config with static value as template
-		cfg, err := config.ReadConfig()
-		if err != nil {
-			return fmt.Errorf("error reading config: %w", err)
-		}
-		cfg.PreRelease.Template = value
-		if err := config.WriteConfig(cfg); err != nil {
-			return fmt.Errorf("error writing config: %w", err)
-		}
 
 		// Update VERSION file
 		if err := version.SetPreRelease(value); err != nil {
@@ -195,35 +177,35 @@ var prereleaseClearCmd = &cobra.Command{
 	},
 }
 
-var prereleaseTemplateCmd = &cobra.Command{
-	Use:   "template [template-string]",
-	Short: "Get or set the pre-release template",
-	Long: `Get or set the pre-release template.
+var prereleaseElementsCmd = &cobra.Command{
+	Use:   "elements [element1,element2,...]",
+	Short: "Get or set the pre-release elements",
+	Long: `Get or set the pre-release elements.
 
-When setting a template, it is saved to .versionator.yaml config AND rendered
+Elements are variable names that will be rendered and joined with dashes (-)
+per SemVer 2.0.0 specification. The leading dash (-) is added automatically.
+
+When setting elements, provide a comma-separated list of variable names.
+The elements are saved to .versionator.yaml config AND rendered
 immediately to set the pre-release value in VERSION file.
 
-IMPORTANT: Use DASHES (-) to separate pre-release identifiers per SemVer 2.0.0.
-The leading dash (-) is added automatically - do NOT include it in your template.
+Available variables:
+  ShortHash            - Short git commit hash, 7 chars (e.g., "abc1234")
+  MediumHash           - Medium git commit hash, 12 chars (e.g., "abc1234def01")
+  Hash                 - Full git commit hash (40 chars)
+  BranchName           - Current branch name
+  EscapedBranchName    - Branch name with / replaced by -
+  CommitsSinceTag      - Commits since last tag
+  BuildDateTimeCompact - Compact timestamp (20241211103045)
+  Dirty                - "dirty" if uncommitted changes
 
-The template uses Mustache syntax. Available variables:
-  {{ShortHash}}            - Short git commit hash, 7 chars (e.g., "abc1234")
-  {{MediumHash}}           - Medium git commit hash, 12 chars (e.g., "abc1234def01")
-  {{Hash}}                 - Full git commit hash (40 chars)
-  {{BranchName}}           - Current branch name
-  {{EscapedBranchName}}    - Branch name with / replaced by -
-  {{CommitsSinceTag}}      - Commits since last tag
-  {{BuildDateTimeCompact}} - Compact timestamp (20241211103045)
-  {{BuildDateUTC}}         - Date only (2024-12-11)
-  {{CommitDate}}           - Commit date ISO 8601
-  {{CommitDateCompact}}    - Commit date compact (20241211103045)
+Literal values are also supported - they are used as-is.
 
 Examples:
-  versionator prerelease template                              # Show current template
-  versionator prerelease template "alpha"                      # Static "alpha"
-  versionator prerelease template "alpha-{{CommitsSinceTag}}"  # "alpha-5"
-  versionator prerelease template "rc-{{CommitsSinceTag}}"     # "rc-5"
-  versionator prerelease template "beta-{{EscapedBranchName}}" # "beta-feature-foo"`,
+  versionator prerelease elements                                              # Show current
+  versionator prerelease elements "alpha,CommitsSinceTag"                      # alpha-5
+  versionator prerelease elements "CommitsSinceTag,BuildDateTimeCompact,ShortHash" # Go-style
+  versionator prerelease elements "beta,EscapedBranchName"                     # beta-feature-foo`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.ReadConfig()
@@ -231,42 +213,38 @@ Examples:
 			return fmt.Errorf("error reading config: %w", err)
 		}
 
-		// If no argument, show current template
+		// If no argument, show current elements
 		if len(args) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "Current pre-release template: %s\n", cfg.PreRelease.Template)
+			fmt.Fprintf(cmd.OutOrStdout(), "Current pre-release elements: [%s]\n", strings.Join(cfg.PreRelease.Elements, ", "))
 
 			// Show what it would render to
-			if cfg.PreRelease.Template != "" {
-				vd, err := version.Load()
-				if err == nil {
-					templateData := emit.BuildTemplateDataFromVersion(vd)
-					result, err := emit.RenderTemplateWithData(cfg.PreRelease.Template, templateData)
-					if err == nil && result != "" {
-						fmt.Fprintf(cmd.OutOrStdout(), "Rendered value: %s\n", result)
-					}
+			if len(cfg.PreRelease.Elements) > 0 {
+				result, err := versionator.RenderPreRelease()
+				if err == nil && result != "" {
+					fmt.Fprintf(cmd.OutOrStdout(), "Rendered value: %s\n", result)
 				}
 			}
 			return nil
 		}
 
-		// Set new template in config
-		cfg.PreRelease.Template = args[0]
+		// Parse comma-separated elements
+		elements := strings.Split(args[0], ",")
+		for i, e := range elements {
+			elements[i] = strings.TrimSpace(e)
+		}
+
+		// Set new elements in config
+		cfg.PreRelease.Elements = elements
 		if err := config.WriteConfig(cfg); err != nil {
 			return fmt.Errorf("error writing config: %w", err)
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "Pre-release template set to: %s\n", cfg.PreRelease.Template)
+		fmt.Fprintf(cmd.OutOrStdout(), "Pre-release elements set to: [%s]\n", strings.Join(elements, ", "))
 
-		// Render template and set in VERSION file
-		vd, err := version.Load()
+		// Render elements and set in VERSION file
+		result, err := versionator.RenderPreRelease()
 		if err != nil {
-			return fmt.Errorf("error loading version: %w", err)
-		}
-
-		templateData := emit.BuildTemplateDataFromVersion(vd)
-		result, err := emit.RenderTemplateWithData(cfg.PreRelease.Template, templateData)
-		if err != nil {
-			return fmt.Errorf("error rendering template: %w", err)
+			return fmt.Errorf("error rendering prerelease: %w", err)
 		}
 
 		// Set the rendered value in VERSION file
@@ -277,7 +255,7 @@ Examples:
 		fmt.Fprintf(cmd.OutOrStdout(), "Pre-release set to: %s\n", result)
 
 		// Show updated version
-		vd, err = version.Load()
+		vd, err := version.Load()
 		if err != nil {
 			return fmt.Errorf("error loading version: %w", err)
 		}
@@ -293,5 +271,5 @@ func init() {
 	prereleaseCmd.AddCommand(prereleaseStatusCmd)
 	prereleaseCmd.AddCommand(prereleaseSetCmd)
 	prereleaseCmd.AddCommand(prereleaseClearCmd)
-	prereleaseCmd.AddCommand(prereleaseTemplateCmd)
+	prereleaseCmd.AddCommand(prereleaseElementsCmd)
 }

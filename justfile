@@ -277,3 +277,75 @@ acceptance-test-compose-slow:
     docker compose -f tests/acceptance/docker-compose.yml run --build acceptance-tests-slow
     docker compose -f tests/acceptance/docker-compose.yml down
 
+# === Container Language Tests ===
+
+# Build the versionator-builder base image (required before other containers)
+container-builder:
+    #!/bin/zsh
+    set -e
+    echo "Building versionator-builder base image..."
+    docker build -t versionator-builder:latest -f tests/containers/images/versionator-builder.Dockerfile .
+
+# Build a specific container test (e.g., just container-build go-emit)
+container-build name: container-builder
+    #!/bin/zsh
+    set -e
+    echo "Building versionator-test-{{name}}..."
+    docker build -t versionator-test-{{name}}:latest -f tests/containers/images/{{name}}.Dockerfile .
+
+# Run a specific container test (e.g., just container-test go-emit)
+container-test name: (container-build name)
+    #!/bin/zsh
+    set -e
+    echo "Running versionator-test-{{name}}..."
+    docker run --rm versionator-test-{{name}}:latest
+
+# Build all container tests
+container-build-all: container-builder
+    #!/bin/zsh
+    set -e
+    echo "Building all container tests..."
+    for f in tests/containers/images/*.Dockerfile; do
+        name=$(basename "$f" .Dockerfile)
+        if [ "$name" != "versionator-builder" ]; then
+            echo "Building $name..."
+            docker build -t "versionator-test-$name:latest" -f "$f" .
+        fi
+    done
+
+# Run all container tests
+container-test-all: container-build-all
+    #!/bin/zsh
+    set -e
+    echo "Running all container tests..."
+    failed=0
+    for f in tests/containers/images/*.Dockerfile; do
+        name=$(basename "$f" .Dockerfile)
+        if [ "$name" != "versionator-builder" ]; then
+            echo "=== Testing $name ==="
+            if docker run --rm "versionator-test-$name:latest"; then
+                echo "✓ $name passed"
+            else
+                echo "✗ $name failed"
+                failed=1
+            fi
+            echo ""
+        fi
+    done
+    if [ $failed -eq 1 ]; then
+        echo "Some container tests failed!"
+        exit 1
+    fi
+    echo "All container tests passed!"
+
+# List available container tests
+container-list:
+    @ls tests/containers/images/*.Dockerfile | xargs -n1 basename | sed 's/.Dockerfile//' | grep -v versionator-builder
+
+# Clean all test container images
+container-clean:
+    #!/bin/zsh
+    echo "Cleaning test container images..."
+    docker images --format '{{"{{"}}.Repository{{"}}"}}' | grep '^versionator-test-' | xargs -r docker rmi -f 2>/dev/null || true
+    docker rmi -f versionator-builder:latest 2>/dev/null || true
+    echo "Done"

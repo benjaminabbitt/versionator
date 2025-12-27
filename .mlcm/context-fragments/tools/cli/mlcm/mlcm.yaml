@@ -1,0 +1,98 @@
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ DO NOT EDIT - Changes will be overwritten on next 'mlcm copy'              │
+# │ To customize: mlcm fragment edit {{name}} then re-run 'mlcm copy'          │
+# └─────────────────────────────────────────────────────────────────────────────┘
+version: "1.0"
+tags:
+    - tooling
+    - mlcm
+content: |-
+    # MLCM - Machine Learning Context Manager
+
+    MLCM manages reusable context fragments and prompts for AI coding assistants.
+
+    ## Key Commands
+
+    - `mlcm copy --from resources --to project` - Copy fragments to project
+    - `mlcm run -p <persona>` - Run AI with persona context
+    - `mlcm run -f <fragment>` - Run AI with specific fragment
+    - `mlcm run -t <tag>` - Run AI with tagged fragments
+    - `mlcm distill` - Compress fragments to reduce tokens
+
+    ## Locations
+
+    - `resources` - Embedded default fragments
+    - `home` (~/.mlcm) - Personal fragments
+    - `project` (.mlcm) - Project-specific fragments
+
+    ## Personas
+
+    Personas are named collections of fragments, tags, and variables.
+    Use `parents` for inheritance:
+
+    ```yaml
+    personas:
+      my-persona:
+        parents: [developer]
+        tags: [golang]
+        fragments: [my-custom-fragment]
+    ```
+
+    ## Fragments
+
+    YAML files with `content` field containing markdown context:
+
+    ```yaml
+    version: "1.0"
+    tags: [category, subcategory]
+    content: |
+      Your context here.
+    ```
+
+    ## Copy Behavior
+
+    - TO project: adds "DO NOT EDIT" header
+    - FROM project: removes header
+    - Use `--force` to overwrite existing files
+content_hash: sha256:92eed0b8862c0b61be6ed31e99638a71a3285dde273082e38196d44fedd1b9a9
+distilled: |-
+    # MLCM - ML Context Manager
+
+    Manages reusable context fragments/prompts for AI coding assistants.
+
+    ## Commands
+    - `mlcm copy --from resources --to project` - Copy fragments
+    - `mlcm run -p <persona>` - Run w/ persona
+    - `mlcm run -f <fragment>` - Run w/ fragment
+    - `mlcm run -t <tag>` - Run w/ tagged fragments
+    - `mlcm distill` - Compress fragments
+
+    ## Locations
+    - `resources` - Embedded defaults
+    - `home` (~/.mlcm) - Personal
+    - `project` (.mlcm) - Project-specific
+
+    ## Personas
+    Named fragment/tag/variable collections. Use `parents` for inheritance:
+    ```yaml
+    personas:
+      my-persona:
+        parents: [developer]
+        tags: [golang]
+        fragments: [my-custom-fragment]
+    ```
+
+    ## Fragments
+    YAML w/ `content` field:
+    ```yaml
+    version: "1.0"
+    tags: [category]
+    content: |
+      Context here.
+    ```
+
+    ## Copy Behavior
+    - TO project: adds "DO NOT EDIT" header
+    - FROM project: removes header
+    - `--force` overwrites existing
+distilled_by: claude-code

@@ -66,12 +66,15 @@ var templateFiles = map[Format]string{
 // TemplateData holds the data passed to templates
 type TemplateData struct {
 	// Version components
-	Major           string // Major version number (e.g., "1")
-	Minor           string // Minor version number (e.g., "2")
-	Patch           string // Patch version number (e.g., "3")
-	MajorMinorPatch string // Core version: Major.Minor.Patch (e.g., "1.2.3")
-	MajorMinor      string // Major.Minor (e.g., "1.2")
-	Prefix          string // Version prefix (e.g., "v")
+	Major                    string // Major version number (e.g., "1")
+	Minor                    string // Minor version number (e.g., "2")
+	Patch                    string // Patch version number (e.g., "3")
+	Revision                 string // Revision version number (e.g., "4", primarily for .NET)
+	MajorMinorPatch          string // Core version: Major.Minor.Patch (e.g., "1.2.3")
+	MajorMinorPatchRevision  string // Full .NET version: Major.Minor.Patch.Revision (e.g., "1.2.3.4")
+	MajorMinor               string // Major.Minor (e.g., "1.2")
+	Prefix                   string // Version prefix (e.g., "v")
+	AssemblyVersion          string // .NET assembly version: Major.Minor.Patch.Revision (e.g., "1.2.3.0")
 
 	// Rendered pre-release (from template config, dash-separated items)
 	PreRelease         string // Rendered pre-release (e.g., "alpha-5")
@@ -87,6 +90,10 @@ type TemplateData struct {
 	Hash               string // Full commit hash (40 chars for git)
 	ShortHash          string // Short commit hash (7 chars)
 	MediumHash         string // Medium commit hash (12 chars)
+	ShortHashWithDot   string // Short hash with leading dot (e.g., ".abc1234") - for metadata
+	MediumHashWithDot  string // Medium hash with leading dot (e.g., ".abc1234def5") - for metadata
+	ShortHashWithDash  string // Short hash with leading dash (e.g., "-abc1234") - for Go prerelease
+	MediumHashWithDash string // Medium hash with leading dash (e.g., "-abc1234def5") - for Go prerelease
 	BranchName         string // Current branch name (e.g., "feature/foo")
 	EscapedBranchName  string // Branch name with slashes replaced (e.g., "feature-foo")
 	CommitsSinceTag    string // Commits since last tag (e.g., "12")
@@ -94,6 +101,8 @@ type TemplateData struct {
 	BuildNumberPadded  string // Padded commits since tag, 4 digits (e.g., "0012")
 	UncommittedChanges string // Count of uncommitted changes (e.g., "3")
 	Dirty              string // "dirty" if uncommitted changes > 0, empty otherwise
+	DirtyWithDot       string // ".dirty" if uncommitted changes > 0 - for metadata
+	DirtyWithDash      string // "-dirty" if uncommitted changes > 0 - for Go prerelease
 	VersionSourceHash  string // Hash of the commit the last tag points to
 
 	// Commit author info
@@ -109,12 +118,14 @@ type TemplateData struct {
 	CommitDay         string // Day: 15 (zero-padded)
 
 	// Build timestamps (all in UTC)
-	BuildDateTimeUTC     string // ISO 8601 format: 2024-01-15T10:30:00Z
-	BuildDateTimeCompact string // Compact format: 20240115103045 (YYYYMMDDHHmmss)
-	BuildDateUTC         string // Date only: 2024-01-15
-	BuildYear            string // Year: 2024
-	BuildMonth           string // Month: 01 (zero-padded)
-	BuildDay             string // Day: 15 (zero-padded)
+	BuildDateTimeUTC             string // ISO 8601 format: 2024-01-15T10:30:00Z
+	BuildDateTimeCompact         string // Compact format: 20240115103045 (YYYYMMDDHHmmss)
+	BuildDateTimeCompactWithDot  string // With leading dot (e.g., ".20240115103045") - for metadata
+	BuildDateTimeCompactWithDash string // With leading dash (e.g., "-20240115103045") - for Go prerelease
+	BuildDateUTC                 string // Date only: 2024-01-15
+	BuildYear                    string // Year: 2024
+	BuildMonth                   string // Month: 01 (zero-padded)
+	BuildDay                     string // Day: 15 (zero-padded)
 
 	// Custom holds arbitrary key-value pairs from config and --set flags
 	Custom map[string]string
@@ -185,6 +196,24 @@ func dirtyFlag(uncommittedChanges int) string {
 	return ""
 }
 
+// withDotPrefix returns the string with a leading dot, or empty if input is empty
+// Useful for metadata suffixes like ".abc1234" or ".dirty"
+func withDotPrefix(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "." + s
+}
+
+// withDashPrefix returns the string with a leading dash, or empty if input is empty
+// Useful for Go-style prerelease suffixes like "-abc1234" or "-dirty"
+func withDashPrefix(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "-" + s
+}
+
 // formatCommitDateTime formats a commit datetime as ISO 8601, or empty string if zero
 func formatCommitDateTime(t time.Time) string {
 	if t.IsZero() {
@@ -221,6 +250,8 @@ type formattedVCSFields struct {
 	BuildNumberPadded  string
 	UncommittedChanges string
 	Dirty              string
+	DirtyWithDot       string // ".dirty" if uncommitted changes > 0 - for metadata
+	DirtyWithDash      string // "-dirty" if uncommitted changes > 0 - for Go prerelease
 	CommitDate         string
 	CommitDateCompact  string
 	CommitDateShort    string
@@ -231,9 +262,12 @@ type formattedVCSFields struct {
 
 // formatVCSFields converts VCSInfo to formatted string fields for templates
 func formatVCSFields(info VCSInfo) formattedVCSFields {
+	dirty := dirtyFlag(info.UncommittedChanges)
 	f := formattedVCSFields{
 		UncommittedChanges: strconv.Itoa(info.UncommittedChanges),
-		Dirty:              dirtyFlag(info.UncommittedChanges),
+		Dirty:              dirty,
+		DirtyWithDot:       withDotPrefix(dirty),
+		DirtyWithDash:      withDashPrefix(dirty),
 	}
 
 	// Format commits since tag
@@ -257,24 +291,29 @@ func formatVCSFields(info VCSInfo) formattedVCSFields {
 
 // formattedBuildTime holds pre-formatted build time fields for template rendering
 type formattedBuildTime struct {
-	DateTime    string
-	DateCompact string
-	DateOnly    string
-	Year        string
-	Month       string
-	Day         string
+	DateTime            string
+	DateTimeCompact     string
+	DateTimeCompactDot  string // With leading dot for metadata (.YYYYMMDDHHmmss)
+	DateTimeCompactDash string // With leading dash for Go prerelease (-YYYYMMDDHHmmss)
+	DateOnly            string
+	Year                string
+	Month               string
+	Day                 string
 }
 
 // formatBuildTime creates formatted build time fields from current UTC time
 func formatBuildTime() formattedBuildTime {
 	now := time.Now().UTC()
+	dateTimeCompact := now.Format("20060102150405")
 	return formattedBuildTime{
-		DateTime:    now.Format(time.RFC3339),
-		DateCompact: now.Format("20060102150405"),
-		DateOnly:    now.Format("2006-01-02"),
-		Year:        now.Format("2006"),
-		Month:       now.Format("01"),
-		Day:         now.Format("02"),
+		DateTime:            now.Format(time.RFC3339),
+		DateTimeCompact:     dateTimeCompact,
+		DateTimeCompactDot:  "." + dateTimeCompact,
+		DateTimeCompactDash: "-" + dateTimeCompact,
+		DateOnly:            now.Format("2006-01-02"),
+		Year:                now.Format("2006"),
+		Month:               now.Format("01"),
+		Day:                 now.Format("02"),
 	}
 }
 
@@ -353,12 +392,15 @@ func RenderTemplate(tmplStr string, versionStr string) (string, error) {
 
 	data := TemplateData{
 		// Version components
-		Major:           sv.MajorString(),
-		Minor:           sv.MinorString(),
-		Patch:           sv.PatchString(),
-		MajorMinorPatch: sv.String(),
-		MajorMinor:      sv.MajorMinor(),
-		Prefix:          sv.Prefix,
+		Major:                   sv.MajorString(),
+		Minor:                   sv.MinorString(),
+		Patch:                   sv.PatchString(),
+		Revision:                sv.RevisionString(),
+		MajorMinorPatch:         sv.CoreVersion(),
+		MajorMinorPatchRevision: sv.CoreVersionWithRevision(),
+		MajorMinor:              sv.MajorMinor(),
+		Prefix:                  sv.Prefix,
+		AssemblyVersion:         sv.AssemblyVersion(),
 
 		// Pre-release components (from parsed version)
 		PreReleaseLabel:  sv.PreReleaseLabel(),
@@ -368,6 +410,10 @@ func RenderTemplate(tmplStr string, versionStr string) (string, error) {
 		Hash:               vcsInfo.Identifier,
 		ShortHash:          vcsInfo.IdentifierShort,
 		MediumHash:         vcsInfo.IdentifierMedium,
+		ShortHashWithDot:   withDotPrefix(vcsInfo.IdentifierShort),
+		MediumHashWithDot:  withDotPrefix(vcsInfo.IdentifierMedium),
+		ShortHashWithDash:  withDashPrefix(vcsInfo.IdentifierShort),
+		MediumHashWithDash: withDashPrefix(vcsInfo.IdentifierMedium),
 		BranchName:         vcsInfo.BranchName,
 		EscapedBranchName:  version.EscapedBranchName(vcsInfo.BranchName),
 		CommitsSinceTag:    vcsFields.CommitsSinceTag,
@@ -375,6 +421,8 @@ func RenderTemplate(tmplStr string, versionStr string) (string, error) {
 		BuildNumberPadded:  vcsFields.BuildNumberPadded,
 		UncommittedChanges: vcsFields.UncommittedChanges,
 		Dirty:              vcsFields.Dirty,
+		DirtyWithDot:       vcsFields.DirtyWithDot,
+		DirtyWithDash:      vcsFields.DirtyWithDash,
 		VersionSourceHash:  vcsInfo.VersionSourceHash,
 
 		// Commit author info
@@ -390,12 +438,14 @@ func RenderTemplate(tmplStr string, versionStr string) (string, error) {
 		CommitDay:         vcsFields.CommitDay,
 
 		// Build timestamps
-		BuildDateTimeUTC:     buildTime.DateTime,
-		BuildDateTimeCompact: buildTime.DateCompact,
-		BuildDateUTC:         buildTime.DateOnly,
-		BuildYear:            buildTime.Year,
-		BuildMonth:           buildTime.Month,
-		BuildDay:             buildTime.Day,
+		BuildDateTimeUTC:             buildTime.DateTime,
+		BuildDateTimeCompact:         buildTime.DateTimeCompact,
+		BuildDateTimeCompactWithDot:  buildTime.DateTimeCompactDot,
+		BuildDateTimeCompactWithDash: buildTime.DateTimeCompactDash,
+		BuildDateUTC:                 buildTime.DateOnly,
+		BuildYear:                    buildTime.Year,
+		BuildMonth:                   buildTime.Month,
+		BuildDay:                     buildTime.Day,
 	}
 
 	result, err := mustache.Render(tmplStr, data)
@@ -499,12 +549,15 @@ func BuildTemplateDataFromVersion(v *version.Version) TemplateData {
 
 	return TemplateData{
 		// Version components
-		Major:           strconv.Itoa(v.Major),
-		Minor:           strconv.Itoa(v.Minor),
-		Patch:           strconv.Itoa(v.Patch),
-		MajorMinorPatch: v.CoreVersion(),
-		MajorMinor:      fmt.Sprintf("%d.%d", v.Major, v.Minor),
-		Prefix:          v.Prefix,
+		Major:                   strconv.Itoa(v.Major),
+		Minor:                   strconv.Itoa(v.Minor),
+		Patch:                   strconv.Itoa(v.Patch),
+		Revision:                strconv.Itoa(v.Revision),
+		MajorMinorPatch:         v.CoreVersion(),
+		MajorMinorPatchRevision: v.CoreVersionWithRevision(),
+		MajorMinor:              fmt.Sprintf("%d.%d", v.Major, v.Minor),
+		Prefix:                  v.Prefix,
+		AssemblyVersion:         v.AssemblyVersion(),
 
 		// Pre-release components
 		PreReleaseLabel:  v.PreReleaseLabel(),
@@ -514,6 +567,10 @@ func BuildTemplateDataFromVersion(v *version.Version) TemplateData {
 		Hash:               vcsInfo.Identifier,
 		ShortHash:          vcsInfo.IdentifierShort,
 		MediumHash:         vcsInfo.IdentifierMedium,
+		ShortHashWithDot:   withDotPrefix(vcsInfo.IdentifierShort),
+		MediumHashWithDot:  withDotPrefix(vcsInfo.IdentifierMedium),
+		ShortHashWithDash:  withDashPrefix(vcsInfo.IdentifierShort),
+		MediumHashWithDash: withDashPrefix(vcsInfo.IdentifierMedium),
 		BranchName:         vcsInfo.BranchName,
 		EscapedBranchName:  version.EscapedBranchName(vcsInfo.BranchName),
 		CommitsSinceTag:    vcsFields.CommitsSinceTag,
@@ -521,6 +578,8 @@ func BuildTemplateDataFromVersion(v *version.Version) TemplateData {
 		BuildNumberPadded:  vcsFields.BuildNumberPadded,
 		UncommittedChanges: vcsFields.UncommittedChanges,
 		Dirty:              vcsFields.Dirty,
+		DirtyWithDot:       vcsFields.DirtyWithDot,
+		DirtyWithDash:      vcsFields.DirtyWithDash,
 		VersionSourceHash:  vcsInfo.VersionSourceHash,
 
 		// Commit author info
@@ -536,12 +595,14 @@ func BuildTemplateDataFromVersion(v *version.Version) TemplateData {
 		CommitDay:         vcsFields.CommitDay,
 
 		// Build timestamps
-		BuildDateTimeUTC:     buildTime.DateTime,
-		BuildDateTimeCompact: buildTime.DateCompact,
-		BuildDateUTC:         buildTime.DateOnly,
-		BuildYear:            buildTime.Year,
-		BuildMonth:           buildTime.Month,
-		BuildDay:             buildTime.Day,
+		BuildDateTimeUTC:             buildTime.DateTime,
+		BuildDateTimeCompact:         buildTime.DateTimeCompact,
+		BuildDateTimeCompactWithDot:  buildTime.DateTimeCompactDot,
+		BuildDateTimeCompactWithDash: buildTime.DateTimeCompactDash,
+		BuildDateUTC:                 buildTime.DateOnly,
+		BuildYear:                    buildTime.Year,
+		BuildMonth:                   buildTime.Month,
+		BuildDay:                     buildTime.Day,
 	}
 }
 
@@ -561,12 +622,15 @@ func RenderTemplateWithData(tmplStr string, data TemplateData) (string, error) {
 func templateDataToMap(data TemplateData) map[string]interface{} {
 	m := map[string]interface{}{
 		// Version components
-		"Major":           data.Major,
-		"Minor":           data.Minor,
-		"Patch":           data.Patch,
-		"MajorMinorPatch": data.MajorMinorPatch,
-		"MajorMinor":      data.MajorMinor,
-		"Prefix":          data.Prefix,
+		"Major":                   data.Major,
+		"Minor":                   data.Minor,
+		"Patch":                   data.Patch,
+		"Revision":                data.Revision,
+		"MajorMinorPatch":         data.MajorMinorPatch,
+		"MajorMinorPatchRevision": data.MajorMinorPatchRevision,
+		"MajorMinor":              data.MajorMinor,
+		"Prefix":                  data.Prefix,
+		"AssemblyVersion":         data.AssemblyVersion,
 
 		// Pre-release
 		"PreRelease":         data.PreRelease,
@@ -582,6 +646,10 @@ func templateDataToMap(data TemplateData) map[string]interface{} {
 		"Hash":               data.Hash,
 		"ShortHash":          data.ShortHash,
 		"MediumHash":         data.MediumHash,
+		"ShortHashWithDot":   data.ShortHashWithDot,
+		"MediumHashWithDot":  data.MediumHashWithDot,
+		"ShortHashWithDash":  data.ShortHashWithDash,
+		"MediumHashWithDash": data.MediumHashWithDash,
 		"BranchName":         data.BranchName,
 		"EscapedBranchName":  data.EscapedBranchName,
 		"CommitsSinceTag":    data.CommitsSinceTag,
@@ -589,6 +657,8 @@ func templateDataToMap(data TemplateData) map[string]interface{} {
 		"BuildNumberPadded":  data.BuildNumberPadded,
 		"UncommittedChanges": data.UncommittedChanges,
 		"Dirty":              data.Dirty,
+		"DirtyWithDot":       data.DirtyWithDot,
+		"DirtyWithDash":      data.DirtyWithDash,
 		"VersionSourceHash":  data.VersionSourceHash,
 
 		// Commit author
@@ -608,12 +678,14 @@ func templateDataToMap(data TemplateData) map[string]interface{} {
 		"CommitDay":           data.CommitDay,
 
 		// Build timestamps
-		"BuildDateTimeUTC":     data.BuildDateTimeUTC,
-		"BuildDateTimeCompact": data.BuildDateTimeCompact,
-		"BuildDateUTC":         data.BuildDateUTC,
-		"BuildYear":            data.BuildYear,
-		"BuildMonth":           data.BuildMonth,
-		"BuildDay":             data.BuildDay,
+		"BuildDateTimeUTC":             data.BuildDateTimeUTC,
+		"BuildDateTimeCompact":         data.BuildDateTimeCompact,
+		"BuildDateTimeCompactWithDot":  data.BuildDateTimeCompactWithDot,
+		"BuildDateTimeCompactWithDash": data.BuildDateTimeCompactWithDash,
+		"BuildDateUTC":                 data.BuildDateUTC,
+		"BuildYear":                    data.BuildYear,
+		"BuildMonth":                   data.BuildMonth,
+		"BuildDay":                     data.BuildDay,
 	}
 
 	// Merge custom variables (they can override built-ins if desired)

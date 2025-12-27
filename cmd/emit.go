@@ -136,22 +136,18 @@ EXAMPLES:
 			prefix = vd.Prefix
 		}
 
-		// Handle prerelease template
+		// Handle prerelease
 		var prereleaseResult string
 		if cmd.Flags().Changed("prerelease") {
-			baseData := emit.BuildTemplateDataFromVersion(vd)
 			if emitPrereleaseTemplate == useDefaultMarker {
-				// Flag provided without value - use defaults from config
-				template, _ := versionator.GetPreReleaseTemplate()
-				if template != "" {
-					prereleaseResult, err = emit.RenderTemplateWithData(template, baseData)
-					if err != nil {
-						return fmt.Errorf("error rendering prerelease template: %w", err)
-					}
-					prereleaseResult = strings.TrimSpace(prereleaseResult)
+				// Flag provided without value - use config elements
+				prereleaseResult, err = versionator.RenderPreRelease()
+				if err != nil {
+					return fmt.Errorf("error rendering prerelease: %w", err)
 				}
 			} else {
-				// Render the provided template
+				// Render the provided template (legacy support)
+				baseData := emit.BuildTemplateDataFromVersion(vd)
 				prereleaseResult, err = emit.RenderTemplateWithData(emitPrereleaseTemplate, baseData)
 				if err != nil {
 					return fmt.Errorf("error rendering prerelease template: %w", err)
@@ -160,22 +156,18 @@ EXAMPLES:
 			}
 		}
 
-		// Handle metadata template
+		// Handle metadata
 		var metadataResult string
 		if cmd.Flags().Changed("metadata") {
-			baseData := emit.BuildTemplateDataFromVersion(vd)
 			if emitMetadataTemplate == useDefaultMarker {
-				// Flag provided without value - use defaults from config
-				template, _ := versionator.GetMetadataTemplate()
-				if template != "" {
-					metadataResult, err = emit.RenderTemplateWithData(template, baseData)
-					if err != nil {
-						return fmt.Errorf("error rendering metadata template: %w", err)
-					}
-					metadataResult = strings.TrimSpace(metadataResult)
+				// Flag provided without value - use config elements
+				metadataResult, err = versionator.RenderMetadata()
+				if err != nil {
+					return fmt.Errorf("error rendering metadata: %w", err)
 				}
 			} else {
-				// Render the provided template
+				// Render the provided template (legacy support)
+				baseData := emit.BuildTemplateDataFromVersion(vd)
 				metadataResult, err = emit.RenderTemplateWithData(emitMetadataTemplate, baseData)
 				if err != nil {
 					return fmt.Errorf("error rendering metadata template: %w", err)

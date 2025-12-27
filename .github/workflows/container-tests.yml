@@ -1,0 +1,202 @@
+name: Container Language Tests
+
+on:
+  push:
+    branches: [master, develop]
+    paths:
+      - 'tests/containers/**'
+      - 'internal/**'
+      - 'cmd/**'
+      - '*.go'
+      - 'go.mod'
+      - 'go.sum'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'tests/containers/**'
+      - 'internal/**'
+      - 'cmd/**'
+      - '*.go'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+env:
+  BUILDER_IMAGE: versionator-builder:latest
+
+jobs:
+  build-versionator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build versionator-builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: tests/containers/images/versionator-builder.Dockerfile
+          tags: ${{ env.BUILDER_IMAGE }}
+          outputs: type=docker,dest=/tmp/versionator-builder.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload builder image
+        uses: actions/upload-artifact@v4
+        with:
+          name: versionator-builder
+          path: /tmp/versionator-builder.tar
+          retention-days: 1
+
+  container-test-emit:
+    needs: build-versionator
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - c-emit
+          - cpp-emit
+          - csharp-emit
+          - go-emit
+          - java-emit
+          - java-gradle-emit
+          - java-maven-emit
+          - js-emit
+          - kotlin-emit
+          - php-emit
+          - python-emit
+          - python-setuptools-emit
+          - ruby-emit
+          - rust-emit
+          - swift-emit
+          - ts-emit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download builder image
+        uses: actions/download-artifact@v4
+        with:
+          name: versionator-builder
+          path: /tmp
+
+      - name: Load builder image
+        run: docker load -i /tmp/versionator-builder.tar
+
+      - name: Build test container
+        run: |
+          docker build \
+            -t versionator-test-${{ matrix.container }}:latest \
+            -f tests/containers/images/${{ matrix.container }}.Dockerfile \
+            .
+
+      - name: Run test container
+        run: |
+          docker run --rm versionator-test-${{ matrix.container }}:latest
+
+  container-test-link:
+    needs: build-versionator
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - c-link
+          - cpp-link
+          - csharp-link
+          - go-link
+          - rust-link
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download builder image
+        uses: actions/download-artifact@v4
+        with:
+          name: versionator-builder
+          path: /tmp
+
+      - name: Load builder image
+        run: docker load -i /tmp/versionator-builder.tar
+
+      - name: Build test container
+        run: |
+          docker build \
+            -t versionator-test-${{ matrix.container }}:latest \
+            -f tests/containers/images/${{ matrix.container }}.Dockerfile \
+            .
+
+      - name: Run test container
+        run: |
+          docker run --rm versionator-test-${{ matrix.container }}:latest
+
+  container-test-patch:
+    needs: build-versionator
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - csharp-patch
+          - java-gradle-patch
+          - java-maven-patch
+          - js-patch
+          - kotlin-patch
+          - php-patch
+          - python-patch
+          - python-setuptools-patch
+          - ruby-patch
+          - rust-patch
+          - swift-patch
+          - ts-patch
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download builder image
+        uses: actions/download-artifact@v4
+        with:
+          name: versionator-builder
+          path: /tmp
+
+      - name: Load builder image
+        run: docker load -i /tmp/versionator-builder.tar
+
+      - name: Build test container
+        run: |
+          docker build \
+            -t versionator-test-${{ matrix.container }}:latest \
+            -f tests/containers/images/${{ matrix.container }}.Dockerfile \
+            .
+
+      - name: Run test container
+        run: |
+          docker run --rm versionator-test-${{ matrix.container }}:latest
+
+  container-tests-summary:
+    needs: [container-test-emit, container-test-link, container-test-patch]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          echo "Container test results:"
+          echo "  Emit tests: ${{ needs.container-test-emit.result }}"
+          echo "  Link tests: ${{ needs.container-test-link.result }}"
+          echo "  Patch tests: ${{ needs.container-test-patch.result }}"
+
+          if [[ "${{ needs.container-test-emit.result }}" == "failure" ]] || \
+             [[ "${{ needs.container-test-link.result }}" == "failure" ]] || \
+             [[ "${{ needs.container-test-patch.result }}" == "failure" ]]; then
+            echo "Some container tests failed!"
+            exit 1
+          fi
+
+          echo "All container tests passed!"
