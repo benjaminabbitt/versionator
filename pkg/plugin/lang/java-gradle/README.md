@@ -1,4 +1,4 @@
-# Java Gradle Plugin
+#re t Java Gradle Plugin
 
 The java-gradle plugin provides versionator support for Gradle-based Java projects.
 

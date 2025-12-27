@@ -33,7 +33,7 @@
 package javamaven
 
 import (
-	"github.com/benjaminabbitt/versionator/internal/plugin"
+	"github.com/benjaminabbitt/versionator/pkg/plugin"
 )
 
 // Plugin implements the LanguagePlugin interface for Java/Maven

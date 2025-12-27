@@ -12,7 +12,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/benjaminabbitt/versionator/internal/plugin"
+	"github.com/benjaminabbitt/versionator/pkg/plugin"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 )
 

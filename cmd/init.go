@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/benjaminabbitt/versionator/internal/plugin"
+	"github.com/benjaminabbitt/versionator/pkg/plugin"
 	"github.com/benjaminabbitt/versionator/internal/version"
 	"github.com/spf13/cobra"
 )

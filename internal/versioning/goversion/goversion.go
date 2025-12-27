@@ -37,7 +37,7 @@
 package goversion
 
 import (
-	"github.com/benjaminabbitt/versionator/internal/plugin"
+	"github.com/benjaminabbitt/versionator/pkg/plugin"
 )
 
 // Plugin implements the VersioningPlugin interface for Go versioning pattern

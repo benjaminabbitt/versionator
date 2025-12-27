@@ -10,7 +10,7 @@ import (
 
 	"github.com/cbroglie/mustache"
 
-	"github.com/benjaminabbitt/versionator/internal/plugin"
+	"github.com/benjaminabbitt/versionator/pkg/plugin"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/version"
 )
