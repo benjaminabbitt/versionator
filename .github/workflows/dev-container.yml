@@ -2,7 +2,7 @@ name: Dev Container
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - '.devcontainer/**'
       - 'Dockerfile'

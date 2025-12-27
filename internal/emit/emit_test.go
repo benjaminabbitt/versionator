@@ -181,7 +181,7 @@ func TestRender_Swift(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.Contains(result, `public let VERSION = "1.2.3"`) {
+	if !strings.Contains(result, `public static let version = "1.2.3"`) {
 		t.Errorf("expected Swift version string, got: %s", result)
 	}
 }
