@@ -2,63 +2,26 @@
 default:
     @just --list
 
-# Fix Go module cache permissions (try different approaches)
-fix-perms:
-    #!/bin/zsh
-    set -e
-
-    echo "Fixing Go module permissions..."
-
-    # Fix /go directory permissions if it exists
-    if [ -d "/go" ]; then
-        echo "Fixing /go directory permissions..."
-        if command -v sudo >/dev/null 2>&1; then
-            sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
-            sudo chmod -R u+w /go 2>/dev/null || true
-        else
-            chown -R $(whoami):$(whoami) /go 2>/dev/null || true
-            chmod -R u+w /go 2>/dev/null || true
-        fi
-    fi
-
-    # Fix local GOPATH if it exists
-    if [ -d "$HOME/go" ]; then
-        echo "Fixing local GOPATH permissions..."
-        chmod -R u+w $HOME/go 2>/dev/null || true
-    fi
-
-    # Create directories with proper permissions if they don't exist
-    mkdir -p /go/pkg/mod 2>/dev/null || true
-    mkdir -p /go/pkg/sumdb 2>/dev/null || true
-    mkdir -p $HOME/go/pkg/mod 2>/dev/null || true
-
-    # Set proper ownership for created directories
-    if command -v sudo >/dev/null 2>&1; then
-        sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
-    fi
-
-# Clean Go module cache and fix permissions
-clean-cache: fix-perms
+# Clean Go module cache
+clean-cache:
     #!/bin/zsh
     echo "Cleaning Go module cache..."
-    GO111MODULE=on go clean -modcache || true
+    go clean -modcache || true
 
-# Download dependencies with permission fix
-deps: fix-perms
+# Download dependencies
+deps:
     #!/bin/zsh
     set -e
-    echo "Fixing permissions before downloading dependencies..."
     echo "Downloading Go modules..."
-    GO111MODULE=on go mod download
+    go mod download
     echo "Tidying go.mod..."
-    GO111MODULE=on go mod tidy
+    go mod tidy
     echo "Dependencies downloaded successfully!"
 
 # Build the application (static binary)
-build: fix-git-dubious-ownership-warning
+build:
     #!/bin/zsh
     set -e
-    just fix-perms
     mkdir -p bin/
     VERSION=$(cat VERSION 2>/dev/null || echo "dev")
     echo "Building versionator $VERSION (static binary)..."
@@ -66,10 +29,9 @@ build: fix-git-dubious-ownership-warning
     echo "Build completed: bin/versionator"
 
 # Build with verbose output for debugging (static binary)
-build-verbose: fix-git-dubious-ownership-warning
+build-verbose:
     #!/bin/zsh
     set -e
-    just fix-perms
     mkdir -p bin/
     VERSION=$(cat VERSION 2>/dev/null || echo "dev")
     echo "Building versionator $VERSION (verbose, static binary)..."
@@ -100,13 +62,11 @@ clean:
 
 # Run tests
 test:
-    @just fix-perms
-    GO111MODULE=on go test ./...
+    go test ./...
 
 # Run tests with coverage
 test-coverage:
-    @just fix-perms
-    GO111MODULE=on go test -cover ./...
+    go test -cover ./...
 
 # Format code
 fmt:
@@ -146,7 +106,7 @@ dev-setup:
     echo "Development environment ready!"
 
 # Build for all platforms with static linking
-build-all: fix-perms fix-git-dubious-ownership-warning
+build-all:
     #!/bin/zsh
     set -e
     VERSION=$(cat VERSION 2>/dev/null || echo "dev")
@@ -215,13 +175,6 @@ rebuild:
     just init
     just build
     echo "Rebuild complete!"
-
-fix-git-dubious-ownership-warning:
-    git config --global --add safe.directory /workspace
-
-# Run Claude Code with permissions bypassed
-claude:
-    claude --dangerously-skip-permissions
 
 # Run acceptance tests locally (requires versionator in PATH or bin/)
 acceptance-test: build
