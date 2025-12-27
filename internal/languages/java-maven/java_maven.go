@@ -12,6 +12,24 @@
 // Injection methods:
 //   - emit: Generate Version.java with constants
 //   - patch: Update version in pom.xml
+//
+// # SNAPSHOT Versions
+//
+// Maven SNAPSHOT versions (e.g., 1.2.3-SNAPSHOT) are supported via the
+// prerelease command:
+//
+//	versionator prerelease set SNAPSHOT    # Sets version to 1.2.3-SNAPSHOT
+//	versionator prerelease clear           # Removes SNAPSHOT suffix
+//
+// Maven handles SNAPSHOT timestamp resolution (e.g., 1.2.3-20231215.143022-1)
+// internally during deployment via "mvn deploy". Versionator does not generate
+// Maven-style timestamps as this is Maven's responsibility during the artifact
+// deployment process.
+//
+// Typical workflow:
+//  1. Development: 1.2.3-SNAPSHOT (set via prerelease)
+//  2. Release: 1.2.3 (clear prerelease, increment as needed)
+//  3. Next dev cycle: 1.2.4-SNAPSHOT
 package javamaven
 
 import (
