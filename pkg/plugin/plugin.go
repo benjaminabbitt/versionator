@@ -1,5 +1,7 @@
 package plugin
 
+import "sync"
+
 // PluginType represents the type of plugin capability.
 // Values match interface names for reflective discovery.
 type PluginType string
@@ -211,6 +213,7 @@ type VersioningPlugin interface {
 
 // Registry holds all registered plugins
 type Registry struct {
+	mu                 sync.RWMutex
 	plugins            []Plugin
 	templateProviders  []TemplateProvider
 	languagePlugins    map[string]LanguagePlugin
@@ -225,6 +228,9 @@ var globalRegistry = &Registry{
 
 // Register adds a plugin to the global registry
 func Register(p Plugin) {
+	globalRegistry.mu.Lock()
+	defer globalRegistry.mu.Unlock()
+
 	globalRegistry.plugins = append(globalRegistry.plugins, p)
 
 	// Also register as template provider if it implements the interface
@@ -245,12 +251,18 @@ func Register(p Plugin) {
 
 // RegisterTemplateProvider adds a template provider to the global registry
 func RegisterTemplateProvider(provider TemplateProvider) {
+	globalRegistry.mu.Lock()
+	defer globalRegistry.mu.Unlock()
+
 	globalRegistry.templateProviders = append(globalRegistry.templateProviders, provider)
 	globalRegistry.plugins = append(globalRegistry.plugins, provider)
 }
 
 // GetAllTemplateVariables collects template variables from all registered plugins
 func GetAllTemplateVariables(context map[string]string) map[string]string {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	result := make(map[string]string)
 	for _, provider := range globalRegistry.templateProviders {
 		vars := provider.GetTemplateVariables(context)
@@ -261,18 +273,31 @@ func GetAllTemplateVariables(context map[string]string) map[string]string {
 	return result
 }
 
-// GetPlugins returns all registered plugins
+// GetPlugins returns a copy of all registered plugins
 func GetPlugins() []Plugin {
-	return globalRegistry.plugins
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
+	result := make([]Plugin, len(globalRegistry.plugins))
+	copy(result, globalRegistry.plugins)
+	return result
 }
 
-// GetTemplateProviders returns all registered template providers
+// GetTemplateProviders returns a copy of all registered template providers
 func GetTemplateProviders() []TemplateProvider {
-	return globalRegistry.templateProviders
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
+	result := make([]TemplateProvider, len(globalRegistry.templateProviders))
+	copy(result, globalRegistry.templateProviders)
+	return result
 }
 
 // GetPluginsByType returns all plugins that implement a specific type
 func GetPluginsByType(pluginType PluginType) []Plugin {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	var result []Plugin
 	for _, p := range globalRegistry.plugins {
 		if p.Types().Contains(pluginType) {
@@ -284,17 +309,30 @@ func GetPluginsByType(pluginType PluginType) []Plugin {
 
 // GetLanguagePlugin returns a language plugin by name
 func GetLanguagePlugin(name string) (LanguagePlugin, bool) {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	lp, ok := globalRegistry.languagePlugins[name]
 	return lp, ok
 }
 
-// GetLanguagePlugins returns all registered language plugins
+// GetLanguagePlugins returns a copy of all registered language plugins
 func GetLanguagePlugins() map[string]LanguagePlugin {
-	return globalRegistry.languagePlugins
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
+	result := make(map[string]LanguagePlugin, len(globalRegistry.languagePlugins))
+	for k, v := range globalRegistry.languagePlugins {
+		result[k] = v
+	}
+	return result
 }
 
 // GetSupportedLanguages returns the list of supported language names
 func GetSupportedLanguages() []string {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	names := make([]string, 0, len(globalRegistry.languagePlugins))
 	for name := range globalRegistry.languagePlugins {
 		names = append(names, name)
@@ -304,23 +342,39 @@ func GetSupportedLanguages() []string {
 
 // IsLanguageSupported checks if a language is supported
 func IsLanguageSupported(name string) bool {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	_, ok := globalRegistry.languagePlugins[name]
 	return ok
 }
 
 // GetVersioningPlugin returns a versioning plugin by name
 func GetVersioningPlugin(name string) (VersioningPlugin, bool) {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	vp, ok := globalRegistry.versioningPlugins[name]
 	return vp, ok
 }
 
-// GetVersioningPlugins returns all registered versioning plugins
+// GetVersioningPlugins returns a copy of all registered versioning plugins
 func GetVersioningPlugins() map[string]VersioningPlugin {
-	return globalRegistry.versioningPlugins
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
+	result := make(map[string]VersioningPlugin, len(globalRegistry.versioningPlugins))
+	for k, v := range globalRegistry.versioningPlugins {
+		result[k] = v
+	}
+	return result
 }
 
 // GetSupportedVersioningPatterns returns the list of supported versioning pattern names
 func GetSupportedVersioningPatterns() []string {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	names := make([]string, 0, len(globalRegistry.versioningPlugins))
 	for name := range globalRegistry.versioningPlugins {
 		names = append(names, name)
@@ -330,6 +384,20 @@ func GetSupportedVersioningPatterns() []string {
 
 // IsVersioningPatternSupported checks if a versioning pattern is supported
 func IsVersioningPatternSupported(name string) bool {
+	globalRegistry.mu.RLock()
+	defer globalRegistry.mu.RUnlock()
+
 	_, ok := globalRegistry.versioningPlugins[name]
 	return ok
+}
+
+// ResetRegistry clears the global registry. Intended for testing only.
+func ResetRegistry() {
+	globalRegistry.mu.Lock()
+	defer globalRegistry.mu.Unlock()
+
+	globalRegistry.plugins = nil
+	globalRegistry.templateProviders = nil
+	globalRegistry.languagePlugins = make(map[string]LanguagePlugin)
+	globalRegistry.versioningPlugins = make(map[string]VersioningPlugin)
 }

@@ -76,3 +76,23 @@ func ServePatch(impl PatchPlugin) {
 		GRPCServer: goplugin.DefaultGRPCServer,
 	})
 }
+
+// --- Helper Functions ---
+
+// GetVar returns a variable value from the vars map, or defaultVal if missing or empty.
+// Useful for safely accessing template variables in Emit implementations.
+func GetVar(vars map[string]string, key, defaultVal string) string {
+	if v, ok := vars[key]; ok && v != "" {
+		return v
+	}
+	return defaultVal
+}
+
+// GetNumericVar returns a numeric variable value from the vars map, defaulting to "0" if missing.
+// Useful for safely accessing Major, Minor, Patch variables in Emit implementations.
+func GetNumericVar(vars map[string]string, key string) string {
+	if v, ok := vars[key]; ok && v != "" {
+		return v
+	}
+	return "0"
+}

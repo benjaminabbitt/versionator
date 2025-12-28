@@ -2,7 +2,7 @@ package plugin
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
@@ -26,6 +26,13 @@ const (
 	PluginTypeEmit  = "emit"
 	PluginTypeBuild = "build"
 	PluginTypePatch = "patch"
+)
+
+// Plugin binary naming prefixes for external plugin discovery
+const (
+	PluginPrefixEmit  = "versionator-plugin-emit-"
+	PluginPrefixBuild = "versionator-plugin-build-"
+	PluginPrefixPatch = "versionator-plugin-patch-"
 )
 
 // --- Emit Plugin ---
@@ -95,7 +102,7 @@ func (c *EmitGRPCClient) fetchInfo() {
 
 func (c *EmitGRPCClient) Name() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.Name
@@ -103,7 +110,7 @@ func (c *EmitGRPCClient) Name() string {
 
 func (c *EmitGRPCClient) Format() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.Format
@@ -111,7 +118,7 @@ func (c *EmitGRPCClient) Format() string {
 
 func (c *EmitGRPCClient) FileExtension() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.FileExtension
@@ -119,7 +126,7 @@ func (c *EmitGRPCClient) FileExtension() string {
 
 func (c *EmitGRPCClient) DefaultOutput() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.DefaultOutput
@@ -133,7 +140,7 @@ func (c *EmitGRPCClient) Emit(vars map[string]string) (string, error) {
 		return "", err
 	}
 	if resp.Error != "" {
-		return "", fmt.Errorf("%s", resp.Error)
+		return "", errors.New(resp.Error)
 	}
 	return resp.Content, nil
 }
@@ -201,7 +208,7 @@ func (c *BuildGRPCClient) fetchInfo() {
 
 func (c *BuildGRPCClient) Name() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.Name
@@ -209,7 +216,7 @@ func (c *BuildGRPCClient) Name() string {
 
 func (c *BuildGRPCClient) Format() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.Format
@@ -223,7 +230,7 @@ func (c *BuildGRPCClient) GenerateFlags(vars map[string]string) (string, error) 
 		return "", err
 	}
 	if resp.Error != "" {
-		return "", fmt.Errorf("%s", resp.Error)
+		return "", errors.New(resp.Error)
 	}
 	return resp.Flags, nil
 }
@@ -293,7 +300,7 @@ func (c *PatchGRPCClient) fetchInfo() {
 
 func (c *PatchGRPCClient) Name() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.Name
@@ -301,7 +308,7 @@ func (c *PatchGRPCClient) Name() string {
 
 func (c *PatchGRPCClient) FilePattern() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.FilePattern
@@ -309,7 +316,7 @@ func (c *PatchGRPCClient) FilePattern() string {
 
 func (c *PatchGRPCClient) Description() string {
 	c.fetchInfo()
-	if c.info == nil {
+	if c.infoErr != nil || c.info == nil {
 		return ""
 	}
 	return c.info.Description
@@ -326,7 +333,7 @@ func (c *PatchGRPCClient) Patch(content, version string) (string, error) {
 		return "", err
 	}
 	if resp.Error != "" {
-		return "", fmt.Errorf("%s", resp.Error)
+		return "", errors.New(resp.Error)
 	}
 	return resp.Content, nil
 }

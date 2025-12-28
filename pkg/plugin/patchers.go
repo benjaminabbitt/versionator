@@ -10,24 +10,69 @@ import (
 // Common patcher functions that plugins can use.
 // Each returns a PatchFunc that can be assigned to PatchConfig.Patch
 
+// Pre-compiled regex patterns for better performance
+var (
+	// JSON version pattern
+	reJSONVersion = regexp.MustCompile(`("version"\s*:\s*)"[^"]*"`)
+
+	// TOML version patterns (double and single quotes)
+	reTOMLVersionDouble = regexp.MustCompile(`(?m)^(\s*version\s*=\s*)"[^"]*"`)
+	reTOMLVersionSingle = regexp.MustCompile(`(?m)^(\s*version\s*=\s*)'[^']*'`)
+
+	// XML version pattern
+	reXMLVersion = regexp.MustCompile(`<[Vv]ersion>[^<]*</[Vv]ersion>`)
+
+	// YAML version pattern
+	reYAMLVersion = regexp.MustCompile(`(?m)^(version:\s*)["']?[^"'\n]*["']?`)
+
+	// Gradle version patterns - reuse TOML patterns since Gradle uses
+	// identical syntax: version = "x.y.z" or version = 'x.y.z'
+	reGradleVersionDouble = reTOMLVersionDouble
+	reGradleVersionSingle = reTOMLVersionSingle
+
+	// Python setup.py version patterns
+	rePythonVersionDouble = regexp.MustCompile(`(version\s*=\s*)"[^"]*"`)
+	rePythonVersionSingle = regexp.MustCompile(`(version\s*=\s*)'[^']*'`)
+
+	// Ruby gemspec version patterns
+	reRubyVersionDouble = regexp.MustCompile(`(\.version\s*=\s*)"[^"]*"`)
+	reRubyVersionSingle = regexp.MustCompile(`(\.version\s*=\s*)'[^']*'`)
+
+	// Swift Package.swift version pattern
+	reSwiftVersion = regexp.MustCompile(`(//\s*VERSION:\s*)[^\n]*`)
+)
+
 // PatchJSON returns a patcher for JSON files with a top-level "version" field.
 func PatchJSON() PatchFunc {
 	return func(content, version string) (string, error) {
-		// Validate JSON
-		var js interface{}
-		if err := json.Unmarshal([]byte(content), &js); err != nil {
+		// Parse JSON to verify it's valid and check for top-level version
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(content), &obj); err != nil {
 			return "", fmt.Errorf("invalid JSON: %w", err)
 		}
 
-		// Match "version": "..." at top level
-		re := regexp.MustCompile(`"version"\s*:\s*"[^"]*"`)
-		if !re.MatchString(content) {
-			return "", nil
+		// Check if top-level version exists
+		if _, ok := obj["version"]; !ok {
+			return content, nil
 		}
-		patched := re.ReplaceAllString(content, `"version": "`+version+`"`)
+
+		// Replace only the first match (top-level version comes first in well-formed package.json)
+		replaced := false
+		patched := reJSONVersion.ReplaceAllStringFunc(content, func(match string) string {
+			if replaced {
+				return match
+			}
+			replaced = true
+			// Preserve the "version": prefix with its spacing
+			prefixEnd := strings.Index(match, ":") + 1
+			for prefixEnd < len(match) && (match[prefixEnd] == ' ' || match[prefixEnd] == '\t') {
+				prefixEnd++
+			}
+			return match[:prefixEnd] + `"` + version + `"`
+		})
 
 		// Validate patched JSON
-		if err := json.Unmarshal([]byte(patched), &js); err != nil {
+		if err := json.Unmarshal([]byte(patched), &obj); err != nil {
 			return "", fmt.Errorf("patched JSON is invalid: %w", err)
 		}
 		return patched, nil
@@ -38,17 +83,13 @@ func PatchJSON() PatchFunc {
 // Works for pyproject.toml, Cargo.toml, and similar files.
 func PatchTOML() PatchFunc {
 	return func(content, version string) (string, error) {
-		// Match version = "..." or version = '...' at start of line
-		reDouble := regexp.MustCompile(`(?m)^(\s*version\s*=\s*)"[^"]*"`)
-		reSingle := regexp.MustCompile(`(?m)^(\s*version\s*=\s*)'[^']*'`)
-
-		if reDouble.MatchString(content) {
-			return reDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
+		if reTOMLVersionDouble.MatchString(content) {
+			return reTOMLVersionDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
 		}
-		if reSingle.MatchString(content) {
-			return reSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
+		if reTOMLVersionSingle.MatchString(content) {
+			return reTOMLVersionSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
 		}
-		return "", nil
+		return content, nil
 	}
 }
 
@@ -56,15 +97,13 @@ func PatchTOML() PatchFunc {
 // Works for pom.xml, *.csproj, and similar files.
 func PatchXML() PatchFunc {
 	return func(content, version string) (string, error) {
-		// Match <version>...</version> or <Version>...</Version>
-		reVersion := regexp.MustCompile(`<[Vv]ersion>[^<]*</[Vv]ersion>`)
-		if !reVersion.MatchString(content) {
-			return "", nil
+		if !reXMLVersion.MatchString(content) {
+			return content, nil
 		}
 
 		// Replace only the first match for project version
 		replaced := false
-		return reVersion.ReplaceAllStringFunc(content, func(match string) string {
+		return reXMLVersion.ReplaceAllStringFunc(content, func(match string) string {
 			if !replaced {
 				replaced = true
 				if strings.HasPrefix(match, "<V") {
@@ -81,11 +120,10 @@ func PatchXML() PatchFunc {
 // Works for pubspec.yaml and similar files.
 func PatchYAML() PatchFunc {
 	return func(content, version string) (string, error) {
-		re := regexp.MustCompile(`(?m)^(version:\s*)["']?[^"'\n]*["']?`)
-		if !re.MatchString(content) {
-			return "", nil
+		if !reYAMLVersion.MatchString(content) {
+			return content, nil
 		}
-		return re.ReplaceAllString(content, `${1}`+version), nil
+		return reYAMLVersion.ReplaceAllString(content, `${1}`+version), nil
 	}
 }
 
@@ -93,17 +131,13 @@ func PatchYAML() PatchFunc {
 // Matches version = "..." or version = '...'
 func PatchGradle() PatchFunc {
 	return func(content, version string) (string, error) {
-		// Match version = "..." or version = '...'
-		reDouble := regexp.MustCompile(`(?m)^(\s*version\s*=\s*)"[^"]*"`)
-		reSingle := regexp.MustCompile(`(?m)^(\s*version\s*=\s*)'[^']*'`)
-
-		if reDouble.MatchString(content) {
-			return reDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
+		if reGradleVersionDouble.MatchString(content) {
+			return reGradleVersionDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
 		}
-		if reSingle.MatchString(content) {
-			return reSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
+		if reGradleVersionSingle.MatchString(content) {
+			return reGradleVersionSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
 		}
-		return "", nil
+		return content, nil
 	}
 }
 
@@ -111,16 +145,13 @@ func PatchGradle() PatchFunc {
 // Matches version="..." or version='...' in setup() call.
 func PatchPythonSetup() PatchFunc {
 	return func(content, version string) (string, error) {
-		reDouble := regexp.MustCompile(`(version\s*=\s*)"[^"]*"`)
-		reSingle := regexp.MustCompile(`(version\s*=\s*)'[^']*'`)
-
-		if reDouble.MatchString(content) {
-			return reDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
+		if rePythonVersionDouble.MatchString(content) {
+			return rePythonVersionDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
 		}
-		if reSingle.MatchString(content) {
-			return reSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
+		if rePythonVersionSingle.MatchString(content) {
+			return rePythonVersionSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
 		}
-		return "", nil
+		return content, nil
 	}
 }
 
@@ -128,16 +159,13 @@ func PatchPythonSetup() PatchFunc {
 // Matches spec.version = "..." or .version = "..."
 func PatchRubyGemspec() PatchFunc {
 	return func(content, version string) (string, error) {
-		reDouble := regexp.MustCompile(`(\.version\s*=\s*)"[^"]*"`)
-		reSingle := regexp.MustCompile(`(\.version\s*=\s*)'[^']*'`)
-
-		if reDouble.MatchString(content) {
-			return reDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
+		if reRubyVersionDouble.MatchString(content) {
+			return reRubyVersionDouble.ReplaceAllString(content, `${1}"`+version+`"`), nil
 		}
-		if reSingle.MatchString(content) {
-			return reSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
+		if reRubyVersionSingle.MatchString(content) {
+			return reRubyVersionSingle.ReplaceAllString(content, `${1}'`+version+`'`), nil
 		}
-		return "", nil
+		return content, nil
 	}
 }
 
@@ -145,10 +173,9 @@ func PatchRubyGemspec() PatchFunc {
 // Matches // VERSION: x.y.z comments.
 func PatchSwiftPackage() PatchFunc {
 	return func(content, version string) (string, error) {
-		re := regexp.MustCompile(`(//\s*VERSION:\s*)[^\n]*`)
-		if !re.MatchString(content) {
-			return "", nil
+		if !reSwiftVersion.MatchString(content) {
+			return content, nil
 		}
-		return re.ReplaceAllString(content, `${1}`+version), nil
+		return reSwiftVersion.ReplaceAllString(content, `${1}`+version), nil
 	}
 }

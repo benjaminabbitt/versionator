@@ -34,6 +34,10 @@ func NewLoader(logger *zap.Logger) *Loader {
 	}
 }
 
+// getPluginDirsFunc is the function used to get plugin directories.
+// Can be replaced in tests for isolation.
+var getPluginDirsFunc = getPluginDirs
+
 // getPluginDirs returns the directories to search for plugins.
 func getPluginDirs() []string {
 	var dirs []string
@@ -66,7 +70,7 @@ func getPluginDirs() []string {
 func (l *Loader) DiscoverAndLoad() (int, error) {
 	loaded := 0
 
-	for _, dir := range getPluginDirs() {
+	for _, dir := range getPluginDirsFunc() {
 		n, err := l.loadFromDir(dir)
 		if err != nil {
 			l.logger.Debug("error loading plugins from directory",
@@ -106,11 +110,11 @@ func (l *Loader) loadFromDir(dir string) (int, error) {
 		// Determine plugin type from name prefix
 		var pluginType string
 		switch {
-		case strings.HasPrefix(name, "versionator-plugin-emit-"):
+		case strings.HasPrefix(name, plugin.PluginPrefixEmit):
 			pluginType = plugin.PluginTypeEmit
-		case strings.HasPrefix(name, "versionator-plugin-build-"):
+		case strings.HasPrefix(name, plugin.PluginPrefixBuild):
 			pluginType = plugin.PluginTypeBuild
-		case strings.HasPrefix(name, "versionator-plugin-patch-"):
+		case strings.HasPrefix(name, plugin.PluginPrefixPatch):
 			pluginType = plugin.PluginTypePatch
 		default:
 			continue
@@ -212,6 +216,14 @@ func (l *Loader) Close() {
 	l.clients = nil
 }
 
+// windowsExecutableExtensions contains file extensions that represent
+// binary executables on Windows. Only binary formats are included since
+// go-plugin requires spawning actual executables, not scripts.
+var windowsExecutableExtensions = map[string]struct{}{
+	".exe": {}, // Windows PE executable (primary, what Go produces)
+	".com": {}, // DOS/Windows command file (legacy binary format)
+}
+
 // isExecutable checks if a file is executable.
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)
@@ -219,9 +231,18 @@ func isExecutable(path string) bool {
 		return false
 	}
 
-	if runtime.GOOS == "windows" {
-		return strings.HasSuffix(strings.ToLower(path), ".exe")
+	// Must be a regular file
+	if !info.Mode().IsRegular() {
+		return false
 	}
 
+	if runtime.GOOS == "windows" {
+		// On Windows, check for known binary executable extensions
+		ext := strings.ToLower(filepath.Ext(path))
+		_, ok := windowsExecutableExtensions[ext]
+		return ok
+	}
+
+	// On Unix, check executable permission bits
 	return info.Mode()&0111 != 0
 }
