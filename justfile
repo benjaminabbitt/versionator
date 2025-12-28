@@ -4,13 +4,13 @@ default:
 
 # Clean Go module cache
 clean-cache:
-    #!/bin/zsh
+    #!/bin/bash
     echo "Cleaning Go module cache..."
     go clean -modcache || true
 
 # Download dependencies
 deps:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Downloading Go modules..."
     go mod download
@@ -18,9 +18,35 @@ deps:
     go mod tidy
     echo "Dependencies downloaded successfully!"
 
+# Compile protocol buffer definitions
+proto:
+    #!/bin/bash
+    set -e
+    echo "Compiling protocol buffer definitions..."
+    PROTO_DIR="pkg/plugin/proto"
+    if [ ! -f "$PROTO_DIR/plugin.proto" ]; then
+        echo "No proto files found, skipping..."
+        exit 0
+    fi
+    if ! command -v protoc >/dev/null 2>&1; then
+        echo "Error: protoc not found. Install protobuf compiler:"
+        echo "  macOS: brew install protobuf"
+        echo "  Linux: apt install protobuf-compiler"
+        exit 1
+    fi
+    if ! command -v protoc-gen-go >/dev/null 2>&1 || ! command -v protoc-gen-go-grpc >/dev/null 2>&1; then
+        echo "Installing Go protobuf plugins..."
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+        go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+    fi
+    protoc --go_out=. --go_opt=paths=source_relative \
+           --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+           "$PROTO_DIR/plugin.proto"
+    echo "Proto compilation complete!"
+
 # Build the application (static binary)
-build:
-    #!/bin/zsh
+build: proto
+    #!/bin/bash
     set -e
     mkdir -p bin/
     VERSION=$(cat VERSION 2>/dev/null || echo "dev")
@@ -29,8 +55,8 @@ build:
     echo "Build completed: bin/versionator"
 
 # Build with verbose output for debugging (static binary)
-build-verbose:
-    #!/bin/zsh
+build-verbose: proto
+    #!/bin/bash
     set -e
     mkdir -p bin/
     VERSION=$(cat VERSION 2>/dev/null || echo "dev")
@@ -74,7 +100,7 @@ fmt:
 
 # Run linter (if golangci-lint is available)
 lint:
-    #!/bin/zsh
+    #!/bin/bash
     if command -v golangci-lint >/dev/null 2>&1; then
         GO111MODULE=on golangci-lint run
     else
@@ -84,7 +110,7 @@ lint:
 
 # Initialize project (run once after cloning)
 init:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Initializing versionator project..."
     echo "Step 1: Cleaning cache and fixing permissions..."
@@ -97,7 +123,7 @@ init:
 
 # Development setup
 dev-setup:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Setting up development environment..."
     just init
@@ -106,8 +132,8 @@ dev-setup:
     echo "Development environment ready!"
 
 # Build for all platforms with static linking
-build-all:
-    #!/bin/zsh
+build-all: proto
+    #!/bin/bash
     set -e
     VERSION=$(cat VERSION 2>/dev/null || echo "dev")
     LDFLAGS="-s -w -X github.com/benjaminabbitt/versionator/internal/buildinfo.Version=$VERSION"
@@ -167,7 +193,7 @@ status:
 
 # Force rebuild everything
 rebuild:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Rebuilding everything..."
     just clean
@@ -178,7 +204,7 @@ rebuild:
 
 # Run acceptance tests locally (requires versionator in PATH or bin/)
 acceptance-test: build
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Running acceptance tests locally..."
     # Tests look for $VERSIONATOR_PROJECT_ROOT/versionator
@@ -187,14 +213,14 @@ acceptance-test: build
 
 # Build acceptance test container image
 acceptance-test-build:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Building acceptance test container..."
     docker build -f tests/acceptance/Dockerfile -t versionator-acceptance:latest .
 
 # Run acceptance tests in container (fast tests only)
 acceptance-test-container: acceptance-test-build
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Running acceptance tests in container..."
     docker run --rm \
@@ -205,7 +231,7 @@ acceptance-test-container: acceptance-test-build
 
 # Run ALL acceptance tests in container (including slow)
 acceptance-test-container-all: acceptance-test-build
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Running ALL acceptance tests in container (including slow)..."
     docker run --rm \
@@ -216,7 +242,7 @@ acceptance-test-container-all: acceptance-test-build
 
 # Run acceptance tests via docker-compose
 acceptance-test-compose:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Running acceptance tests via docker-compose..."
     docker compose -f tests/acceptance/docker-compose.yml up --build --abort-on-container-exit
@@ -224,7 +250,7 @@ acceptance-test-compose:
 
 # Run slow acceptance tests via docker-compose
 acceptance-test-compose-slow:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Running slow acceptance tests via docker-compose..."
     docker compose -f tests/acceptance/docker-compose.yml run --build acceptance-tests-slow
@@ -234,28 +260,28 @@ acceptance-test-compose-slow:
 
 # Build the versionator-builder base image (required before other containers)
 container-builder:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Building versionator-builder base image..."
     docker build -t versionator-builder:latest -f tests/containers/images/versionator-builder.Dockerfile .
 
 # Build a specific container test (e.g., just container-build go-emit)
 container-build name: container-builder
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Building versionator-test-{{name}}..."
     docker build -t versionator-test-{{name}}:latest -f tests/containers/images/{{name}}.Dockerfile .
 
 # Run a specific container test (e.g., just container-test go-emit)
 container-test name: (container-build name)
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Running versionator-test-{{name}}..."
     docker run --rm versionator-test-{{name}}:latest
 
 # Build all container tests
 container-build-all: container-builder
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Building all container tests..."
     for f in tests/containers/images/*.Dockerfile; do
@@ -268,7 +294,7 @@ container-build-all: container-builder
 
 # Run all container tests
 container-test-all: container-build-all
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Running all container tests..."
     failed=0
@@ -297,8 +323,130 @@ container-list:
 
 # Clean all test container images
 container-clean:
-    #!/bin/zsh
+    #!/bin/bash
     echo "Cleaning test container images..."
     docker images --format '{{"{{"}}.Repository{{"}}"}}' | grep '^versionator-test-' | xargs -r docker rmi -f 2>/dev/null || true
     docker rmi -f versionator-builder:latest 2>/dev/null || true
     echo "Done"
+
+# === Plugin Build Targets ===
+
+# Build all external plugins
+plugins: proto
+    #!/bin/bash
+    set -e
+    echo "Building all versionator plugins..."
+    mkdir -p bin/plugins
+
+    # Build emit plugins
+    for d in plugins/emit/*/; do
+        name=$(basename "$d")
+        echo "Building emit plugin: $name"
+        CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o "bin/plugins/versionator-plugin-emit-$name" "./$d"
+    done
+
+    # Build build plugins
+    for d in plugins/build/*/; do
+        name=$(basename "$d")
+        echo "Building build plugin: $name"
+        CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o "bin/plugins/versionator-plugin-build-$name" "./$d"
+    done
+
+    # Build patch plugins
+    for d in plugins/patch/*/; do
+        name=$(basename "$d")
+        echo "Building patch plugin: $name"
+        CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o "bin/plugins/versionator-plugin-patch-$name" "./$d"
+    done
+
+    echo "All plugins built successfully!"
+    ls -lh bin/plugins/
+
+# Build all plugins with UPX compression (smaller binaries)
+plugins-compressed: plugins
+    #!/bin/bash
+    set -e
+    echo "Compressing plugins with UPX..."
+
+    # Check for UPX
+    UPX_BIN=""
+    if command -v upx >/dev/null 2>&1; then
+        UPX_BIN="upx"
+    elif [ -x "/tmp/upx-4.2.2-amd64_linux/upx" ]; then
+        UPX_BIN="/tmp/upx-4.2.2-amd64_linux/upx"
+    else
+        echo "UPX not found. Install with: apt install upx"
+        echo "Or download from: https://github.com/upx/upx/releases"
+        exit 1
+    fi
+
+    echo "Using UPX: $UPX_BIN"
+    echo ""
+
+    # Get size before compression
+    SIZE_BEFORE=$(du -sh bin/plugins/ | cut -f1)
+
+    # Compress all plugins
+    for f in bin/plugins/versionator-plugin-*; do
+        echo "Compressing $(basename $f)..."
+        $UPX_BIN -q --best "$f" || true
+    done
+
+    # Get size after compression
+    SIZE_AFTER=$(du -sh bin/plugins/ | cut -f1)
+
+    echo ""
+    echo "Compression complete!"
+    echo "Before: $SIZE_BEFORE"
+    echo "After:  $SIZE_AFTER"
+    echo ""
+    ls -lh bin/plugins/
+
+# Build a single plugin (e.g., just plugin emit-go, just plugin patch-maven)
+plugin name: proto
+    #!/bin/bash
+    set -e
+    mkdir -p bin/plugins
+
+    # Parse plugin type and name from input (e.g., "emit-go" -> type="emit", name="go")
+    plugin_type=$(echo "{{name}}" | cut -d'-' -f1)
+    plugin_name=$(echo "{{name}}" | cut -d'-' -f2-)
+
+    if [ -d "plugins/$plugin_type/$plugin_name" ]; then
+        echo "Building plugin: {{name}}"
+        CGO_ENABLED=0 go build -trimpath -o "bin/plugins/versionator-plugin-{{name}}" "./plugins/$plugin_type/$plugin_name"
+        echo "Built: bin/plugins/versionator-plugin-{{name}}"
+    else
+        echo "Error: Plugin 'plugins/$plugin_type/$plugin_name' not found"
+        exit 1
+    fi
+
+# Install plugins to user plugin directory
+plugins-install: plugins
+    #!/bin/bash
+    set -e
+    PLUGIN_DIR="${HOME}/.versionator/plugins"
+    echo "Installing plugins to $PLUGIN_DIR..."
+    mkdir -p "$PLUGIN_DIR"
+    cp bin/plugins/versionator-plugin-* "$PLUGIN_DIR/"
+    chmod +x "$PLUGIN_DIR"/*
+    echo "Installed $(ls bin/plugins/ | wc -l | tr -d ' ') plugins to $PLUGIN_DIR"
+    ls "$PLUGIN_DIR/"
+
+# List available plugins
+plugins-list:
+    @echo "=== Available Plugins ==="
+    @echo ""
+    @echo "Emit plugins (generate version source files):"
+    @ls -1 plugins/emit/ 2>/dev/null | sed 's/^/  emit-/'
+    @echo ""
+    @echo "Build plugins (generate build/linker flags):"
+    @ls -1 plugins/build/ 2>/dev/null | sed 's/^/  build-/'
+    @echo ""
+    @echo "Patch plugins (patch manifest files):"
+    @ls -1 plugins/patch/ 2>/dev/null | sed 's/^/  patch-/'
+
+# Clean built plugins
+plugins-clean:
+    rm -rf bin/plugins/
+    @echo "Cleaned bin/plugins/"

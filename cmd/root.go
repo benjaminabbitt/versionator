@@ -9,8 +9,10 @@ import (
 	"github.com/benjaminabbitt/versionator/internal/logging"
 	"github.com/benjaminabbitt/versionator/internal/version"
 	"github.com/benjaminabbitt/versionator/internal/versionator"
+	"github.com/benjaminabbitt/versionator/pkg/plugin/loader"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var logOutput string
@@ -19,6 +21,9 @@ var prereleaseTemplate string
 var metadataTemplate string
 var prefixOverride string
 var setVars []string
+
+// pluginLoader holds the external plugin loader instance
+var pluginLoader *loader.Loader
 
 // Marker for "flag provided without value" - use defaults
 const useDefaultMarker = "\x00DEFAULT\x00"
@@ -41,7 +46,24 @@ stored in a VERSION file in the current directory.`,
 		if err := logging.InitLogger(logOutput); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
+
+		// Load external plugins
+		logger := logging.GetLogger()
+		pluginLoader = loader.NewLoader(logger)
+		count, err := pluginLoader.DiscoverAndLoad()
+		if err != nil {
+			logger.Warn("error discovering plugins", zap.Error(err))
+		}
+		if count > 0 {
+			logger.Debug("loaded external plugins")
+		}
+
 		return nil
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		if pluginLoader != nil {
+			pluginLoader.Close()
+		}
 	},
 }
 

@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/benjaminabbitt/versionator/pkg/plugin/proto";
+
+// EmitPlugin service - generates version source files
+service EmitPlugin {
+    rpc GetInfo(Empty) returns (EmitInfo);
+    rpc Emit(EmitRequest) returns (EmitResponse);
+}
+
+// BuildPlugin service - generates build/linker flags
+service BuildPlugin {
+    rpc GetInfo(Empty) returns (BuildInfo);
+    rpc GenerateFlags(BuildRequest) returns (BuildResponse);
+}
+
+// PatchPlugin service - patches version in config/manifest files
+service PatchPlugin {
+    rpc GetInfo(Empty) returns (PatchInfo);
+    rpc Patch(PatchRequest) returns (PatchResponse);
+}
+
+message Empty {}
+
+// Emit plugin messages
+message EmitInfo {
+    string name = 1;              // Plugin name (e.g., "go-emit")
+    string format = 2;            // Format identifier (e.g., "go", "python")
+    string file_extension = 3;    // File extension (e.g., ".go", ".py")
+    string default_output = 4;    // Default output path
+}
+
+message EmitRequest {
+    map<string, string> vars = 1; // Template variables (Version, Major, Minor, etc.)
+}
+
+message EmitResponse {
+    string content = 1;
+    string error = 2;
+}
+
+// Build plugin messages
+message BuildInfo {
+    string name = 1;              // Plugin name (e.g., "go-build")
+    string format = 2;            // Format identifier (e.g., "go", "rust")
+}
+
+message BuildRequest {
+    map<string, string> vars = 1; // Template variables
+}
+
+message BuildResponse {
+    string flags = 1;
+    string error = 2;
+}
+
+// Patch plugin messages
+message PatchInfo {
+    string name = 1;              // Plugin name (e.g., "patch-maven")
+    string file_pattern = 2;      // File to patch (e.g., "pom.xml", "package.json")
+    string description = 3;       // Human-readable description
+}
+
+message PatchRequest {
+    string content = 1;           // File content to patch
+    string version = 2;           // New version string
+}
+
+message PatchResponse {
+    string content = 1;           // Patched content
+    string error = 2;
+}

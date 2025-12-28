@@ -10,25 +10,18 @@ import (
 	// Git VCS also registers as a TemplateProvider plugin
 	_ "github.com/benjaminabbitt/versionator/internal/vcs/git"
 
-	// Import language plugins for auto-registration
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/c"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/cpp"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/csharp"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/golang"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/java-gradle"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/java-maven"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/javascript"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/php"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/python"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/python-setuptools"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/ruby"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/rust"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/swift"
-	_ "github.com/benjaminabbitt/versionator/pkg/plugin/lang/typescript"
-
 	// Import versioning pattern plugins for auto-registration
 	_ "github.com/benjaminabbitt/versionator/internal/versioning/goversion"
 	_ "github.com/benjaminabbitt/versionator/internal/versioning/standard"
+
+	// NOTE: Language plugins are now loaded as external plugins from:
+	//   - $VERSIONATOR_PLUGIN_DIR
+	//   - $XDG_CONFIG_HOME/versionator/plugins
+	//   - ~/.versionator/plugins
+	//   - /usr/local/lib/versionator/plugins
+	//   - /usr/lib/versionator/plugins
+	// Build plugins with: just plugins
+	// Install plugins with: just plugins-install
 )
 
 func main() {
