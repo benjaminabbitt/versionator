@@ -86,41 +86,41 @@ versionator init              # Creates VERSION and .versionator.yaml
 # Initialize a Go project (enables prerelease for pseudo-version compatibility)
 versionator init --go         # Creates VERSION and Go-optimized config
 
-# Increment versions
-versionator major increment   # 0.0.0 -> 1.0.0
-versionator minor increment   # 1.0.0 -> 1.1.0
-versionator patch increment   # 1.1.0 -> 1.1.1
+# Increment versions (aliases: increment, inc, bump, up, +)
+versionator version major bump   # 0.0.0 -> 1.0.0
+versionator ver minor up         # 1.0.0 -> 1.1.0
+versionator ver patch bump       # 1.1.0 -> 1.1.1
 
-# Decrement versions
-versionator patch decrement   # 1.1.1 -> 1.1.0
+# Decrement versions (aliases: decrement, dec, down, -)
+versionator ver patch down       # 1.1.1 -> 1.1.0
 
-# Create git tag for current version
-versionator commit            # Creates tag v1.1.0
+# Render VERSION with dynamic values from config elements
+versionator version render    # Applies prerelease/metadata from config
 
-# Full SemVer 2.0.0 with pre-release and metadata
-versionator version \
-  -t "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}" \
-  --prefix \
-  --prerelease="alpha-{{CommitsSinceTag}}" \
-  --metadata="{{BuildDateTimeCompact}}.{{ShortSha}}"
-# Output: v1.1.0-alpha-5+20241211103045.abc1234
+# Create git tag from VERSION file
+versionator commit            # Creates tag with full version from VERSION
+
+# Emit version to source files
+versionator out file emit-go --output version/version.go
 ```
 
 ## Git Integration
 
-Versionator can automatically create git tags for your versions:
+Versionator can create git tags from the VERSION file:
 
 ```bash
-# Bump version and tag in one workflow
-versionator patch increment
-versionator commit
+# Bump version (automatically renders from config elements)
+versionator version patch bump
 
-# This creates an annotated git tag (e.g., v1.0.1) pointing to HEAD
+# Create git tag from VERSION file
+versionator output tag
+
+# This creates an annotated git tag (e.g., v1.0.1-5-abc1234) pointing to HEAD
 # Push tags to remote
 git push --tags
 ```
 
-The tag name respects your prefix configuration (e.g., `v1.0.0` with prefix, `1.0.0` without).
+The tag name is taken directly from the VERSION file. Use `versionator version render` to update VERSION with fresh dynamic values before tagging.
 
 ## Usage
 
@@ -128,22 +128,30 @@ The tag name respects your prefix configuration (e.g., `v1.0.0` with prefix, `1.
 versionator [command]
 
 Available Commands:
-  version     Show current version (with template support)
-  emit        Emit version in various language formats
-  major       Increment or decrement major version
-  minor       Increment or decrement minor version
-  patch       Increment or decrement patch version
-  prefix      Manage version prefix in VERSION file
-  prerelease  Manage pre-release identifier in VERSION file
-  metadata    Manage build metadata in VERSION file
+  version     Show current version or manage version components (alias: ver)
+    major       Manage major version (bump/up/down)
+    minor       Manage minor version (bump/up/down)
+    patch       Manage patch version (bump/up/down)
+    revision    Manage revision version for .NET (bump/up/down)
+    render      Render VERSION with fresh config elements (convenience)
+    sync        Sync config from VERSION file
+  output      Output version information (alias: out)
+    tag         Create git tag from VERSION file
+    patch       Patch version in manifest files
+    build       Generate build flags for version injection
+    file        Generate version source files
+  prefix      Manage version prefix configuration
+  prerelease  Manage pre-release configuration
+  metadata    Manage build metadata configuration
   config      Configuration management commands
   vars        Show all template variables and their values
-  commit      Create git tag for current version
+  init        Initialize versionator in current directory
   help        Help about any command
 
 Global Flags:
   --log-format string   Log output format (console, json, development) (default "console")
   -h, --help            Help for versionator
+  --version             Show versionator version
 ```
 
 ### Version Command Flags
@@ -162,23 +170,41 @@ Flags:
 
 ## VERSION File Format
 
-Versionator stores version information in a plain text `VERSION` file containing the full SemVer string:
+The VERSION file is the **source of truth** and contains the full version:
 
 ```
-v1.2.3-alpha.1+build.123
+v1.2.3-alpha-5+20241228.abc1234
 ```
 
-The format is: `[prefix]major.minor.patch[-prerelease][+metadata]`
+**What the VERSION file contains:**
+- Prefix (e.g., `v`, `release-`)
+- Core version: `Major.Minor.Patch` (or `.Revision` for .NET)
+- Pre-release tag (e.g., `-alpha`, `-5-20241228-abc1234`)
+- Build metadata (e.g., `+build.123`, `+20241228.abc1234`)
 
-Examples:
-- `1.0.0` - Simple version without prefix
-- `v2.5.3` - Version with "v" prefix
-- `release-1.0.0-beta.1` - Custom prefix with pre-release
-- `v3.0.0+20241212.abc1234` - With build metadata
+**Config file (.versionator.yaml) stores:**
+- Default prefix for new projects
+- Pre-release element templates (e.g., `["CommitsSinceTag", "ShortHash"]`)
+- Metadata element templates (rendered dynamically)
 
-**Important**: The VERSION file is the **source of truth**. Its content takes priority over any configuration in `.versionator.yaml`. The prefix is parsed directly from the VERSION file (everything before the first digit). Config settings only apply as defaults when creating a new VERSION file.
+**Workflow:**
+```bash
+# 1. Bump version (clears prerelease per SemVer)
+versionator version patch bump
 
-**Note**: Custom variables are stored in `.versionator.yaml` config file, not in the VERSION file.
+# 2. Render with dynamic values from config elements
+versionator version render
+# VERSION now contains: v1.2.4-5-20241228-abc1234
+
+# 3. Create git tag from VERSION
+versionator commit
+# Creates tag: v1.2.4-5-20241228-abc1234
+
+# 4. Emit version to other files
+versionator out file emit-go --output version/version.go
+```
+
+**Note**: Dynamic values (CommitsSinceTag, ShortHash, etc.) are rendered at `version render` time and saved to VERSION. Subsequent outputs use the snapshot in VERSION.
 
 ### Managing Pre-release and Metadata
 
@@ -397,21 +423,22 @@ See the `examples/` directory for complete integration examples in multiple lang
 
 | Language Type | Recommended Approach | Why |
 |---------------|---------------------|-----|
-| **Interpreted** (Python, Ruby, JS) | `versionator emit` | No compilation step; generates source file at build time |
+| **Interpreted** (Python, Ruby, JS) | `versionator out file` | No compilation step; generates source file at build time |
 | **Compiled** (Go, Rust, C, C++) | Build-time variables | Avoids generated files in source control; version injected at compile time |
 
-### Interpreted Languages: Use `emit`
+### Interpreted Languages: Use `out file`
 
-For Python, Ruby, JavaScript, etc., use `versionator emit` to generate a version file:
+For Python, Ruby, JavaScript, etc., use `versionator out file` to generate a version file:
 
 ```bash
 # Generate Python _version.py
-versionator emit python --output mypackage/_version.py
+versionator out file emit-python --output mypackage/_version.py
 
-# Generate with custom template
-versionator emit --template-file version.py.tmpl --output _version.py
+# Generate Go version file
+versionator out file emit-go --output version/version.go
 
-# Supported formats: python, json, js, ruby, rust, go
+# List available emit plugins
+versionator plugin list emit
 ```
 
 Add the generated file to `.gitignore` to avoid polluting source control.

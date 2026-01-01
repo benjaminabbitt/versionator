@@ -1,16 +1,15 @@
-# Lua Language Plugin for Versionator
+# Lua Emit Plugin for Versionator
 
-This is an example external language plugin that adds Lua support to versionator.
+This is an example external emit plugin that adds Lua support to versionator.
 
 ## Features
 
-- **Emit**: Generates `version.lua` files with version constants
-- **Patch**: Updates version in `.rockspec` files (LuaRocks package spec)
+- Generates `version.lua` files with version constants
 
 ## Building
 
 ```bash
-go build -o versionator-plugin-lua .
+go build -o versionator-plugin-emit-lua .
 ```
 
 ## Installing
@@ -20,11 +19,11 @@ Copy the built binary to one of the plugin directories:
 ```bash
 # User-specific (recommended)
 mkdir -p ~/.config/versionator/plugins
-cp versionator-plugin-lua ~/.config/versionator/plugins/
+cp versionator-plugin-emit-lua ~/.config/versionator/plugins/
 
 # Or use environment variable
 export VERSIONATOR_PLUGIN_DIR=/path/to/plugins
-cp versionator-plugin-lua $VERSIONATOR_PLUGIN_DIR/
+cp versionator-plugin-emit-lua $VERSIONATOR_PLUGIN_DIR/
 ```
 
 ## Plugin Search Paths
@@ -39,11 +38,13 @@ Versionator searches for plugins in these directories (in order):
 
 ## Plugin Naming Convention
 
-External plugin binaries must be named with the prefix `versionator-plugin-`:
+External plugin binaries must be named with the appropriate prefix:
 
-- `versionator-plugin-lua`
-- `versionator-plugin-mylang`
-- `versionator-plugin-custom.exe` (Windows)
+| Type | Prefix | Example |
+|------|--------|---------|
+| Emit | `versionator-plugin-emit-` | `versionator-plugin-emit-lua` |
+| Build | `versionator-plugin-build-` | `versionator-plugin-build-rust` |
+| Patch | `versionator-plugin-patch-` | `versionator-plugin-patch-npm` |
 
 ## Usage
 
@@ -52,23 +53,19 @@ Once installed, the plugin is automatically discovered and loaded:
 ```bash
 # Emit a version.lua file
 versionator emit file lua
-
-# Patch rockspec files
-versionator emit patch
 ```
 
 ## Development
 
-This plugin uses the versionator SDK. Key interfaces to implement:
+This plugin uses the versionator SDK. The EmitPlugin interface:
 
 ```go
-type LanguagePlugin interface {
-    Name() string
-    LanguageName() string
-    GetEmitConfig() *EmitConfig
-    GetBuildConfig() *LinkConfig  // nil for interpreted languages
-    GetPatchConfigs() []PatchConfig
-    Patch(configName, content, version string) (string, error)
+type EmitPlugin interface {
+    Name() string                              // Plugin name
+    Format() string                            // Format identifier
+    FileExtension() string                     // File extension
+    DefaultOutput() string                     // Default output path
+    Emit(vars map[string]string) (string, error) // Generate content
 }
 ```
 

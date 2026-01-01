@@ -3,63 +3,56 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/benjaminabbitt/versionator/pkg/plugin"
+	versioncmd "github.com/benjaminabbitt/versionator/cmd/version"
+	"github.com/benjaminabbitt/versionator/internal/filesystem"
 	"github.com/benjaminabbitt/versionator/internal/version"
+	"github.com/benjaminabbitt/versionator/pkg/plugin"
 	"github.com/spf13/cobra"
 )
 
 const configFileName = ".versionator.yaml"
 
 var initGoMode bool
+var initFormat string
 
 var initCmd = &cobra.Command{
-	Use:   "init [language]",
+	Use:   "init",
 	Short: "Initialize versionator in the current directory",
 	Long: `Initialize versionator by creating VERSION and .versionator.yaml files.
 
 This command creates:
   - VERSION file with initial version 0.0.0 (or v0.0.0 if prefix configured)
-  - .versionator.yaml configuration file with language-specific defaults
-
-Arguments:
-  language  Target language for version file emission (optional)
-            Use 'versionator init --help' to see supported languages
+  - .versionator.yaml configuration file
 
 Flags:
-  --go    Use Go pseudo-version prerelease pattern
-          ({{CommitsSinceTag}}.{{BuildDateTimeCompact}}.{{ShortHash}})
-          Can be combined with any language for Go-compatible versioning
+  --go           Use Go pseudo-version prerelease pattern
+  --format, -f   Set emit format (e.g., go, python, rust)
 
 Examples:
-  versionator init              # Default configuration
-  versionator init go           # Go project with Go-specific settings
-  versionator init python       # Python project settings
-  versionator init rust --go    # Rust project with Go pseudo-version pattern
+  versionator init                # Default configuration
+  versionator init --go           # Go versioning pattern (v prefix, pseudo-version prerelease)
+  versionator init -f python      # Set emit format to python
+  versionator init -f rust --go   # Rust format with Go versioning pattern
 
 Existing files are not overwritten.`,
-	Args: cobra.MaximumNArgs(1),
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		langs := plugin.GetSupportedLanguages()
-		sort.Strings(langs)
-		return langs, cobra.ShellCompDirectiveNoFileComp
-	},
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var createdVersion, createdConfig bool
-		var language string
 
-		if len(args) > 0 {
-			language = strings.ToLower(args[0])
-			if !plugin.IsLanguageSupported(language) {
-				langs := plugin.GetSupportedLanguages()
-				sort.Strings(langs)
-				return fmt.Errorf("unsupported language: %s\nSupported languages: %s",
-					language, strings.Join(langs, ", "))
+		// Validate format if specified
+		if initFormat != "" && pluginLoader != nil {
+			if _, ok := pluginLoader.EmitPlugins[initFormat]; !ok {
+				formats := make([]string, 0, len(pluginLoader.EmitPlugins))
+				for f := range pluginLoader.EmitPlugins {
+					formats = append(formats, f)
+				}
+				sort.Strings(formats)
+				return fmt.Errorf("unsupported format: %s\nAvailable formats: %s",
+					initFormat, strings.Join(formats, ", "))
 			}
 		}
 
@@ -84,11 +77,11 @@ Existing files are not overwritten.`,
 		// Check if config file exists
 		configExists := fileExists(configFileName)
 		if !configExists {
-			configContent := buildConfigYAML(language, initGoMode)
-			msg := describeConfig(language, initGoMode)
+			configContent := buildConfigYAML(initFormat, initGoMode)
+			msg := describeConfig(initFormat, initGoMode)
 			fmt.Fprintf(cmd.OutOrStdout(), "Created %s %s\n", configFileName, msg)
 
-			if err := os.WriteFile(configFileName, []byte(configContent), 0644); err != nil {
+			if err := filesystem.AppFs.WriteFile(getAbsPath(configFileName), []byte(configContent), 0644); err != nil {
 				return fmt.Errorf("failed to create config file: %w", err)
 			}
 			createdConfig = true
@@ -96,7 +89,18 @@ Existing files are not overwritten.`,
 			fmt.Fprintf(cmd.OutOrStdout(), "%s exists\n", configFileName)
 		}
 
+		// Render VERSION with config elements if we created config or version
 		if createdVersion || createdConfig {
+			if err := versioncmd.RenderFromConfig(); err != nil {
+				return fmt.Errorf("failed to render version from config: %w", err)
+			}
+
+			// Show the rendered version
+			v, err := version.Load()
+			if err == nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "VERSION rendered: %s\n", v.FullString())
+			}
+
 			fmt.Fprintln(cmd.OutOrStdout(), "\nInitialization complete!")
 		} else {
 			fmt.Fprintln(cmd.OutOrStdout(), "\nAlready initialized.")
@@ -106,8 +110,8 @@ Existing files are not overwritten.`,
 	},
 }
 
-// buildConfigYAML generates the configuration YAML based on language and versioning pattern
-func buildConfigYAML(language string, goVersioning bool) string {
+// buildConfigYAML generates the configuration YAML based on format and versioning pattern
+func buildConfigYAML(format string, goVersioning bool) string {
 	// Get versioning config (go or standard)
 	var versioningCfg *plugin.VersioningConfig
 	if goVersioning {
@@ -130,15 +134,7 @@ func buildConfigYAML(language string, goVersioning bool) string {
 		}
 	}
 
-	// Get language plugin if specified
-	var langPlugin plugin.LanguagePlugin
-	if language != "" {
-		if lp, ok := plugin.GetLanguagePlugin(language); ok {
-			langPlugin = lp
-		}
-	}
-
-	return generateConfigYAML(langPlugin, versioningCfg)
+	return generateConfigYAML(format, versioningCfg)
 }
 
 // escapeYAMLString escapes quotes in a string for YAML double-quoted output
@@ -158,8 +154,8 @@ func formatElementsList(elements []string) string {
 	return "[" + strings.Join(parts, ", ") + "]"
 }
 
-// generateConfigYAML creates the YAML configuration from language plugin and versioning configs
-func generateConfigYAML(langPlugin plugin.LanguagePlugin, verCfg *plugin.VersioningConfig) string {
+// generateConfigYAML creates the YAML configuration
+func generateConfigYAML(format string, verCfg *plugin.VersioningConfig) string {
 	prefix := verCfg.Prefix
 	if prefix == "" {
 		prefix = `""`
@@ -184,39 +180,19 @@ func generateConfigYAML(langPlugin plugin.LanguagePlugin, verCfg *plugin.Version
 	sb.WriteString("  git:\n")
 	sb.WriteString("    hashLength: 12\n\n")
 
-	if langPlugin != nil {
-		// Add emit configuration
-		emitCfg := langPlugin.GetEmitConfig()
-		if emitCfg != nil {
-			sb.WriteString("# Emit configuration - generate version source file\n")
-			sb.WriteString("emit:\n")
-			sb.WriteString(fmt.Sprintf("  language: \"%s\"\n", langPlugin.LanguageName()))
-			sb.WriteString(fmt.Sprintf("  outputPath: \"%s\"  # Override default output path\n", emitCfg.DefaultOutputPath))
-			if emitCfg.DefaultPackageName != "" {
-				sb.WriteString(fmt.Sprintf("  packageName: \"%s\"\n", emitCfg.DefaultPackageName))
+	// Add emit configuration if format specified
+	if format != "" {
+		sb.WriteString("# Emit configuration - generate version source file\n")
+		sb.WriteString("emit:\n")
+		sb.WriteString(fmt.Sprintf("  format: \"%s\"\n", format))
+
+		// Get default output from emit plugin if available
+		if pluginLoader != nil {
+			if ep, ok := pluginLoader.EmitPlugins[format]; ok {
+				sb.WriteString(fmt.Sprintf("  outputPath: \"%s\"\n", ep.DefaultOutput()))
 			}
-			sb.WriteString("\n")
 		}
-
-		// Add link configuration if supported
-		linkCfg := langPlugin.GetBuildConfig()
-		if linkCfg != nil {
-			sb.WriteString("# Link configuration - linker flag injection\n")
-			sb.WriteString("link:\n")
-			sb.WriteString(fmt.Sprintf("  variablePath: \"%s\"  # Override variable to inject\n", linkCfg.VariablePath))
-			sb.WriteString(fmt.Sprintf("  flagTemplate: \"%s\"\n", escapeYAMLString(linkCfg.FlagTemplate)))
-			sb.WriteString("\n")
-		}
-
-		// Add patch configuration if supported
-		patchConfigs := langPlugin.GetPatchConfigs()
-		if len(patchConfigs) > 0 {
-			sb.WriteString("# Patch configuration - update manifest/config files\n")
-			sb.WriteString("patch:\n")
-			sb.WriteString(fmt.Sprintf("  filePath: \"%s\"  # Override file to patch\n", patchConfigs[0].FilePath))
-			sb.WriteString(fmt.Sprintf("  versionPath: \"%s\"  # Override path to version field\n", patchConfigs[0].VersionPath))
-			sb.WriteString("\n")
-		}
+		sb.WriteString("\n")
 	}
 
 	sb.WriteString("# Logging configuration\n")
@@ -227,12 +203,12 @@ func generateConfigYAML(langPlugin plugin.LanguagePlugin, verCfg *plugin.Version
 }
 
 // describeConfig returns a description of the configuration being created
-func describeConfig(language string, goVersioning bool) string {
-	if language != "" && goVersioning {
-		return fmt.Sprintf("for %s with Go versioning pattern", language)
+func describeConfig(format string, goVersioning bool) string {
+	if format != "" && goVersioning {
+		return fmt.Sprintf("for %s with Go versioning pattern", format)
 	}
-	if language != "" {
-		return fmt.Sprintf("for %s", language)
+	if format != "" {
+		return fmt.Sprintf("for %s", format)
 	}
 	if goVersioning {
 		return "with Go versioning pattern"
@@ -240,12 +216,23 @@ func describeConfig(language string, goVersioning bool) string {
 	return "with default configuration"
 }
 
+// getAbsPath returns the absolute path for a file relative to the current directory
+func getAbsPath(filename string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return filename
+	}
+	return filepath.Join(cwd, filename)
+}
+
 func fileExists(path string) bool {
-	_, err := os.Stat(path)
+	absPath := getAbsPath(path)
+	_, err := filesystem.AppFs.Stat(absPath)
 	return err == nil
 }
 
 func init() {
-	initCmd.Flags().BoolVar(&initGoMode, "go", false, "Configure for Go projects with prerelease versioning enabled")
+	initCmd.Flags().BoolVar(&initGoMode, "go", false, "Use Go versioning pattern (v prefix, pseudo-version prerelease)")
+	initCmd.Flags().StringVarP(&initFormat, "format", "f", "", "Emit format (e.g., go, python, rust)")
 	rootCmd.AddCommand(initCmd)
 }

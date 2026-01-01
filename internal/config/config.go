@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/benjaminabbitt/versionator/internal/filesystem"
 	"github.com/cbroglie/mustache"
 	"gopkg.in/yaml.v3"
 )
@@ -19,12 +20,13 @@ type Config struct {
 	Link       LinkConfig        `yaml:"link,omitempty"`
 	Patch      PatchConfig       `yaml:"patch,omitempty"`
 	Logging    LoggingConfig     `yaml:"logging"`
+	DotNet     bool              `yaml:"dotnet,omitempty"` // Enable 4-component version for .NET (Major.Minor.Patch.Revision)
 	Custom     map[string]string `yaml:"custom,omitempty"`
 }
 
 // EmitConfig holds configuration for version file emission
 type EmitConfig struct {
-	Language    string `yaml:"language,omitempty"`    // Target language (go, python, java-maven, etc.)
+	Format      string `yaml:"format,omitempty"`      // Target format (go, python, java, etc.)
 	OutputPath  string `yaml:"outputPath,omitempty"`  // Override: path to write the generated version file
 	PackageName string `yaml:"packageName,omitempty"` // Override: package/module name for the generated code
 }
@@ -102,7 +104,7 @@ func ReadConfig() (*Config, error) {
 		},
 	}
 
-	data, err := os.ReadFile(configFile)
+	data, err := filesystem.AppFs.ReadFile(configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Config file doesn't exist, return default config
@@ -150,7 +152,7 @@ func WriteConfig(config *Config) error {
 
 	// Add a comment header
 	content := "# Versionator Configuration\n" + string(data)
-	return os.WriteFile(configFile, []byte(content), FilePermission)
+	return filesystem.AppFs.WriteFile(configFile, []byte(content), FilePermission)
 }
 
 // SetCustom sets a custom key-value pair in the config

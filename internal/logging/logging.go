@@ -8,15 +8,34 @@ import (
 )
 
 var (
-	logger   *zap.Logger
-	loggerMu sync.RWMutex
+	logger    *zap.Logger
+	loggerMu  sync.RWMutex
+	verbosity int
 )
 
-// InitLogger initializes the global logger with the specified output format
+// VerbosityToLevel converts a verbosity count to a zap log level
+// 0 = Warn (default - only warnings and errors)
+// 1 = Info
+// 2+ = Debug
+func VerbosityToLevel(v int) zapcore.Level {
+	switch {
+	case v >= 2:
+		return zapcore.DebugLevel
+	case v == 1:
+		return zapcore.InfoLevel
+	default:
+		return zapcore.WarnLevel
+	}
+}
+
+// InitLoggerWithVerbosity initializes the global logger with format and verbosity
 // This function is thread-safe and can be called multiple times
-func InitLogger(outputFormat string) error {
+func InitLoggerWithVerbosity(outputFormat string, v int) error {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
+
+	verbosity = v
+	level := VerbosityToLevel(v)
 
 	var config zap.Config
 
@@ -35,6 +54,8 @@ func InitLogger(outputFormat string) error {
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	}
 
+	config.Level = zap.NewAtomicLevelAt(level)
+
 	var err error
 	logger, err = config.Build()
 	if err != nil {
@@ -42,6 +63,27 @@ func InitLogger(outputFormat string) error {
 	}
 
 	return nil
+}
+
+// InitLogger initializes the global logger with the specified output format
+// Uses default verbosity (0 = Warn level)
+// This function is thread-safe and can be called multiple times
+func InitLogger(outputFormat string) error {
+	return InitLoggerWithVerbosity(outputFormat, 0)
+}
+
+// GetVerbosity returns the current verbosity level
+func GetVerbosity() int {
+	loggerMu.RLock()
+	defer loggerMu.RUnlock()
+	return verbosity
+}
+
+// ResetVerbosity resets the verbosity level to 0 (for testing)
+func ResetVerbosity() {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+	verbosity = 0
 }
 
 // GetSugaredLogger returns a sugared logger instance for the application to use

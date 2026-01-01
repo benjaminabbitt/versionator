@@ -19,36 +19,36 @@ Feature: Version Management
     And the exit code should be 0
 
   Scenario: Increment major version
-    When I run "versionator major increment"
+    When I run "versionator version major increment"
     And I run "versionator version"
     Then the output should be "2.0.0"
 
   Scenario: Increment minor version
-    When I run "versionator minor increment"
+    When I run "versionator version minor increment"
     And I run "versionator version"
     Then the output should be "1.1.0"
 
   Scenario: Increment patch version
-    When I run "versionator patch increment"
+    When I run "versionator version patch increment"
     And I run "versionator version"
     Then the output should be "1.0.1"
 
   Scenario: Multiple version increments
-    When I run "versionator patch increment"
-    And I run "versionator patch increment"
-    And I run "versionator patch increment"
+    When I run "versionator version patch increment"
+    And I run "versionator version patch increment"
+    And I run "versionator version patch increment"
     And I run "versionator version"
     Then the output should be "1.0.3"
 
   Scenario: Major reset resets minor and patch
     Given a VERSION file with version "1.5.3"
-    When I run "versionator major increment"
+    When I run "versionator version major increment"
     And I run "versionator version"
     Then the output should be "2.0.0"
 
   Scenario: Minor reset resets patch
     Given a VERSION file with version "1.5.3"
-    When I run "versionator minor increment"
+    When I run "versionator version minor increment"
     And I run "versionator version"
     Then the output should be "1.6.0"
 
@@ -106,6 +106,6 @@ Feature: Version Management
 
   Scenario: Incrementing clears prerelease
     Given a VERSION file with prefix "v", version "1.0.0" and prerelease "alpha"
-    When I run "versionator patch increment"
+    When I run "versionator version patch increment"
     And I run "versionator version"
     Then the output should be "1.0.1"

@@ -2,6 +2,8 @@ package logging
 
 import (
 	"testing"
+
+	"go.uber.org/zap/zapcore"
 )
 
 func TestInitLogger_ConsoleFormat(t *testing.T) {
@@ -235,5 +237,121 @@ func BenchmarkGetSugaredLogger(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		GetSugaredLogger()
+	}
+}
+
+func TestVerbosityToLevel_Zero(t *testing.T) {
+	level := VerbosityToLevel(0)
+	if level != zapcore.WarnLevel {
+		t.Errorf("Expected WarnLevel for verbosity 0, got %v", level)
+	}
+}
+
+func TestVerbosityToLevel_One(t *testing.T) {
+	level := VerbosityToLevel(1)
+	if level != zapcore.InfoLevel {
+		t.Errorf("Expected InfoLevel for verbosity 1, got %v", level)
+	}
+}
+
+func TestVerbosityToLevel_Two(t *testing.T) {
+	level := VerbosityToLevel(2)
+	if level != zapcore.DebugLevel {
+		t.Errorf("Expected DebugLevel for verbosity 2, got %v", level)
+	}
+}
+
+func TestVerbosityToLevel_HigherThanTwo(t *testing.T) {
+	level := VerbosityToLevel(5)
+	if level != zapcore.DebugLevel {
+		t.Errorf("Expected DebugLevel for verbosity 5, got %v", level)
+	}
+}
+
+func TestVerbosityToLevel_Negative(t *testing.T) {
+	level := VerbosityToLevel(-1)
+	if level != zapcore.WarnLevel {
+		t.Errorf("Expected WarnLevel for negative verbosity, got %v", level)
+	}
+}
+
+func TestInitLoggerWithVerbosity_ZeroVerbosity(t *testing.T) {
+	err := InitLoggerWithVerbosity("console", 0)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if GetVerbosity() != 0 {
+		t.Errorf("Expected verbosity 0, got %d", GetVerbosity())
+	}
+}
+
+func TestInitLoggerWithVerbosity_OneVerbosity(t *testing.T) {
+	err := InitLoggerWithVerbosity("console", 1)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if GetVerbosity() != 1 {
+		t.Errorf("Expected verbosity 1, got %d", GetVerbosity())
+	}
+}
+
+func TestInitLoggerWithVerbosity_TwoVerbosity(t *testing.T) {
+	err := InitLoggerWithVerbosity("console", 2)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if GetVerbosity() != 2 {
+		t.Errorf("Expected verbosity 2, got %d", GetVerbosity())
+	}
+}
+
+func TestInitLoggerWithVerbosity_AllFormats(t *testing.T) {
+	formats := []string{"console", "json", "development"}
+
+	for _, format := range formats {
+		for v := 0; v <= 2; v++ {
+			t.Run(format+"_v"+string(rune('0'+v)), func(t *testing.T) {
+				err := InitLoggerWithVerbosity(format, v)
+				if err != nil {
+					t.Fatalf("Failed to initialize logger with format '%s' and verbosity %d: %v", format, v, err)
+				}
+
+				if GetVerbosity() != v {
+					t.Errorf("Expected verbosity %d, got %d", v, GetVerbosity())
+				}
+
+				// Verify logger is functional
+				sugaredLogger := GetSugaredLogger()
+				if sugaredLogger == nil {
+					t.Fatal("Expected sugared logger to be available")
+				}
+			})
+		}
+	}
+}
+
+func TestGetVerbosity_ThreadSafety(t *testing.T) {
+	err := InitLoggerWithVerbosity("console", 1)
+	if err != nil {
+		t.Fatalf("Failed to initialize logger: %v", err)
+	}
+
+	done := make(chan bool, 10)
+
+	for i := 0; i < 10; i++ {
+		go func() {
+			defer func() { done <- true }()
+			v := GetVerbosity()
+			if v != 1 {
+				t.Errorf("Expected verbosity 1, got %d", v)
+			}
+		}()
+	}
+
+	for i := 0; i < 10; i++ {
+		<-done
 	}
 }

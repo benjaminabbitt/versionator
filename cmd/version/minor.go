@@ -1,0 +1,69 @@
+package version
+
+import (
+	"fmt"
+
+	"github.com/benjaminabbitt/versionator/internal/version"
+	"github.com/spf13/cobra"
+)
+
+var MinorCmd = &cobra.Command{
+	Use:   "minor",
+	Short: "Manage minor version",
+	Long:  "Commands to increment or decrement the minor version component",
+}
+
+var minorIncrementCmd = &cobra.Command{
+	Use:     "increment",
+	Aliases: []string{"inc", "bump", "up", "+"},
+	Short:   "Increment minor version",
+	Long:    "Increment the minor version and reset patch to 0",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := version.Increment(version.MinorLevel); err != nil {
+			return err
+		}
+
+		// Render prerelease/metadata from config elements
+		if err := RenderFromConfig(); err != nil {
+			return fmt.Errorf("error rendering from config: %w", err)
+		}
+
+		vd, err := version.Load()
+		if err != nil {
+			return fmt.Errorf("error reading updated version: %w", err)
+		}
+
+		fmt.Printf("Minor version incremented to: %s\n", vd.FullString())
+		return nil
+	},
+}
+
+var minorDecrementCmd = &cobra.Command{
+	Use:     "decrement",
+	Aliases: []string{"dec", "down", "-"},
+	Short:   "Decrement minor version",
+	Long:    "Decrement the minor version and reset patch to 0",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := version.Decrement(version.MinorLevel); err != nil {
+			return err
+		}
+
+		// Render prerelease/metadata from config elements
+		if err := RenderFromConfig(); err != nil {
+			return fmt.Errorf("error rendering from config: %w", err)
+		}
+
+		vd, err := version.Load()
+		if err != nil {
+			return fmt.Errorf("error reading updated version: %w", err)
+		}
+
+		fmt.Printf("Minor version decremented to: %s\n", vd.FullString())
+		return nil
+	},
+}
+
+func init() {
+	MinorCmd.AddCommand(minorIncrementCmd)
+	MinorCmd.AddCommand(minorDecrementCmd)
+}

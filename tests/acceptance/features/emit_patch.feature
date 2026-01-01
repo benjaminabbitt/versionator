@@ -16,7 +16,7 @@ Feature: Emit Patch - Manifest File Patching
       version = "0.0.0"
       description = "My application"
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "pyproject.toml" should contain 'version = "1.2.3"'
 
@@ -27,7 +27,7 @@ Feature: Emit Patch - Manifest File Patching
       name = "myapp"
       version = "0.0.0"
       """
-    When I run "versionator emit patch --prerelease='alpha'"
+    When I run "versionator output patch --prerelease='alpha'"
     Then the file "pyproject.toml" should contain 'version = "1.2.3-alpha"'
 
   # Python setuptools - setup.py
@@ -42,7 +42,7 @@ Feature: Emit Patch - Manifest File Patching
           description="My application",
       )
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the file "setup.py" should contain 'version="1.2.3"'
 
   # JavaScript/TypeScript - package.json
@@ -55,7 +55,7 @@ Feature: Emit Patch - Manifest File Patching
         "description": "My application"
       }
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "package.json" should contain '"version": "1.2.3"'
 
@@ -68,7 +68,7 @@ Feature: Emit Patch - Manifest File Patching
       version = "0.0.0"
       edition = "2021"
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "Cargo.toml" should contain 'version = "1.2.3"'
 
@@ -84,7 +84,7 @@ Feature: Emit Patch - Manifest File Patching
         <version>0.0.0</version>
       </project>
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "pom.xml" should contain '<version>1.2.3</version>'
 
@@ -99,7 +99,7 @@ Feature: Emit Patch - Manifest File Patching
       group = 'com.example'
       version = '0.0.0'
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "build.gradle" should contain "version = '1.2.3'"
 
@@ -114,7 +114,7 @@ Feature: Emit Patch - Manifest File Patching
       group = "com.example"
       version = "0.0.0"
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "build.gradle.kts" should contain 'version = "1.2.3"'
 
@@ -129,7 +129,7 @@ Feature: Emit Patch - Manifest File Patching
         </PropertyGroup>
       </Project>
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "MyApp.csproj" should contain '<Version>1.2.3</Version>'
 
@@ -143,7 +143,7 @@ Feature: Emit Patch - Manifest File Patching
         "type": "library"
       }
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "composer.json" should contain '"version": "1.2.3"'
 
@@ -157,7 +157,7 @@ Feature: Emit Patch - Manifest File Patching
         spec.authors       = ["Author"]
       end
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "myapp.gemspec" should contain 'spec.version       = "1.2.3"'
 
@@ -180,7 +180,7 @@ Feature: Emit Patch - Manifest File Patching
 
       // VERSION: 0.0.0
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "Package.swift" should contain '// VERSION: 1.2.3'
 
@@ -199,7 +199,7 @@ Feature: Emit Patch - Manifest File Patching
         "version": "0.0.0"
       }
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 0
     And the file "pyproject.toml" should contain 'version = "1.2.3"'
     And the file "package.json" should contain '"version": "1.2.3"'
@@ -219,7 +219,7 @@ Feature: Emit Patch - Manifest File Patching
         "version": "0.0.0"
       }
       """
-    When I run "versionator emit patch pyproject.toml"
+    When I run "versionator output patch pyproject.toml"
     Then the exit code should be 0
     And the file "pyproject.toml" should contain 'version = "1.2.3"'
     And the file "package.json" should contain '"version": "0.0.0"'
@@ -233,7 +233,7 @@ Feature: Emit Patch - Manifest File Patching
         "version": "0.0.0"
       }
       """
-    When I run "versionator emit patch --dry-run"
+    When I run "versionator output patch --dry-run"
     Then the exit code should be 0
     And the output should contain "package.json"
     And the output should contain "1.2.3"
@@ -241,7 +241,7 @@ Feature: Emit Patch - Manifest File Patching
 
   # Error handling
   Scenario: Error when no manifest files found
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 1
     And the output should contain "no manifest files found"
 
@@ -250,6 +250,6 @@ Feature: Emit Patch - Manifest File Patching
       """
       { invalid json }
       """
-    When I run "versionator emit patch"
+    When I run "versionator output patch"
     Then the exit code should be 1
     And the output should contain "error"

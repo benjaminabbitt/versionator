@@ -12,10 +12,31 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/benjaminabbitt/versionator/internal/config"
+	"github.com/benjaminabbitt/versionator/internal/filesystem"
 	"github.com/benjaminabbitt/versionator/internal/logging"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 )
 
+// versionFile is the name of the file containing the principal version.
+//
+// The VERSION file is the source of truth and contains the full version:
+//   - Prefix (e.g., "v", "release-")
+//   - Core version: Major.Minor.Patch (e.g., "1.2.3")
+//   - Optional revision for .NET: Major.Minor.Patch.Revision (e.g., "1.2.3.4")
+//   - Pre-release tag (e.g., "-alpha", "-rc.1", "-5-20241228-abc1234")
+//   - Build metadata (e.g., "+build.123", "+20241228.abc1234")
+//
+// Example: v1.0.0-alpha-5+20241228.abc1234
+//
+// The config file (.versionator.yaml) stores:
+//   - Default prefix for new projects
+//   - Pre-release element templates (rendered dynamically at tag time)
+//   - Metadata element templates (rendered dynamically at tag time)
+//
+// At tag time, config elements are rendered and applied to update VERSION
+// before creating the git tag. VERSION is then the snapshot of that render.
+//
+// If VERSION is corrupt or unreadable, config values are used as fallback.
 const versionFile = "VERSION"
 
 // Version represents a semantic version with all components
@@ -29,6 +50,7 @@ type Version struct {
 	PreRelease    string // Pre-release identifier (e.g., "alpha.1")
 	BuildMetadata string // Build metadata (e.g., "build.123")
 	Raw           string // Original parsed string
+	FourComponent bool   // True if version was parsed as 4-component (for .NET)
 }
 
 // VersionLevel represents the semantic version component to modify
@@ -112,6 +134,7 @@ func Parse(version string) Version {
 			return Version{Raw: version}
 		}
 		v.Revision = revision
+		v.FourComponent = true // Mark as 4-component version
 	}
 
 	v.PreRelease = matches[5]
@@ -139,7 +162,7 @@ func getVersionPath() (string, error) {
 
 // Load reads the VERSION file and returns the parsed Version
 // If VERSION doesn't exist, creates a default 0.0.0 (using config prefix if set)
-// VERSION file content is the source of truth - it takes priority over config
+// VERSION file content is the source of truth - Load does not alter the parsed data
 func Load() (*Version, error) {
 	logger := logging.GetLogger()
 
@@ -148,7 +171,7 @@ func Load() (*Version, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := filesystem.AppFs.ReadFile(path)
 	if err == nil {
 		// VERSION file exists - parse it directly
 		// The VERSION file is the source of truth
@@ -184,6 +207,36 @@ func Load() (*Version, error) {
 	return nil, fmt.Errorf("failed to read VERSION: %w", err)
 }
 
+// SyncConfigFromVersion updates config to match VERSION values
+// This syncs: prefix
+// Call this when you want to ensure config matches VERSION
+func SyncConfigFromVersion(v *Version) error {
+	if v == nil {
+		return nil
+	}
+
+	cfg, err := config.ReadConfig()
+	if err != nil {
+		return err
+	}
+
+	updated := false
+
+	// Sync prefix if VERSION has one and it differs from config
+	if v.Prefix != "" && v.Prefix != cfg.Prefix {
+		cfg.Prefix = v.Prefix
+		updated = true
+	}
+
+	if updated {
+		if err := config.WriteConfig(cfg); err != nil {
+			return fmt.Errorf("failed to sync config from VERSION: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Save writes the version to the VERSION file
 func Save(v *Version) error {
 	logger := logging.GetLogger()
@@ -201,7 +254,7 @@ func Save(v *Version) error {
 	// Write full version string with newline
 	content := v.FullString() + "\n"
 
-	if err := os.WriteFile(path, []byte(content), FilePermission); err != nil {
+	if err := filesystem.AppFs.WriteFile(path, []byte(content), FilePermission); err != nil {
 		logger.Error(LogFileWriteError, zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("failed to write VERSION: %w", err)
 	}
@@ -214,10 +267,10 @@ func Save(v *Version) error {
 
 // String returns the SemVer 2.0.0 compliant string (no prefix)
 // Format: Major.Minor.Patch[.Revision][-PreRelease][+BuildMetadata]
-// Revision is only included when non-zero (for .NET compatibility)
+// Revision is included when non-zero OR when FourComponent is true (for .NET)
 func (v *Version) String() string {
 	result := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
-	if v.Revision != 0 {
+	if v.Revision != 0 || v.FourComponent {
 		result += fmt.Sprintf(".%d", v.Revision)
 	}
 	if v.PreRelease != "" {

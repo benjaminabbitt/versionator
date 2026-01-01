@@ -3,42 +3,72 @@ package cmd
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/benjaminabbitt/versionator/internal/filesystem"
+	fstesting "github.com/benjaminabbitt/versionator/internal/filesystem/testing"
+	"github.com/benjaminabbitt/versionator/internal/logging"
 	"github.com/stretchr/testify/suite"
 )
 
 // InitTestSuite defines the test suite for init command tests
 type InitTestSuite struct {
 	suite.Suite
-	tempDir string
-	origDir string
+	memFs     *fstesting.MemFs
+	fsCleanup func()
+	cwd       string
 }
 
 // SetupTest runs before each test
 func (suite *InitTestSuite) SetupTest() {
-	suite.tempDir = suite.T().TempDir()
-	var err error
-	suite.origDir, err = os.Getwd()
-	suite.Require().NoError(err)
-	err = os.Chdir(suite.tempDir)
-	suite.Require().NoError(err)
+	// Get current working directory for absolute paths
+	cwd, err := os.Getwd()
+	suite.Require().NoError(err, "Failed to get current working directory")
+	suite.cwd = cwd
+
+	// Set up in-memory filesystem
+	suite.memFs, suite.fsCleanup = fstesting.SetupTestFs()
+
+	// Reset command state
+	suite.resetInitCommand()
 }
 
 // TearDownTest runs after each test
 func (suite *InitTestSuite) TearDownTest() {
-	if suite.origDir != "" {
-		os.Chdir(suite.origDir)
-	}
 	rootCmd.SetOut(nil)
 	rootCmd.SetErr(nil)
 	rootCmd.SetArgs(nil)
+
+	// Restore real filesystem
+	if suite.fsCleanup != nil {
+		suite.fsCleanup()
+	}
+}
+
+// absPath returns absolute path for a filename relative to cwd
+func (suite *InitTestSuite) absPath(filename string) string {
+	return filepath.Join(suite.cwd, filename)
+}
+
+// resetInitCommand resets command state between tests
+func (suite *InitTestSuite) resetInitCommand() {
+	rootCmd.SetOut(nil)
+	rootCmd.SetErr(nil)
+	rootCmd.SetArgs(nil)
+
+	// Reset init command flags
+	initCmd.Flags().Set("go", "false")
+
+	// Reset verbosity
+	logging.ResetVerbosity()
+	verboseCount = 0
 }
 
 func (suite *InitTestSuite) TestInitCommand_CreatesVersionFile() {
 	// Verify VERSION doesn't exist
-	_, err := os.Stat("VERSION")
+	_, err := filesystem.AppFs.Stat(suite.absPath("VERSION"))
 	suite.True(os.IsNotExist(err), "VERSION file should not exist before init")
 
 	// Execute init command
@@ -49,7 +79,7 @@ func (suite *InitTestSuite) TestInitCommand_CreatesVersionFile() {
 	suite.Require().NoError(err, "init command should succeed")
 
 	// Verify VERSION was created
-	data, err := os.ReadFile("VERSION")
+	data, err := filesystem.AppFs.ReadFile(suite.absPath("VERSION"))
 	suite.Require().NoError(err, "VERSION file should exist after init")
 
 	content := strings.TrimSpace(string(data))
@@ -59,7 +89,7 @@ func (suite *InitTestSuite) TestInitCommand_CreatesVersionFile() {
 
 func (suite *InitTestSuite) TestInitCommand_CreatesConfigFile() {
 	// Verify config doesn't exist
-	_, err := os.Stat(".versionator.yaml")
+	_, err := filesystem.AppFs.Stat(suite.absPath(".versionator.yaml"))
 	suite.True(os.IsNotExist(err), ".versionator.yaml should not exist before init")
 
 	// Execute init command
@@ -70,7 +100,7 @@ func (suite *InitTestSuite) TestInitCommand_CreatesConfigFile() {
 	suite.Require().NoError(err, "init command should succeed")
 
 	// Verify config was created
-	data, err := os.ReadFile(".versionator.yaml")
+	data, err := filesystem.AppFs.ReadFile(suite.absPath(".versionator.yaml"))
 	suite.Require().NoError(err, ".versionator.yaml should exist after init")
 
 	content := string(data)
@@ -81,8 +111,13 @@ func (suite *InitTestSuite) TestInitCommand_CreatesConfigFile() {
 func (suite *InitTestSuite) TestInitCommand_DoesNotOverwriteExistingVersion() {
 	// Create existing VERSION file with custom content
 	existingVersion := "1.2.3\n"
-	err := os.WriteFile("VERSION", []byte(existingVersion), 0644)
+	err := filesystem.AppFs.WriteFile(suite.absPath("VERSION"), []byte(existingVersion), 0644)
 	suite.Require().NoError(err, "failed to create existing VERSION")
+
+	// Also create config so that init doesn't create it (which would trigger re-render)
+	existingConfig := "prefix: \"\"\nprerelease:\n  elements: []\nmetadata:\n  elements: []\n  git:\n    hashLength: 7\nlogging:\n  output: console\n"
+	err = filesystem.AppFs.WriteFile(suite.absPath(".versionator.yaml"), []byte(existingConfig), 0644)
+	suite.Require().NoError(err, "failed to create existing config")
 
 	// Execute init command
 	var stdout bytes.Buffer
@@ -92,7 +127,7 @@ func (suite *InitTestSuite) TestInitCommand_DoesNotOverwriteExistingVersion() {
 	suite.Require().NoError(err, "init command should succeed")
 
 	// Verify VERSION was NOT overwritten
-	data, err := os.ReadFile("VERSION")
+	data, err := filesystem.AppFs.ReadFile(suite.absPath("VERSION"))
 	suite.Require().NoError(err, "failed to read VERSION")
 	suite.Equal(existingVersion, string(data), "VERSION should not be overwritten")
 }
@@ -100,7 +135,7 @@ func (suite *InitTestSuite) TestInitCommand_DoesNotOverwriteExistingVersion() {
 func (suite *InitTestSuite) TestInitCommand_DoesNotOverwriteExistingConfig() {
 	// Create existing config file
 	existingConfig := "# custom config\nprefix: \"release-\"\n"
-	err := os.WriteFile(".versionator.yaml", []byte(existingConfig), 0644)
+	err := filesystem.AppFs.WriteFile(suite.absPath(".versionator.yaml"), []byte(existingConfig), 0644)
 	suite.Require().NoError(err, "failed to create existing config")
 
 	// Execute init command
@@ -111,7 +146,7 @@ func (suite *InitTestSuite) TestInitCommand_DoesNotOverwriteExistingConfig() {
 	suite.Require().NoError(err, "init command should succeed")
 
 	// Verify config was NOT overwritten
-	data, err := os.ReadFile(".versionator.yaml")
+	data, err := filesystem.AppFs.ReadFile(suite.absPath(".versionator.yaml"))
 	suite.Require().NoError(err, "failed to read config")
 	suite.Equal(existingConfig, string(data), "config should not be overwritten")
 }
@@ -132,9 +167,9 @@ func (suite *InitTestSuite) TestInitCommand_OutputsCreatedStatus() {
 
 func (suite *InitTestSuite) TestInitCommand_OutputsExistsStatus() {
 	// Create existing files
-	err := os.WriteFile("VERSION", []byte("1.0.0\n"), 0644)
+	err := filesystem.AppFs.WriteFile(suite.absPath("VERSION"), []byte("1.0.0\n"), 0644)
 	suite.Require().NoError(err)
-	err = os.WriteFile(".versionator.yaml", []byte("prefix: \"v\"\n"), 0644)
+	err = filesystem.AppFs.WriteFile(suite.absPath(".versionator.yaml"), []byte("prefix: \"v\"\n"), 0644)
 	suite.Require().NoError(err)
 
 	// Execute init command
@@ -159,7 +194,7 @@ func (suite *InitTestSuite) TestInitCommand_GoFlag_EnablesPrerelease() {
 	suite.Require().NoError(err, "init command should succeed")
 
 	// Verify config has prerelease template set
-	data, err := os.ReadFile(".versionator.yaml")
+	data, err := filesystem.AppFs.ReadFile(suite.absPath(".versionator.yaml"))
 	suite.Require().NoError(err, "failed to read config")
 
 	content := string(data)
@@ -180,7 +215,7 @@ func (suite *InitTestSuite) TestInitCommand_NoGoFlag_DefaultPrerelease() {
 	suite.Require().NoError(err, "init command should succeed")
 
 	// Verify config exists with default settings
-	data, err := os.ReadFile(".versionator.yaml")
+	data, err := filesystem.AppFs.ReadFile(suite.absPath(".versionator.yaml"))
 	suite.Require().NoError(err, "failed to read config")
 
 	content := string(data)

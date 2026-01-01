@@ -10,7 +10,7 @@ Feature: End-to-End Integration
   Scenario: Complete release workflow
     Given a VERSION file with prefix "v" and version "1.0.0"
     And a committed file "README.md" with content "# My Project"
-    When I run "versionator patch increment"
+    When I run "versionator version patch increment"
     And I commit the VERSION changes
     And I run "versionator commit -m 'Release v1.0.1'"
     Then a git tag "v1.0.1" should exist
@@ -19,12 +19,12 @@ Feature: End-to-End Integration
   Scenario: Version injection for Python project
     Given a VERSION file with version "1.2.3"
     And a file "mypackage/__init__.py" with content "# placeholder"
-    When I run "versionator emit python --output mypackage/_version.py"
+    When I run "versionator output file emit-python --output mypackage/_version.py"
     Then the file "mypackage/_version.py" should contain '__version__ = "1.2.3"'
 
   Scenario: Version injection for Go project
     Given a VERSION file with version "0.5.0"
-    When I run "versionator emit go --output version_info.go"
+    When I run "versionator output file emit-go --output version_info.go"
     Then the file "version_info.go" should contain 'Version     = "0.5.0"'
 
   Scenario: Pre-release workflow
@@ -65,7 +65,7 @@ Feature: End-to-End Integration
     And a committed file "file1.txt" with content "Initial"
     When I run "versionator commit -m 'Initial release'"
     And I create 5 commits with message prefix "feat:"
-    And I run "versionator minor increment"
+    And I run "versionator version minor increment"
     And I commit the VERSION changes
     And I run "versionator commit -m 'Feature release'"
     Then a git tag "v1.0.0" should exist

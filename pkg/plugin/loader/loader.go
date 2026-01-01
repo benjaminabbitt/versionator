@@ -3,6 +3,7 @@ package loader
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,14 +11,16 @@ import (
 	"strings"
 
 	"github.com/benjaminabbitt/versionator/pkg/plugin"
+	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"go.uber.org/zap"
 )
 
 // Loader handles plugin discovery and loading.
 type Loader struct {
-	logger  *zap.Logger
-	clients []*goplugin.Client
+	logger    *zap.Logger
+	verbosity int
+	clients   []*goplugin.Client
 
 	EmitPlugins  map[string]plugin.EmitPluginInterface
 	BuildPlugins map[string]plugin.BuildPluginInterface
@@ -26,8 +29,14 @@ type Loader struct {
 
 // NewLoader creates a new plugin loader.
 func NewLoader(logger *zap.Logger) *Loader {
+	return NewLoaderWithVerbosity(logger, 0)
+}
+
+// NewLoaderWithVerbosity creates a new plugin loader with specified verbosity.
+func NewLoaderWithVerbosity(logger *zap.Logger, verbosity int) *Loader {
 	return &Loader{
 		logger:       logger,
+		verbosity:    verbosity,
 		EmitPlugins:  make(map[string]plugin.EmitPluginInterface),
 		BuildPlugins: make(map[string]plugin.BuildPluginInterface),
 		PatchPlugins: make(map[string]plugin.PatchPluginInterface),
@@ -149,11 +158,34 @@ func (l *Loader) loadPlugin(path, pluginType string) error {
 		return fmt.Errorf("unknown plugin type: %s", pluginType)
 	}
 
+	// Configure hclog level based on verbosity
+	// 0 = Off (silent), 1 = Warn, 2+ = Debug
+	hclogLevel := hclog.Off
+	if l.verbosity >= 2 {
+		hclogLevel = hclog.Debug
+	} else if l.verbosity == 1 {
+		hclogLevel = hclog.Warn
+	}
+
+	pluginLogger := hclog.New(&hclog.LoggerOptions{
+		Name:   "plugin",
+		Output: io.Discard,
+		Level:  hclogLevel,
+	})
+	if l.verbosity >= 2 {
+		pluginLogger = hclog.New(&hclog.LoggerOptions{
+			Name:   "plugin",
+			Output: os.Stderr,
+			Level:  hclogLevel,
+		})
+	}
+
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig:  plugin.Handshake,
 		Plugins:          pluginMap,
 		Cmd:              exec.Command(path),
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
+		Logger:           pluginLogger,
 	})
 
 	rpcClient, err := client.Client()

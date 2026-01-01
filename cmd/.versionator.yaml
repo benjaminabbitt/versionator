@@ -1,0 +1,19 @@
+# Versionator Configuration
+# See https://github.com/benjaminabbitt/versionator for documentation
+
+# Version prefix
+prefix: ""
+
+# Pre-release configuration (elements joined with dashes)
+prerelease:
+  elements: ["alpha", "CommitsSinceTag"]
+
+# Build metadata configuration (elements joined with dots)
+metadata:
+  elements: ["BuildDateTimeCompact", "ShortHash", "Dirty"]
+  git:
+    hashLength: 12
+
+# Logging configuration
+logging:
+  output: "console"

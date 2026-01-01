@@ -2,106 +2,38 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/benjaminabbitt/versionator/internal/vcs"
-	"github.com/benjaminabbitt/versionator/internal/version"
 
+	"github.com/benjaminabbitt/versionator/cmd/output"
 	"github.com/spf13/cobra"
 )
 
+// commitCmd is a deprecated alias for 'output tag'
 var commitCmd = &cobra.Command{
-	Use:   "commit",
-	Short: "Create a git tag for the current version",
-	Long: `Create a git tag for the current version after ensuring the working directory is clean.
-
-This command will:
-1. Check that you're in a git repository
-2. Verify there are no uncommitted changes
-3. Get the current version
-4. Create a git tag with the version (prefixed with 'v')
-
-The command will fail if there are uncommitted changes or if the tag already exists.`,
+	Use:        "commit",
+	Short:      "Create a git tag (deprecated: use 'output tag')",
+	Long:       "DEPRECATED: Use 'versionator output tag' instead.\n\nThis command is an alias for 'output tag' for backwards compatibility.",
+	Deprecated: "use 'output tag' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get active VCS
-		vcs := vcs.GetActiveVCS()
-		if vcs == nil {
-			return fmt.Errorf("not in a version control repository")
-		}
+		fmt.Fprintln(cmd.ErrOrStderr(), "Note: 'commit' is deprecated. Use 'output tag' instead.")
 
-		// Check if working directory is clean
-		clean, err := vcs.IsWorkingDirectoryClean()
-		if err != nil {
-			return fmt.Errorf("error checking %s status: %w", vcs.Name(), err)
-		}
-
-		if !clean {
-			return fmt.Errorf("working directory is not clean. Please commit or stash your changes first")
-		}
-
-		// Get current version data (includes prefix)
-		vd, err := version.Load()
-		if err != nil {
-			return fmt.Errorf("error getting current version: %w", err)
-		}
-
-		// Use VERSION file prefix by default, or command-line override
-		prefix := vd.Prefix
-		if cmdPrefix, _ := cmd.Flags().GetString("prefix"); cmdPrefix != "" {
-			prefix = cmdPrefix
-		}
-		// If no prefix configured anywhere, default to "v"
-		if prefix == "" {
-			prefix = "v"
-		}
-
-		tagName := prefix + vd.String()
-
-		// Check if tag already exists
-		exists, err := vcs.TagExists(tagName)
-		if err != nil {
-			return fmt.Errorf("error checking if tag exists: %w", err)
-		}
-
-		if exists {
-			force, _ := cmd.Flags().GetBool("force")
-			if !force {
-				return fmt.Errorf("tag '%s' already exists. Use --force to overwrite", tagName)
-			}
-		}
-
-		// Get custom message or use default
+		// Pass flags from commit command to tag command
 		message, _ := cmd.Flags().GetString("message")
-		if message == "" {
-			message = fmt.Sprintf("Release %s", vd.String())
-		}
+		force, _ := cmd.Flags().GetBool("force")
+		output.TagCmd.Flags().Set("message", message)
+		output.TagCmd.Flags().Set("force", fmt.Sprintf("%t", force))
 
-		// Create the tag
-		if err := vcs.CreateTag(tagName, message); err != nil {
-			return fmt.Errorf("error creating tag: %w", err)
-		}
+		// Copy output settings
+		output.TagCmd.SetOut(cmd.OutOrStdout())
+		output.TagCmd.SetErr(cmd.ErrOrStderr())
 
-		cmd.Printf("Successfully created tag '%s' for version %s using %s\n", tagName, vd.String(), vcs.Name())
-
-		// Show additional information if requested
-		verbose, _ := cmd.Flags().GetBool("verbose")
-		if verbose {
-			cmd.Printf("  Message: %s\n", message)
-
-			// Get current VCS identifier
-			if identifier, err := vcs.GetVCSIdentifier(7); err == nil {
-				cmd.Printf("  %s ID: %s\n", vcs.Name(), identifier)
-			}
-		}
-
-		return nil
+		return output.TagCmd.RunE(output.TagCmd, args)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(commitCmd)
 
-	// Add flags
+	// Mirror flags from output.TagCmd for compatibility
 	commitCmd.Flags().StringP("message", "m", "", "Tag message (default: 'Release <version>')")
-	commitCmd.Flags().StringP("prefix", "p", "v", "Tag prefix (default: 'v')")
 	commitCmd.Flags().BoolP("force", "f", false, "Force creation even if tag exists")
-	commitCmd.Flags().BoolP("verbose", "v", false, "Show additional information")
 }

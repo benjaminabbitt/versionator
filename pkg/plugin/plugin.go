@@ -19,9 +19,6 @@ const (
 	// TypeHook indicates a lifecycle hook plugin
 	TypeHook PluginType = "Hook"
 
-	// TypeLanguage indicates a language configuration plugin
-	TypeLanguage PluginType = "Language"
-
 	// TypeVersioning indicates a versioning pattern plugin
 	TypeVersioning PluginType = "Versioning"
 )
@@ -98,35 +95,6 @@ type TemplateProvider interface {
 	GetTemplateVariables(context map[string]string) map[string]string
 }
 
-// EmitConfig holds configuration for source file emission
-type EmitConfig struct {
-	// DefaultOutputPath is the default path for the generated version file
-	// Example: "internal/version/version.go", "_version.py", "src/version.rs"
-	DefaultOutputPath string
-
-	// DefaultPackageName is the default package/module name for the generated code
-	// Example: "version" for Go, "" for languages that don't need it
-	DefaultPackageName string
-
-	// FileExtension is the file extension for the language
-	// Example: ".go", ".py", ".rs"
-	FileExtension string
-}
-
-// LinkConfig holds configuration for link-time variable injection
-type LinkConfig struct {
-	// VariablePath is the default variable path to override
-	// Go example: "main.Version" or "github.com/user/pkg/version.Version"
-	// C/C++ example: "VERSION"
-	VariablePath string
-
-	// FlagTemplate is the flag template using {{Variable}} and {{Value}} placeholders
-	// Go example: "-X {{Variable}}={{Value}}"
-	// C example: "-D{{Variable}}={{Value}}"
-	// User incorporates output into their build command
-	FlagTemplate string
-}
-
 // PatchFormat specifies the file format for config/manifest patching
 type PatchFormat string
 
@@ -170,27 +138,6 @@ type PatchConfig struct {
 	Patch PatchFunc
 }
 
-// LanguagePlugin is an interface for plugins that provide language-specific configuration.
-// Each method returns nil if that injection method is not supported by the language.
-type LanguagePlugin interface {
-	Plugin
-
-	// LanguageName returns the language identifier (e.g., "go", "python")
-	LanguageName() string
-
-	// GetEmitConfig returns configuration for source file emission.
-	// Returns nil if emit is not supported (all languages should support emit).
-	GetEmitConfig() *EmitConfig
-
-	// GetBuildConfig returns configuration for link-time variable injection.
-	// Returns nil if link injection is not supported (e.g., interpreted languages).
-	GetBuildConfig() *LinkConfig
-
-	// GetPatchConfigs returns configuration for manifest/config file patching.
-	// Returns nil or empty slice if patching is not supported.
-	GetPatchConfigs() []PatchConfig
-}
-
 // VersioningConfig holds versioning pattern configuration
 // All patterns use three-dot semver (Major.Minor.Patch) as the base
 type VersioningConfig struct {
@@ -213,16 +160,14 @@ type VersioningPlugin interface {
 
 // Registry holds all registered plugins
 type Registry struct {
-	mu                 sync.RWMutex
-	plugins            []Plugin
-	templateProviders  []TemplateProvider
-	languagePlugins    map[string]LanguagePlugin
-	versioningPlugins  map[string]VersioningPlugin
+	mu                sync.RWMutex
+	plugins           []Plugin
+	templateProviders []TemplateProvider
+	versioningPlugins map[string]VersioningPlugin
 }
 
 // globalRegistry is the default plugin registry
 var globalRegistry = &Registry{
-	languagePlugins:   make(map[string]LanguagePlugin),
 	versioningPlugins: make(map[string]VersioningPlugin),
 }
 
@@ -236,11 +181,6 @@ func Register(p Plugin) {
 	// Also register as template provider if it implements the interface
 	if tp, ok := p.(TemplateProvider); ok {
 		globalRegistry.templateProviders = append(globalRegistry.templateProviders, tp)
-	}
-
-	// Also register as language plugin if it implements the interface
-	if lp, ok := p.(LanguagePlugin); ok {
-		globalRegistry.languagePlugins[lp.LanguageName()] = lp
 	}
 
 	// Also register as versioning plugin if it implements the interface
@@ -307,48 +247,6 @@ func GetPluginsByType(pluginType PluginType) []Plugin {
 	return result
 }
 
-// GetLanguagePlugin returns a language plugin by name
-func GetLanguagePlugin(name string) (LanguagePlugin, bool) {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
-
-	lp, ok := globalRegistry.languagePlugins[name]
-	return lp, ok
-}
-
-// GetLanguagePlugins returns a copy of all registered language plugins
-func GetLanguagePlugins() map[string]LanguagePlugin {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
-
-	result := make(map[string]LanguagePlugin, len(globalRegistry.languagePlugins))
-	for k, v := range globalRegistry.languagePlugins {
-		result[k] = v
-	}
-	return result
-}
-
-// GetSupportedLanguages returns the list of supported language names
-func GetSupportedLanguages() []string {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
-
-	names := make([]string, 0, len(globalRegistry.languagePlugins))
-	for name := range globalRegistry.languagePlugins {
-		names = append(names, name)
-	}
-	return names
-}
-
-// IsLanguageSupported checks if a language is supported
-func IsLanguageSupported(name string) bool {
-	globalRegistry.mu.RLock()
-	defer globalRegistry.mu.RUnlock()
-
-	_, ok := globalRegistry.languagePlugins[name]
-	return ok
-}
-
 // GetVersioningPlugin returns a versioning plugin by name
 func GetVersioningPlugin(name string) (VersioningPlugin, bool) {
 	globalRegistry.mu.RLock()
@@ -398,6 +296,5 @@ func ResetRegistry() {
 
 	globalRegistry.plugins = nil
 	globalRegistry.templateProviders = nil
-	globalRegistry.languagePlugins = make(map[string]LanguagePlugin)
 	globalRegistry.versioningPlugins = make(map[string]VersioningPlugin)
 }

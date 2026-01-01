@@ -712,6 +712,21 @@ func templateDataToMap(data TemplateData) map[string]interface{} {
 	return m
 }
 
+// TemplateDataToMap converts TemplateData to a map[string]string for external use
+// This is used by build plugins that need template variables as strings
+func TemplateDataToMap(data TemplateData) map[string]string {
+	interfaceMap := templateDataToMap(data)
+	result := make(map[string]string, len(interfaceMap))
+	for k, v := range interfaceMap {
+		if s, ok := v.(string); ok {
+			result[k] = s
+		} else if i, ok := v.(int); ok {
+			result[k] = fmt.Sprintf("%d", i)
+		}
+	}
+	return result
+}
+
 // RenderTemplateList renders a list of template strings and joins with separator
 func RenderTemplateList(templates []string, data TemplateData, sep string) string {
 	var parts []string

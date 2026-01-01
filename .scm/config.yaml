@@ -20,24 +20,31 @@ profiles:
     fragments:
       - general/communication
       - general/security
+      - general/code-quality
+      - patterns/12-factor/12-factor
+      - general/documentation
+      - general/problem-solving
+      - general/pushback
+
+  tooling:
+    description: Common tooling for AI's use
+    fragments:
+      - tools/cli/git/git
+      - tools/cli/ast-grep/ast-grep
+      - tools/cli/just/just
+
 
   developer:
     default: true
     description: Full development context with all standards and practices
     parents:
       - base
+      - tooling
     fragments:
       - general/tdd
-      - general/code-quality
-      - tools/cli/just/just
-      - tools/cli/git/git
-      - tools/cli/ast-grep/ast-grep
-      - general/documentation
-      - general/problem-solving
-      - general/pushback
-      - patterns/12-factor/12-factor
 
   go-developer:
+    default: true
     description: Go development context
     parents:
       - developer

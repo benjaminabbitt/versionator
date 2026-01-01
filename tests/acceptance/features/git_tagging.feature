@@ -14,7 +14,7 @@ Feature: Git Tag Creation
     And the exit code should be 0
 
   Scenario: Create tag after version increment
-    When I run "versionator minor increment"
+    When I run "versionator version minor increment"
     And I commit the VERSION changes
     And I run "versionator commit"
     Then a git tag "v1.1.0" should exist
@@ -46,7 +46,7 @@ Feature: Git Tag Creation
 
   Scenario: Multiple releases
     When I run "versionator commit"
-    And I run "versionator patch increment"
+    And I run "versionator version patch increment"
     And I commit the VERSION changes
     And I run "versionator commit"
     Then a git tag "v1.0.0" should exist

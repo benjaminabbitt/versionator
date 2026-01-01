@@ -11,73 +11,66 @@ Feature: Emit File - Source File Generation
   # The old syntax should remain as an alias for backwards compatibility
 
   Scenario: Emit file for Python
-    When I run "versionator emit file python"
+    When I run "versionator output file emit-python"
     Then the exit code should be 0
     And the output should contain '__version__ = "2.3.4"'
     And the output should contain '__version_tuple__ = (2, 3, 4)'
 
   Scenario: Emit file for Go
-    When I run "versionator emit file go"
+    When I run "versionator output file emit-go"
     Then the exit code should be 0
     And the output should contain 'Version     = "2.3.4"'
     And the output should contain 'Major       = 2'
 
   Scenario: Emit file for Rust
-    When I run "versionator emit file rust"
+    When I run "versionator output file emit-rust"
     Then the exit code should be 0
     And the output should contain 'pub const VERSION'
     And the output should contain '"2.3.4"'
 
   Scenario: Emit file for JavaScript
-    When I run "versionator emit file js"
+    When I run "versionator output file emit-javascript"
     Then the exit code should be 0
     And the output should contain 'export const VERSION'
 
   Scenario: Emit file for TypeScript
-    When I run "versionator emit file ts"
+    When I run "versionator output file emit-typescript"
     Then the exit code should be 0
     And the output should contain 'export const VERSION: string'
 
   Scenario: Emit file to output path
-    When I run "versionator emit file python --output _version.py"
+    When I run "versionator output file emit-python --output _version.py"
     Then the exit code should be 0
     And the file "_version.py" should exist
     And the file "_version.py" should contain '__version__ = "2.3.4"'
 
   Scenario: Emit file with prerelease
-    When I run "versionator emit file python --prerelease='beta'"
+    When I run "versionator output file emit-python --prerelease='beta'"
     Then the output should contain '__version__ = "2.3.4-beta"'
 
   Scenario: Emit file with metadata
-    When I run "versionator emit file python --metadata='build.123'"
+    When I run "versionator output file emit-python --metadata='build.123'"
     Then the output should contain '__version__ = "2.3.4+build.123"'
 
   Scenario Outline: Emit file for all supported languages
-    When I run "versionator emit file <format>"
+    When I run "versionator output file <plugin>"
     Then the exit code should be 0
     And the output should contain "<expected>"
 
     Examples:
-      | format    | expected                         |
-      | python    | __version__                      |
-      | json      | "version"                        |
-      | yaml      | version:                         |
-      | go        | Version     =                    |
-      | c         | #define VERSION                  |
-      | c-header  | #ifndef                          |
-      | cpp       | namespace version                |
-      | js        | export const VERSION             |
-      | ts        | export const VERSION: string     |
-      | java      | public static final String       |
-      | kotlin    | const val VERSION                |
-      | csharp    | public const string Version      |
-      | php       | const VERSION                    |
-      | swift     | public let VERSION               |
-      | ruby      | VERSION =                        |
-      | rust      | pub const VERSION                |
-
-  # Backwards compatibility - old syntax should still work
-  Scenario: Old emit syntax still works for backwards compatibility
-    When I run "versionator emit python"
-    Then the exit code should be 0
-    And the output should contain '__version__ = "2.3.4"'
+      | plugin          | expected                         |
+      | emit-python     | __version__                      |
+      | emit-json       | "version"                        |
+      | emit-yaml       | version:                         |
+      | emit-go         | Version     =                    |
+      | emit-c          | #define VERSION                  |
+      | emit-cpp        | namespace version                |
+      | emit-javascript | export const VERSION             |
+      | emit-typescript | export const VERSION: string     |
+      | emit-java       | public static final String       |
+      | emit-kotlin     | const val VERSION                |
+      | emit-csharp     | public const string Version      |
+      | emit-php        | const VERSION                    |
+      | emit-swift      | public static let version        |
+      | emit-ruby       | VERSION =                        |
+      | emit-rust       | pub const VERSION                |

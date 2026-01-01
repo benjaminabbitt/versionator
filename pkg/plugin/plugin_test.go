@@ -24,17 +24,6 @@ func (m *mockTemplateProvider) GetTemplateVariables(ctx map[string]string) map[s
 	return m.vars
 }
 
-// mockLanguagePlugin implements LanguagePlugin for testing
-type mockLanguagePlugin struct {
-	mockPlugin
-	language string
-}
-
-func (m *mockLanguagePlugin) LanguageName() string           { return m.language }
-func (m *mockLanguagePlugin) GetEmitConfig() *EmitConfig     { return nil }
-func (m *mockLanguagePlugin) GetBuildConfig() *LinkConfig    { return nil }
-func (m *mockLanguagePlugin) GetPatchConfigs() []PatchConfig { return nil }
-
 // mockVersioningPlugin implements VersioningPlugin for testing
 type mockVersioningPlugin struct {
 	mockPlugin
@@ -45,21 +34,21 @@ func (m *mockVersioningPlugin) PatternName() string                    { return 
 func (m *mockVersioningPlugin) GetVersioningConfig() *VersioningConfig { return nil }
 
 func TestNewPluginTypeSet_CreatesSet_WithAllTypes(t *testing.T) {
-	set := NewPluginTypeSet(TypeVCS, TypeLanguage)
+	set := NewPluginTypeSet(TypeVCS, TypeHook)
 
 	if !set.Contains(TypeVCS) {
 		t.Error("expected set to contain TypeVCS")
 	}
-	if !set.Contains(TypeLanguage) {
-		t.Error("expected set to contain TypeLanguage")
+	if !set.Contains(TypeHook) {
+		t.Error("expected set to contain TypeHook")
 	}
-	if set.Contains(TypeHook) {
-		t.Error("expected set to not contain TypeHook")
+	if set.Contains(TypeVersioning) {
+		t.Error("expected set to not contain TypeVersioning")
 	}
 }
 
 func TestPluginTypeSetSlice_WithMultipleTypes_ReturnsAll(t *testing.T) {
-	set := NewPluginTypeSet(TypeVCS, TypeLanguage)
+	set := NewPluginTypeSet(TypeVCS, TypeHook)
 	slice := set.Slice()
 
 	if len(slice) != 2 {
@@ -67,17 +56,17 @@ func TestPluginTypeSetSlice_WithMultipleTypes_ReturnsAll(t *testing.T) {
 	}
 
 	hasVCS := false
-	hasLanguage := false
+	hasHook := false
 	for _, pt := range slice {
 		if pt == TypeVCS {
 			hasVCS = true
 		}
-		if pt == TypeLanguage {
-			hasLanguage = true
+		if pt == TypeHook {
+			hasHook = true
 		}
 	}
 
-	if !hasVCS || !hasLanguage {
+	if !hasVCS || !hasHook {
 		t.Error("slice missing expected types")
 	}
 }
@@ -100,26 +89,6 @@ func TestGetPlugins_Always_ReturnsCopy(t *testing.T) {
 	plugins1[0] = nil
 	if plugins2[0] == nil {
 		t.Error("modifying returned slice affected other copy")
-	}
-}
-
-func TestGetLanguagePlugins_Always_ReturnsCopy(t *testing.T) {
-	t.Cleanup(ResetRegistry)
-	ResetRegistry()
-
-	lp := &mockLanguagePlugin{
-		mockPlugin: mockPlugin{name: "go-test", types: NewPluginTypeSet(TypeLanguage)},
-		language:   "go",
-	}
-	Register(lp)
-
-	plugins1 := GetLanguagePlugins()
-	plugins2 := GetLanguagePlugins()
-
-	// Modifying one should not affect the other
-	delete(plugins1, "go")
-	if _, ok := plugins2["go"]; !ok {
-		t.Error("modifying returned map affected other copy")
 	}
 }
 
@@ -169,7 +138,6 @@ func TestRegister_ConcurrentAccess_NoRace(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_ = GetPlugins()
-			_ = GetLanguagePlugins()
 			_ = GetVersioningPlugins()
 		}()
 	}
@@ -230,72 +198,9 @@ func TestGetPluginsByType_MixedTypes_FiltersCorrectly(t *testing.T) {
 		t.Errorf("expected 2 Hook plugins, got %d", len(hookPlugins))
 	}
 
-	languagePlugins := GetPluginsByType(TypeLanguage)
-	if len(languagePlugins) != 0 {
-		t.Errorf("expected 0 Language plugins, got %d", len(languagePlugins))
-	}
-}
-
-func TestGetLanguagePlugin_Registered_ReturnsPlugin(t *testing.T) {
-	t.Cleanup(ResetRegistry)
-	ResetRegistry()
-
-	lp := &mockLanguagePlugin{
-		mockPlugin: mockPlugin{name: "go-lang", types: NewPluginTypeSet(TypeLanguage)},
-		language:   "go",
-	}
-	Register(lp)
-
-	plugin, ok := GetLanguagePlugin("go")
-	if !ok {
-		t.Error("expected to find 'go' language plugin")
-	}
-	if plugin.Name() != "go-lang" {
-		t.Errorf("expected plugin name 'go-lang', got '%s'", plugin.Name())
-	}
-
-	_, ok = GetLanguagePlugin("rust")
-	if ok {
-		t.Error("expected not to find 'rust' language plugin")
-	}
-}
-
-func TestGetSupportedLanguages_MultipleRegistered_ReturnsAll(t *testing.T) {
-	t.Cleanup(ResetRegistry)
-	ResetRegistry()
-
-	goPlugin := &mockLanguagePlugin{
-		mockPlugin: mockPlugin{name: "go-lang", types: NewPluginTypeSet(TypeLanguage)},
-		language:   "go",
-	}
-	rustPlugin := &mockLanguagePlugin{
-		mockPlugin: mockPlugin{name: "rust-lang", types: NewPluginTypeSet(TypeLanguage)},
-		language:   "rust",
-	}
-	Register(goPlugin)
-	Register(rustPlugin)
-
-	languages := GetSupportedLanguages()
-	if len(languages) != 2 {
-		t.Errorf("expected 2 languages, got %d", len(languages))
-	}
-}
-
-func TestIsLanguageSupported_RegisteredLanguage_ReturnsTrue(t *testing.T) {
-	t.Cleanup(ResetRegistry)
-	ResetRegistry()
-
-	lp := &mockLanguagePlugin{
-		mockPlugin: mockPlugin{name: "go-lang", types: NewPluginTypeSet(TypeLanguage)},
-		language:   "go",
-	}
-	Register(lp)
-
-	if !IsLanguageSupported("go") {
-		t.Error("expected 'go' to be supported")
-	}
-	if IsLanguageSupported("rust") {
-		t.Error("expected 'rust' to not be supported")
+	versioningPlugins := GetPluginsByType(TypeVersioning)
+	if len(versioningPlugins) != 0 {
+		t.Errorf("expected 0 Versioning plugins, got %d", len(versioningPlugins))
 	}
 }
 
