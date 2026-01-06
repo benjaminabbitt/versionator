@@ -1,3 +1,7 @@
+<!-- SCM:BEGIN -->
+@.scm/context.md
+<!-- SCM:END -->
+
 # Go Development Guidelines
 
 If `CLAUDE.project.md` exists, it supplements/overrides these guidelines.
