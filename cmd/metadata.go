@@ -13,7 +13,7 @@ import (
 
 var metadataCmd = &cobra.Command{
 	Use:   "metadata",
-	Short: "Manage version build metadata behavior",
+	Short: "Manage build metadata",
 	Long: `Commands to enable or disable appending build metadata to version numbers.
 
 Build metadata follows SemVer 2.0.0 specification:

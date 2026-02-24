@@ -12,7 +12,7 @@ import (
 
 var prereleaseCmd = &cobra.Command{
 	Use:   "prerelease",
-	Short: "Manage version pre-release behavior",
+	Short: "Manage pre-release identifier",
 	Long: `Commands to enable or disable pre-release identifiers.
 
 Pre-release follows SemVer 2.0.0 specification:

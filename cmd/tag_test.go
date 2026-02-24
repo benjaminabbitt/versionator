@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// CommitTestSuite defines the test suite for commit command tests
-type CommitTestSuite struct {
+// TagTestSuite defines the test suite for tag command tests
+type TagTestSuite struct {
 	suite.Suite
 	ctrl    *gomock.Controller
 	tempDir string
@@ -20,17 +20,17 @@ type CommitTestSuite struct {
 }
 
 // SetupSuite runs once before all tests in the suite
-func (suite *CommitTestSuite) SetupSuite() {
+func (suite *TagTestSuite) SetupSuite() {
 	// This runs once for the entire suite
 }
 
 // TearDownSuite runs once after all tests in the suite
-func (suite *CommitTestSuite) TearDownSuite() {
+func (suite *TagTestSuite) TearDownSuite() {
 	// This runs once after the entire suite
 }
 
 // SetupTest runs before each test
-func (suite *CommitTestSuite) SetupTest() {
+func (suite *TagTestSuite) SetupTest() {
 	// Create a temporary directory for testing
 	suite.tempDir = suite.T().TempDir()
 	var err error
@@ -43,11 +43,11 @@ func (suite *CommitTestSuite) SetupTest() {
 	suite.ctrl = gomock.NewController(suite.T())
 
 	// Reset command state to prevent flag pollution
-	suite.resetCommitCommand()
+	suite.resetTagCommand()
 }
 
 // TearDownTest runs after each test
-func (suite *CommitTestSuite) TearDownTest() {
+func (suite *TagTestSuite) TearDownTest() {
 	// Restore original directory
 	if suite.origDir != "" {
 		os.Chdir(suite.origDir)
@@ -62,22 +62,22 @@ func (suite *CommitTestSuite) TearDownTest() {
 	vcs.UnregisterVCS("git")
 }
 
-// resetCommitCommand resets the commit command state between tests
-func (suite *CommitTestSuite) resetCommitCommand() {
+// resetTagCommand resets the tag command state between tests
+func (suite *TagTestSuite) resetTagCommand() {
 	// Reset command output and args
 	rootCmd.SetOut(nil)
 	rootCmd.SetErr(nil)
 	rootCmd.SetArgs(nil)
 
-	// Reset commit command flags to their default values
-	commitCmd.Flags().Set("message", "")
-	commitCmd.Flags().Set("prefix", "v")
-	commitCmd.Flags().Set("force", "false")
-	commitCmd.Flags().Set("verbose", "false")
+	// Reset tag command flags to their default values
+	tagCmd.Flags().Set("message", "")
+	tagCmd.Flags().Set("prefix", "v")
+	tagCmd.Flags().Set("force", "false")
+	tagCmd.Flags().Set("verbose", "false")
 }
 
 // createTestFiles creates the standard test files needed for most tests
-func (suite *CommitTestSuite) createTestFiles(version string) {
+func (suite *TagTestSuite) createTestFiles(version string) {
 	// Create a VERSION file
 	err := os.WriteFile("VERSION", []byte(version), 0644)
 	suite.Require().NoError(err, "Failed to create VERSION file")
@@ -95,7 +95,7 @@ logging:
 	suite.Require().NoError(err, "Failed to create config file")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_Success() {
+func (suite *TagTestSuite) TestTagCommand_Success() {
 	// Create test files
 	suite.createTestFiles("1.2.3")
 
@@ -115,11 +115,11 @@ func (suite *CommitTestSuite) TestCommitCommand_Success() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"commit", "--verbose"})
+	rootCmd.SetArgs([]string{"tag", "--verbose"})
 
-	// Execute the commit command
+	// Execute the tag command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "commit command should succeed")
+	suite.Require().NoError(err, "tag command should succeed")
 
 	// Check output contains success message
 	output := buf.String()
@@ -128,7 +128,7 @@ func (suite *CommitTestSuite) TestCommitCommand_Success() {
 	suite.Contains(output, "git ID: abc1234", "Should contain verbose git ID output")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_CustomPrefix() {
+func (suite *TagTestSuite) TestTagCommand_CustomPrefix() {
 	// Create test files
 	suite.createTestFiles("2.0.0")
 
@@ -147,18 +147,18 @@ func (suite *CommitTestSuite) TestCommitCommand_CustomPrefix() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"commit", "--prefix", "release-"})
+	rootCmd.SetArgs([]string{"tag", "--prefix", "release-"})
 
-	// Execute the commit command
+	// Execute the tag command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "commit command should succeed")
+	suite.Require().NoError(err, "tag command should succeed")
 
 	// Check output contains success message with custom prefix
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'release-2.0.0'", "Should contain success message with custom prefix")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_CustomMessage() {
+func (suite *TagTestSuite) TestTagCommand_CustomMessage() {
 	// Create test files
 	suite.createTestFiles("1.5.0")
 
@@ -177,18 +177,18 @@ func (suite *CommitTestSuite) TestCommitCommand_CustomMessage() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"commit", "--message", "Custom release message"})
+	rootCmd.SetArgs([]string{"tag", "--message", "Custom release message"})
 
-	// Execute the commit command
+	// Execute the tag command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "commit command should succeed")
+	suite.Require().NoError(err, "tag command should succeed")
 
 	// Check output contains success message
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'v1.5.0'", "Should contain success message")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_NoVCS() {
+func (suite *TagTestSuite) TestTagCommand_NoVCS() {
 	// Create test files
 	suite.createTestFiles("1.0.0")
 
@@ -198,14 +198,14 @@ func (suite *CommitTestSuite) TestCommitCommand_NoVCS() {
 	// Capture stderr
 	var buf bytes.Buffer
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"commit"})
+	rootCmd.SetArgs([]string{"tag"})
 
-	// Execute the commit command - should fail
+	// Execute the tag command - should fail
 	err := rootCmd.Execute()
-	suite.Error(err, "Expected commit command to fail when no VCS is available")
+	suite.Error(err, "Expected tag command to fail when no VCS is available")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_DirtyWorkingDirectory() {
+func (suite *TagTestSuite) TestTagCommand_DirtyWorkingDirectory() {
 	// Create test files
 	suite.createTestFiles("1.0.0")
 
@@ -221,14 +221,14 @@ func (suite *CommitTestSuite) TestCommitCommand_DirtyWorkingDirectory() {
 	// Capture stderr
 	var buf bytes.Buffer
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"commit"})
+	rootCmd.SetArgs([]string{"tag"})
 
-	// Execute the commit command - should fail
+	// Execute the tag command - should fail
 	err := rootCmd.Execute()
-	suite.Error(err, "Expected commit command to fail when working directory is dirty")
+	suite.Error(err, "Expected tag command to fail when working directory is dirty")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_TagExists_NoForce() {
+func (suite *TagTestSuite) TestTagCommand_TagExists_NoForce() {
 	// Create test files
 	suite.createTestFiles("1.0.0")
 
@@ -246,14 +246,14 @@ func (suite *CommitTestSuite) TestCommitCommand_TagExists_NoForce() {
 	// Capture stderr
 	var buf bytes.Buffer
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"commit"})
+	rootCmd.SetArgs([]string{"tag"})
 
-	// Execute the commit command - should fail
+	// Execute the tag command - should fail
 	err := rootCmd.Execute()
-	suite.Error(err, "Expected commit command to fail when tag exists and force is not used")
+	suite.Error(err, "Expected tag command to fail when tag exists and force is not used")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_TagExists_WithForce() {
+func (suite *TagTestSuite) TestTagCommand_TagExists_WithForce() {
 	// Create test files
 	suite.createTestFiles("1.0.0")
 
@@ -272,18 +272,18 @@ func (suite *CommitTestSuite) TestCommitCommand_TagExists_WithForce() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"commit", "--force"})
+	rootCmd.SetArgs([]string{"tag", "--force"})
 
-	// Execute the commit command
+	// Execute the tag command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "commit command should succeed with force flag")
+	suite.Require().NoError(err, "tag command should succeed with force flag")
 
 	// Check output contains success message
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'v1.0.0'", "Should contain success message")
 }
 
-func (suite *CommitTestSuite) TestCommitCommand_NoVersionFile() {
+func (suite *TagTestSuite) TestTagCommand_NoVersionFile() {
 	// Create only config file (no VERSION file)
 	configContent := `prefix: ""
 metadata:
@@ -311,18 +311,18 @@ logging:
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"commit"})
+	rootCmd.SetArgs([]string{"tag"})
 
-	// Execute the commit command - should succeed with default version
+	// Execute the tag command - should succeed with default version
 	err = rootCmd.Execute()
-	suite.Require().NoError(err, "commit command should succeed with default version")
+	suite.Require().NoError(err, "tag command should succeed with default version")
 
 	// Check output contains success message with default version
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'v0.0.0' for version 0.0.0", "Should contain success message with default version")
 }
 
-// TestCommitTestSuite runs the commit test suite
-func TestCommitTestSuite(t *testing.T) {
-	suite.Run(t, new(CommitTestSuite))
+// TestTagTestSuite runs the tag test suite
+func TestTagTestSuite(t *testing.T) {
+	suite.Run(t, new(TagTestSuite))
 }
