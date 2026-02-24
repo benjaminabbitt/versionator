@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cbroglie/mustache"
@@ -278,7 +279,7 @@ func formatBuildTime() formattedBuildTime {
 	}
 }
 
-// getVCSInfo retrieves all VCS information
+// getVCSInfo retrieves all VCS information concurrently
 // Returns empty/zero values if not in a VCS repository
 func getVCSInfo() VCSInfo {
 	info := VCSInfo{CommitsSinceTag: -1} // -1 indicates no tags
@@ -288,56 +289,87 @@ func getVCSInfo() VCSInfo {
 		return info
 	}
 
-	// Get full identifier (40 chars for git)
-	if id, err := activeVCS.GetVCSIdentifier(40); err == nil {
-		info.Identifier = id
+	// Use a WaitGroup to gather VCS info concurrently
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	// Helper to run a VCS operation concurrently
+	gather := func(fn func()) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			fn()
+		}()
 	}
 
-	// Get short identifier (7 chars is common default)
-	if id, err := activeVCS.GetVCSIdentifier(7); err == nil {
-		info.IdentifierShort = id
-	}
-
-	// Get medium identifier (12 chars for Go-like versions)
-	if id, err := activeVCS.GetVCSIdentifier(12); err == nil {
-		info.IdentifierMedium = id
-	}
+	// Get identifiers (all from same commit, but different lengths)
+	gather(func() {
+		if id, err := activeVCS.GetVCSIdentifier(40); err == nil {
+			mu.Lock()
+			info.Identifier = id
+			info.IdentifierShort = id[:min(7, len(id))]
+			info.IdentifierMedium = id[:min(12, len(id))]
+			mu.Unlock()
+		}
+	})
 
 	// Get branch name
-	if branch, err := activeVCS.GetBranchName(); err == nil {
-		info.BranchName = branch
-	}
+	gather(func() {
+		if branch, err := activeVCS.GetBranchName(); err == nil {
+			mu.Lock()
+			info.BranchName = branch
+			mu.Unlock()
+		}
+	})
 
 	// Get commit date
-	if date, err := activeVCS.GetCommitDate(); err == nil {
-		info.CommitDate = date
-	}
+	gather(func() {
+		if date, err := activeVCS.GetCommitDate(); err == nil {
+			mu.Lock()
+			info.CommitDate = date
+			mu.Unlock()
+		}
+	})
 
-	// Get commits since tag
-	if count, err := activeVCS.GetCommitsSinceTag(); err == nil {
-		info.CommitsSinceTag = count
-	}
+	// Get commits since tag (this also gives us VersionSourceHash via cached TagInfo)
+	gather(func() {
+		if count, err := activeVCS.GetCommitsSinceTag(); err == nil {
+			mu.Lock()
+			info.CommitsSinceTag = count
+			mu.Unlock()
+		}
+		// Get version source hash (uses same cached TagInfo)
+		if hash, err := activeVCS.GetLastTagCommit(); err == nil {
+			mu.Lock()
+			info.VersionSourceHash = hash
+			mu.Unlock()
+		}
+	})
 
 	// Get uncommitted changes count
-	if count, err := activeVCS.GetUncommittedChanges(); err == nil {
-		info.UncommittedChanges = count
-	}
+	gather(func() {
+		if count, err := activeVCS.GetUncommittedChanges(); err == nil {
+			mu.Lock()
+			info.UncommittedChanges = count
+			mu.Unlock()
+		}
+	})
 
-	// Get version source hash (last tag's commit)
-	if hash, err := activeVCS.GetLastTagCommit(); err == nil {
-		info.VersionSourceHash = hash
-	}
+	// Get commit author info
+	gather(func() {
+		if author, err := activeVCS.GetCommitAuthor(); err == nil {
+			mu.Lock()
+			info.CommitAuthor = author
+			mu.Unlock()
+		}
+		if email, err := activeVCS.GetCommitAuthorEmail(); err == nil {
+			mu.Lock()
+			info.CommitAuthorEmail = email
+			mu.Unlock()
+		}
+	})
 
-	// Get commit author
-	if author, err := activeVCS.GetCommitAuthor(); err == nil {
-		info.CommitAuthor = author
-	}
-
-	// Get commit author email
-	if email, err := activeVCS.GetCommitAuthorEmail(); err == nil {
-		info.CommitAuthorEmail = email
-	}
-
+	wg.Wait()
 	return info
 }
 

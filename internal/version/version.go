@@ -108,20 +108,58 @@ func Parse(version string) Version {
 	return v
 }
 
-// getVersionPath returns the path to the VERSION file
-func getVersionPath() (string, error) {
-	activeVCS := vcs.GetActiveVCS()
-	if activeVCS != nil {
-		root, err := activeVCS.GetRepositoryRoot()
-		if err == nil {
-			return filepath.Join(root, versionFile), nil
+// findVersionFile walks up from startPath looking for a VERSION file
+// Stops at stopPath (exclusive) or filesystem root
+// Returns empty string if not found
+func findVersionFile(startPath, stopPath string) string {
+	currentPath := startPath
+
+	for {
+		versionPath := filepath.Join(currentPath, versionFile)
+		if _, err := os.Stat(versionPath); err == nil {
+			return versionPath
 		}
+
+		// Stop if we've reached the stop path (VCS root) or filesystem root
+		parentPath := filepath.Dir(currentPath)
+		if parentPath == currentPath {
+			// Reached filesystem root
+			break
+		}
+		if stopPath != "" && currentPath == stopPath {
+			// Reached VCS root without finding VERSION
+			break
+		}
+		currentPath = parentPath
 	}
 
+	return ""
+}
+
+// getVersionPath returns the path to the VERSION file
+// Walks up from cwd looking for an existing VERSION file
+// If not found, returns path in cwd (for creating new VERSION)
+func getVersionPath() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current directory: %w", err)
 	}
+
+	// Determine stop path (VCS root if in a repo, otherwise empty = walk to filesystem root)
+	var stopPath string
+	activeVCS := vcs.GetActiveVCS()
+	if activeVCS != nil {
+		if root, err := activeVCS.GetRepositoryRoot(); err == nil {
+			stopPath = root
+		}
+	}
+
+	// Walk up looking for VERSION file
+	if found := findVersionFile(cwd, stopPath); found != "" {
+		return found, nil
+	}
+
+	// Not found - return path in cwd for creating new VERSION
 	return filepath.Join(cwd, versionFile), nil
 }
 

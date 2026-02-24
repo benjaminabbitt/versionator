@@ -20,9 +20,22 @@ import (
 // This is a standard Go pattern (similar to io.EOF) for signaling iteration completion
 var errStopIteration = errors.New("stop iteration")
 
+// DefaultMaxCommitDepth is the maximum number of commits to walk when searching for tags
+const DefaultMaxCommitDepth = 10000
+
 // GitVersionControlSystem implements VersionControlSystem for Git
 type GitVersionControlSystem struct {
-	repoRoot string
+	repoRoot   string
+	repo       *git.Repository // cached repository
+	tagInfo    *TagInfo        // cached tag information
+	tagInfoErr error           // cached error from tag info fetch
+}
+
+// TagInfo holds pre-computed tag-related information from a single walk
+type TagInfo struct {
+	CommitsSinceTag   int    // -1 if no tags exist
+	LastTagName       string // empty if no tags
+	LastTagCommitHash string // empty if no tags
 }
 
 // NewGitVCS creates a new GitVersionControlSystem
@@ -186,9 +199,14 @@ func (g *GitVersionControlSystem) TagExists(tagName string) (bool, error) {
 	err = tags.ForEach(func(tag *plumbing.Reference) error {
 		if tag.Name().Short() == tagName {
 			exists = true
+			return errStopIteration // Early exit once found
 		}
 		return nil
 	})
+
+	if errors.Is(err, errStopIteration) {
+		return true, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("failed to iterate tags: %w", err)
 	}
@@ -240,74 +258,11 @@ func (g *GitVersionControlSystem) GetCommitDate() (time.Time, error) {
 // GetCommitsSinceTag returns the number of commits since the most recent tag
 // Returns 0 if on a tagged commit, -1 if no tags exist
 func (g *GitVersionControlSystem) GetCommitsSinceTag() (int, error) {
-	repo, err := g.openRepository()
+	info, err := g.getTagInfo()
 	if err != nil {
 		return 0, err
 	}
-
-	// Get HEAD commit
-	ref, err := repo.Head()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get HEAD reference: %w", err)
-	}
-
-	headCommit, err := repo.CommitObject(ref.Hash())
-	if err != nil {
-		return 0, fmt.Errorf("failed to get commit object: %w", err)
-	}
-
-	// Build a map of tag hashes for quick lookup
-	tagHashes := make(map[plumbing.Hash]bool)
-	tags, err := repo.Tags()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get tags: %w", err)
-	}
-
-	err = tags.ForEach(func(ref *plumbing.Reference) error {
-		// Handle both lightweight and annotated tags
-		tagHashes[ref.Hash()] = true
-
-		// For annotated tags, also add the target commit hash
-		tagObj, err := repo.TagObject(ref.Hash())
-		if err == nil {
-			tagHashes[tagObj.Target] = true
-		}
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("failed to iterate tags: %w", err)
-	}
-
-	// No tags exist
-	if len(tagHashes) == 0 {
-		return -1, nil
-	}
-
-	// Walk commits from HEAD until we find a tagged commit
-	count := 0
-	commitIter, err := repo.Log(&git.LogOptions{From: headCommit.Hash})
-	if err != nil {
-		return 0, fmt.Errorf("failed to get commit log: %w", err)
-	}
-
-	err = commitIter.ForEach(func(c *object.Commit) error {
-		if tagHashes[c.Hash] {
-			return errStopIteration // Use sentinel error to break iteration
-		}
-		count++
-		return nil
-	})
-
-	// If we broke out because we found a tag, return the count
-	if errors.Is(err, errStopIteration) {
-		return count, nil
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to iterate commits: %w", err)
-	}
-
-	// No tagged ancestor found (shouldn't happen if tags exist)
-	return count, nil
+	return info.CommitsSinceTag, nil
 }
 
 // GetUncommittedChanges returns the count of uncommitted changes (staged + unstaged + untracked)
@@ -333,142 +288,20 @@ func (g *GitVersionControlSystem) GetUncommittedChanges() (int, error) {
 // GetLastTag returns the most recent semver tag
 // Returns empty string if no tags exist
 func (g *GitVersionControlSystem) GetLastTag() (string, error) {
-	repo, err := g.openRepository()
+	info, err := g.getTagInfo()
 	if err != nil {
 		return "", err
 	}
-
-	// Get HEAD commit
-	ref, err := repo.Head()
-	if err != nil {
-		return "", fmt.Errorf("failed to get HEAD reference: %w", err)
-	}
-
-	headCommit, err := repo.CommitObject(ref.Hash())
-	if err != nil {
-		return "", fmt.Errorf("failed to get commit object: %w", err)
-	}
-
-	// Build a map of commit hash -> tag name
-	tagMap := make(map[plumbing.Hash]string)
-	tags, err := repo.Tags()
-	if err != nil {
-		return "", fmt.Errorf("failed to get tags: %w", err)
-	}
-
-	err = tags.ForEach(func(ref *plumbing.Reference) error {
-		tagName := ref.Name().Short()
-
-		// For annotated tags, get the target commit
-		tagObj, err := repo.TagObject(ref.Hash())
-		if err == nil {
-			tagMap[tagObj.Target] = tagName
-		} else {
-			// Lightweight tag - ref.Hash() is the commit
-			tagMap[ref.Hash()] = tagName
-		}
-		return nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to iterate tags: %w", err)
-	}
-
-	if len(tagMap) == 0 {
-		return "", nil
-	}
-
-	// Walk commits from HEAD until we find a tagged commit
-	commitIter, err := repo.Log(&git.LogOptions{From: headCommit.Hash})
-	if err != nil {
-		return "", fmt.Errorf("failed to get commit log: %w", err)
-	}
-
-	var lastTag string
-	err = commitIter.ForEach(func(c *object.Commit) error {
-		if tag, ok := tagMap[c.Hash]; ok {
-			lastTag = tag
-			return errStopIteration // Use sentinel error to break iteration
-		}
-		return nil
-	})
-
-	if errors.Is(err, errStopIteration) {
-		return lastTag, nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to iterate commits: %w", err)
-	}
-
-	return lastTag, nil
+	return info.LastTagName, nil
 }
 
 // GetLastTagCommit returns the SHA of the commit the last tag points to
 func (g *GitVersionControlSystem) GetLastTagCommit() (string, error) {
-	repo, err := g.openRepository()
+	info, err := g.getTagInfo()
 	if err != nil {
 		return "", err
 	}
-
-	// Get HEAD commit
-	ref, err := repo.Head()
-	if err != nil {
-		return "", fmt.Errorf("failed to get HEAD reference: %w", err)
-	}
-
-	headCommit, err := repo.CommitObject(ref.Hash())
-	if err != nil {
-		return "", fmt.Errorf("failed to get commit object: %w", err)
-	}
-
-	// Build a map of commit hash -> tag exists
-	tagCommits := make(map[plumbing.Hash]bool)
-	tags, err := repo.Tags()
-	if err != nil {
-		return "", fmt.Errorf("failed to get tags: %w", err)
-	}
-
-	err = tags.ForEach(func(ref *plumbing.Reference) error {
-		// For annotated tags, get the target commit
-		tagObj, err := repo.TagObject(ref.Hash())
-		if err == nil {
-			tagCommits[tagObj.Target] = true
-		} else {
-			// Lightweight tag
-			tagCommits[ref.Hash()] = true
-		}
-		return nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to iterate tags: %w", err)
-	}
-
-	if len(tagCommits) == 0 {
-		return "", nil
-	}
-
-	// Walk commits from HEAD until we find a tagged commit
-	commitIter, err := repo.Log(&git.LogOptions{From: headCommit.Hash})
-	if err != nil {
-		return "", fmt.Errorf("failed to get commit log: %w", err)
-	}
-
-	var lastTagCommit string
-	err = commitIter.ForEach(func(c *object.Commit) error {
-		if tagCommits[c.Hash] {
-			lastTagCommit = c.Hash.String()
-			return errStopIteration // Use sentinel error to break iteration
-		}
-		return nil
-	})
-
-	if errors.Is(err, errStopIteration) {
-		return lastTagCommit, nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to iterate commits: %w", err)
-	}
-
-	return lastTagCommit, nil
+	return info.LastTagCommitHash, nil
 }
 
 // GetCommitAuthor returns the name of the current commit's author
@@ -532,6 +365,11 @@ func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 }
 
 func (g *GitVersionControlSystem) openRepository() (*git.Repository, error) {
+	// Return cached repo if available
+	if g.repo != nil {
+		return g.repo, nil
+	}
+
 	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return nil, err
@@ -542,7 +380,109 @@ func (g *GitVersionControlSystem) openRepository() (*git.Repository, error) {
 		return nil, fmt.Errorf("failed to open git repository: %w", err)
 	}
 
+	// Cache for future calls
+	g.repo = repo
 	return repo, nil
+}
+
+// getTagInfo performs a single walk to gather all tag-related information
+// Results are cached for subsequent calls
+func (g *GitVersionControlSystem) getTagInfo() (*TagInfo, error) {
+	// Return cached result if available
+	if g.tagInfo != nil || g.tagInfoErr != nil {
+		return g.tagInfo, g.tagInfoErr
+	}
+
+	info, err := g.computeTagInfo()
+	g.tagInfo = info
+	g.tagInfoErr = err
+	return info, err
+}
+
+// computeTagInfo does the actual work of walking commits to find tag info
+func (g *GitVersionControlSystem) computeTagInfo() (*TagInfo, error) {
+	repo, err := g.openRepository()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get HEAD commit
+	ref, err := repo.Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	headCommit, err := repo.CommitObject(ref.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit object: %w", err)
+	}
+
+	// Build a map of commit hash -> tag name (for both lightweight and annotated tags)
+	tagMap := make(map[plumbing.Hash]string)
+	tags, err := repo.Tags()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags: %w", err)
+	}
+
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		tagName := ref.Name().Short()
+
+		// For annotated tags, get the target commit
+		tagObj, err := repo.TagObject(ref.Hash())
+		if err == nil {
+			tagMap[tagObj.Target] = tagName
+		} else {
+			// Lightweight tag - ref.Hash() is the commit
+			tagMap[ref.Hash()] = tagName
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate tags: %w", err)
+	}
+
+	// No tags exist
+	if len(tagMap) == 0 {
+		return &TagInfo{CommitsSinceTag: -1}, nil
+	}
+
+	// Walk commits from HEAD until we find a tagged commit (with depth limit)
+	commitIter, err := repo.Log(&git.LogOptions{From: headCommit.Hash})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit log: %w", err)
+	}
+
+	count := 0
+	var result *TagInfo
+
+	err = commitIter.ForEach(func(c *object.Commit) error {
+		if tagName, ok := tagMap[c.Hash]; ok {
+			result = &TagInfo{
+				CommitsSinceTag:   count,
+				LastTagName:       tagName,
+				LastTagCommitHash: c.Hash.String(),
+			}
+			return errStopIteration
+		}
+		count++
+
+		// Depth limit to avoid walking huge histories
+		if count >= DefaultMaxCommitDepth {
+			return errStopIteration
+		}
+		return nil
+	})
+
+	if result != nil {
+		return result, nil
+	}
+
+	// Hit depth limit or no tagged ancestor found
+	if errors.Is(err, errStopIteration) || err == nil {
+		return &TagInfo{CommitsSinceTag: count}, nil
+	}
+
+	return nil, fmt.Errorf("failed to iterate commits: %w", err)
 }
 
 // GetHashLength returns the configured hash length from config file or environment variable

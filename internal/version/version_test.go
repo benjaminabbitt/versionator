@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/benjaminabbitt/versionator/internal/vcs"
+	gitVCS "github.com/benjaminabbitt/versionator/internal/vcs/git"
 	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
 	"github.com/golang/mock/gomock"
 )
@@ -508,44 +509,112 @@ func TestDecrement_InvalidLevel(t *testing.T) {
 	}
 }
 
-func TestGetVersionJSONPath_WithVCS(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// Create mock VCS
-	mockVCS := mock.NewMockVersionControlSystem(ctrl)
-	mockVCS.EXPECT().Name().Return("mock-git-path").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return("/repo/root", nil).Times(1)
-
-	// Register the mock VCS
-	vcs.RegisterVCS(mockVCS)
-	defer vcs.UnregisterVCS("mock-git-path")
-
-	// Test getting version JSON path with VCS
-	path, err := getVersionPath()
+func TestGetVersionPath_WalksUpToFindVersionFile(t *testing.T) {
+	// Create temp directory structure: /tmp/root/subdir
+	rootDir := t.TempDir()
+	subDir := filepath.Join(rootDir, "subdir")
+	err := os.MkdirAll(subDir, 0755)
 	if err != nil {
-		t.Fatalf("Expected no error getting version file path, got: %v", err)
+		t.Fatalf("Failed to create subdir: %v", err)
 	}
 
-	expectedPath := filepath.Join("/repo/root", versionFile)
+	// Create VERSION file in root
+	versionPath := filepath.Join(rootDir, versionFile)
+	err = os.WriteFile(versionPath, []byte("1.0.0"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create VERSION file: %v", err)
+	}
+
+	// Change to subdir
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(subDir)
+
+	// Unregister any VCS to test pure walk-up behavior
+	vcs.UnregisterVCS("git")
+	defer func() {
+		// Re-register git VCS after test
+		vcs.RegisterVCS(gitVCS.NewGitVCS())
+	}()
+
+	// Should find VERSION in parent directory
+	path, err := getVersionPath()
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if path != versionPath {
+		t.Errorf("Expected to find VERSION at '%s', got '%s'", versionPath, path)
+	}
+}
+
+func TestGetVersionPath_ReturnsCurrentDirWhenNotFound(t *testing.T) {
+	// Create isolated temp directory with no VERSION file
+	tempDir := t.TempDir()
+
+	// Change to temp dir
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Unregister any VCS
+	vcs.UnregisterVCS("git")
+	defer func() {
+		vcs.RegisterVCS(gitVCS.NewGitVCS())
+	}()
+
+	// Should return path in current directory (for creating new VERSION)
+	path, err := getVersionPath()
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	expectedPath := filepath.Join(tempDir, versionFile)
 	if path != expectedPath {
 		t.Errorf("Expected path '%s', got '%s'", expectedPath, path)
 	}
 }
 
-func TestGetVersionJSONPath_NoVCS(t *testing.T) {
-	// Test getting version JSON path without VCS
-	// This test assumes no active VCS is registered that would interfere
-	path, err := getVersionPath()
+func TestGetVersionPath_PrefersCloserVersionFile(t *testing.T) {
+	// Create temp directory structure: /tmp/root/subdir with VERSION in both
+	rootDir := t.TempDir()
+	subDir := filepath.Join(rootDir, "subdir")
+	err := os.MkdirAll(subDir, 0755)
 	if err != nil {
-		t.Fatalf("Expected no error getting version file path, got: %v", err)
+		t.Fatalf("Failed to create subdir: %v", err)
 	}
 
-	cwd, _ := os.Getwd()
-	expectedPath := filepath.Join(cwd, versionFile)
-	if path != expectedPath {
-		t.Errorf("Expected path '%s', got '%s'", expectedPath, path)
+	// Create VERSION files in both directories
+	rootVersionPath := filepath.Join(rootDir, versionFile)
+	subVersionPath := filepath.Join(subDir, versionFile)
+	err = os.WriteFile(rootVersionPath, []byte("1.0.0"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create root VERSION file: %v", err)
+	}
+	err = os.WriteFile(subVersionPath, []byte("2.0.0"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create sub VERSION file: %v", err)
+	}
+
+	// Change to subdir
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(subDir)
+
+	// Unregister any VCS
+	vcs.UnregisterVCS("git")
+	defer func() {
+		vcs.RegisterVCS(gitVCS.NewGitVCS())
+	}()
+
+	// Should find VERSION in current directory (closest)
+	path, err := getVersionPath()
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if path != subVersionPath {
+		t.Errorf("Expected to find closer VERSION at '%s', got '%s'", subVersionPath, path)
 	}
 }
 
