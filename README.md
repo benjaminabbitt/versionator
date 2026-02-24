@@ -270,6 +270,41 @@ Examples:
 
 **Note**: Custom variables are stored in `.versionator.yaml` config file, not in the VERSION file.
 
+### VERSION File Discovery (Monorepo Support)
+
+Versionator walks up from the current directory looking for a VERSION file, enabling nested projects with independent versions:
+
+```
+myproject/
+├── VERSION              # 1.0.0 (root project)
+├── packages/
+│   ├── VERSION          # 2.0.0 (packages workspace)
+│   └── core/
+│       ├── VERSION      # 3.0.0 (core package)
+│       └── src/
+└── apps/
+    └── web/             # No VERSION - uses packages/VERSION (2.0.0)
+```
+
+```bash
+# From myproject/
+versionator version          # 1.0.0
+
+# From myproject/packages/core/
+versionator version          # 3.0.0
+
+# From myproject/packages/core/src/
+versionator version          # 3.0.0 (walks up to packages/core/)
+
+# From myproject/apps/web/
+versionator version          # Creates new VERSION with 0.0.0
+```
+
+This enables:
+- **Monorepos**: Each package can have its own version
+- **Workspaces**: Shared VERSION for related packages
+- **Isolation**: Subprojects don't affect parent versions
+
 ### Managing Pre-release and Metadata
 
 ```bash

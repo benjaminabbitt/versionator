@@ -87,9 +87,12 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^a template file "([^"]*)" with content "([^"]*)"$`, aFileWithContent) // Same implementation
 	sc.Step(`^a config file with prerelease enabled and template "([^"]*)"$`, aConfigFileWithPrereleaseTemplate)
 	sc.Step(`^a config file with:$`, aConfigFileWithDocString)
+	sc.Step(`^a subdirectory "([^"]*)"$`, aSubdirectory)
+	sc.Step(`^a VERSION file with version "([^"]*)" in subdirectory "([^"]*)"$`, aVersionFileInSubdirectory)
 
 	// Action steps
 	sc.Step(`^I run "([^"]*)"$`, iRun)
+	sc.Step(`^I run "([^"]*)" in subdirectory "([^"]*)"$`, iRunInSubdirectory)
 	sc.Step(`^I commit a file "([^"]*)" with content "([^"]*)"$`, iCommitAFileWithContent)
 	sc.Step(`^I commit the VERSION changes$`, iCommitTheVersionChanges)
 	sc.Step(`^I create (\d+) commits with message prefix "([^"]*)"$`, iCreateCommitsWithMessagePrefix)
@@ -332,9 +335,37 @@ func aConfigFileWithDocString(doc *godog.DocString) error {
 	return os.WriteFile(".versionator.yaml", []byte(doc.Content), 0644)
 }
 
+func aSubdirectory(subdir string) error {
+	return os.MkdirAll(subdir, 0755)
+}
+
+func aVersionFileInSubdirectory(version, subdir string) error {
+	// Ensure subdirectory exists
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		return err
+	}
+	versionPath := filepath.Join(subdir, "VERSION")
+	if err := os.WriteFile(versionPath, []byte(version+"\n"), 0644); err != nil {
+		return err
+	}
+	// Commit to keep git clean
+	if err := runCommand("git", "add", versionPath); err != nil {
+		return err
+	}
+	return runCommand("git", "commit", "-m", fmt.Sprintf("Add VERSION in %s", subdir))
+}
+
 // Action steps
 
 func iRun(command string) error {
+	return iRunInDir(command, ctx.workDir)
+}
+
+func iRunInSubdirectory(command, subdir string) error {
+	return iRunInDir(command, filepath.Join(ctx.workDir, subdir))
+}
+
+func iRunInDir(command, dir string) error {
 	// Parse command with proper quote handling
 	parts, err := parseCommand(command)
 	if err != nil {
@@ -355,7 +386,7 @@ func iRun(command string) error {
 	}
 
 	cmd := exec.Command(parts[0], parts[1:]...)
-	cmd.Dir = ctx.workDir
+	cmd.Dir = dir
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
