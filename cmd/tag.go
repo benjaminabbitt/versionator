@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/version"
 
 	"github.com/spf13/cobra"
 )
 
-var commitCmd = &cobra.Command{
-	Use:   "commit",
-	Short: "Create a git tag for the current version",
+var tagCmd = &cobra.Command{
+	Use:   "tag",
+	Short: "Create git tag for current version",
 	Long: `Create a git tag for the current version after ensuring the working directory is clean.
 
 This command will:
@@ -97,11 +98,11 @@ The command will fail if there are uncommitted changes or if the tag already exi
 }
 
 func init() {
-	rootCmd.AddCommand(commitCmd)
+	rootCmd.AddCommand(tagCmd)
 
 	// Add flags
-	commitCmd.Flags().StringP("message", "m", "", "Tag message (default: 'Release <version>')")
-	commitCmd.Flags().StringP("prefix", "p", "v", "Tag prefix (default: 'v')")
-	commitCmd.Flags().BoolP("force", "f", false, "Force creation even if tag exists")
-	commitCmd.Flags().BoolP("verbose", "v", false, "Show additional information")
+	tagCmd.Flags().StringP("message", "m", "", "Tag message (default: 'Release <version>')")
+	tagCmd.Flags().StringP("prefix", "p", "v", "Tag prefix (default: 'v')")
+	tagCmd.Flags().BoolP("force", "f", false, "Force creation even if tag exists")
+	tagCmd.Flags().BoolP("verbose", "v", false, "Show additional information")
 }

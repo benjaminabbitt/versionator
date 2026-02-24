@@ -109,3 +109,48 @@ Feature: Version Management
     When I run "versionator patch increment"
     And I run "versionator version"
     Then the output should be "1.0.1"
+
+  # Decrement scenarios
+  Scenario: Decrement major version
+    Given a VERSION file with version "2.0.0"
+    When I run "versionator major decrement"
+    And I run "versionator version"
+    Then the output should be "1.0.0"
+
+  Scenario: Decrement minor version
+    Given a VERSION file with version "1.5.0"
+    When I run "versionator minor decrement"
+    And I run "versionator version"
+    Then the output should be "1.4.0"
+
+  Scenario: Decrement patch version
+    Given a VERSION file with version "1.0.5"
+    When I run "versionator patch decrement"
+    And I run "versionator version"
+    Then the output should be "1.0.4"
+
+  Scenario: Decrement using short alias
+    Given a VERSION file with version "1.0.5"
+    When I run "versionator patch dec"
+    And I run "versionator version"
+    Then the output should be "1.0.4"
+
+  Scenario: Cannot decrement below zero
+    Given a VERSION file with version "0.0.0"
+    When I run "versionator major decrement"
+    Then the exit code should not be 0
+
+  # Prefix enable/status scenarios
+  Scenario: Enable prefix with default value
+    When I run "versionator prefix enable"
+    Then the VERSION should have prefix "v"
+
+  Scenario: Prefix status when enabled
+    When I run "versionator prefix set release-"
+    And I run "versionator prefix status"
+    Then the output should contain "ENABLED"
+    And the output should contain "release-"
+
+  Scenario: Prefix status when disabled
+    When I run "versionator prefix status"
+    Then the output should contain "DISABLED"

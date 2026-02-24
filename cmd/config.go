@@ -12,7 +12,7 @@ var configDumpOutput string
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Configuration management commands",
+	Short: "Manage configuration",
 	Long:  `Commands for managing versionator configuration files.`,
 }
 

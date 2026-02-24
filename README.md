@@ -77,6 +77,53 @@ versionator version
 
 All binaries are statically compiled - no dependencies required.
 
+## Shell Completion
+
+Generate shell completion scripts for tab-completion support:
+
+### Bash
+
+```bash
+# Load completions for current session
+source <(versionator completion bash)
+
+# Install permanently (Linux)
+versionator completion bash > /etc/bash_completion.d/versionator
+
+# Install permanently (macOS with Homebrew)
+versionator completion bash > $(brew --prefix)/etc/bash_completion.d/versionator
+```
+
+### Zsh
+
+```zsh
+# Enable completion (if not already)
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+# Install completion
+versionator completion zsh > "${fpath[1]}/_versionator"
+```
+
+### Fish
+
+```fish
+# Load for current session
+versionator completion fish | source
+
+# Install permanently
+versionator completion fish > ~/.config/fish/completions/versionator.fish
+```
+
+### PowerShell
+
+```powershell
+# Load for current session
+versionator completion powershell | Out-String | Invoke-Expression
+
+# Install permanently (add to profile)
+versionator completion powershell >> $PROFILE
+```
+
 ## Quick Start
 
 ```bash
@@ -91,8 +138,12 @@ versionator patch increment   # 1.1.0 -> 1.1.1
 # Decrement versions
 versionator patch decrement   # 1.1.1 -> 1.1.0
 
+# Short aliases work too
+versionator patch inc         # increment
+versionator minor dec         # decrement
+
 # Create git tag for current version
-versionator commit            # Creates tag v1.1.0
+versionator tag               # Creates tag v1.1.0
 
 # Full SemVer 2.0.0 with pre-release and metadata
 versionator version \
@@ -110,7 +161,7 @@ Versionator can automatically create git tags for your versions:
 ```bash
 # Bump version and tag in one workflow
 versionator patch increment
-versionator commit
+versionator tag
 
 # This creates an annotated git tag (e.g., v1.0.1) pointing to HEAD
 # Push tags to remote
@@ -133,9 +184,12 @@ Available Commands:
   prefix      Manage version prefix in VERSION file
   prerelease  Manage pre-release identifier in VERSION file
   metadata    Manage build metadata in VERSION file
-  config      Configuration management commands
+  config      Manage configuration
+  custom      Manage custom key-value pairs
   vars        Show all template variables and their values
-  commit      Create git tag for current version
+  tag         Create git tag for current version
+  completion  Generate shell completion scripts
+  schema      Generate machine-readable CLI schema (JSON)
   help        Help about any command
 
 Global Flags:
@@ -156,6 +210,45 @@ Flags:
 ```
 
 **Important**: Use `=` syntax when providing values: `--prefix=release-`
+
+### Schema Command (AI/Tooling Integration)
+
+Generate a JSON schema describing all commands, flags, and template variables:
+
+```bash
+# Print schema to stdout
+versionator schema
+
+# Write schema to file
+versionator schema --output cli-schema.json
+```
+
+The schema includes:
+- All commands and subcommands with descriptions
+- Flag definitions with types and defaults
+- Template variable documentation grouped by category
+- Command aliases and usage patterns
+
+Use cases:
+- **AI assistants**: Provide context about available commands
+- **IDE plugins**: Enable intelligent completion
+- **Documentation**: Auto-generate command references
+- **CI/CD**: Validate command usage in scripts
+
+### Status Subcommands
+
+Check the current state of prefix, prerelease, and metadata:
+
+```bash
+# Check prefix status
+versionator prefix status      # Shows ENABLED/DISABLED and current value
+
+# Check prerelease status
+versionator prerelease status  # Shows ENABLED/DISABLED and current value
+
+# Check metadata status
+versionator metadata status    # Shows ENABLED/DISABLED and current value
+```
 
 ## VERSION File Format
 
@@ -316,7 +409,9 @@ versionator emit python --output mypackage/_version.py
 # Generate with custom template
 versionator emit --template-file version.py.tmpl --output _version.py
 
-# Supported formats: python, json, js, ruby, rust, go
+# Supported formats (17 languages):
+# python, json, yaml, go, c, c-header, cpp, cpp-header,
+# js, ts, java, kotlin, csharp, php, swift, ruby, rust
 ```
 
 Add the generated file to `.gitignore` to avoid polluting source control.
