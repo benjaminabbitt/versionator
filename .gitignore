@@ -1,8 +1,8 @@
 # Build artifacts
 bin/**/*
 bin/
-versionator
-versionator.exe
+/versionator
+/versionator.exe
 .devcontainer/.env
 
 #nul file is being created by Jetbrains or something else.  Deleted it, resbooted, deleted it, and it keeps coming back with *only* Goland running.
