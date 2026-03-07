@@ -4,6 +4,7 @@
     "dockerfile": "Dockerfile",
     "context": "..",
   },
+  "workspaceFolder": "/workspaces/versionator",
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
@@ -47,7 +48,6 @@
   "postCreateCommand": "just fix-perms && pwd && go mod download && just build",
   "remoteUser": "developer",
   "mounts": [
-    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
     "source=versionator-gomod-cache,target=/go/pkg/mod,type=volume"
   ],
   "containerEnv": {
