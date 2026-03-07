@@ -8,6 +8,8 @@ on:
 
 jobs:
   build-and-test:
+    # Skip if commit message contains [skip ci] (prevents infinite loop on version bump)
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
 
     steps:
@@ -100,14 +102,62 @@ jobs:
 
         echo "Integration test passed!"
 
-  release:
+  mutation-test:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    needs: [build-and-test, integration-test]
+    needs: integration-test
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install go-mutesting
+      run: go install github.com/zimmski/go-mutesting/cmd/go-mutesting@latest
+
+    - name: Run mutation tests
+      run: |
+        # Run mutation tests on core packages
+        go-mutesting ./internal/version/... ./internal/versionator/... 2>&1 | tee mutation-report.txt
+
+        # Extract mutation score (format: "The mutation score is 0.XXXX")
+        SCORE=$(grep -oP 'mutation score is \K[0-9.]+' mutation-report.txt || echo "0")
+        THRESHOLD=0.60
+
+        echo "Mutation score: $SCORE (threshold: $THRESHOLD)"
+
+        # Compare using bc for float comparison
+        if (( $(echo "$SCORE < $THRESHOLD" | bc -l) )); then
+          echo "::error::Mutation score $SCORE is below threshold $THRESHOLD"
+          exit 1
+        fi
+
+        echo "::notice::Mutation score $SCORE meets threshold $THRESHOLD"
+
+    - name: Upload mutation report
+      uses: actions/upload-artifact@v4
+      with:
+        name: mutation-report
+        path: mutation-report.txt
+        retention-days: 30
+
+  bump-and-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    needs: mutation-test
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4
@@ -115,25 +165,41 @@ jobs:
         name: versionator-binaries
         path: bin/
 
-    - name: Create release assets
+    - name: Bump version and release
       run: |
-        # Create release directory
-        mkdir -p release
+        chmod +x bin/versionator-linux-amd64
 
-        # Copy and rename binaries
-        cp bin/versionator-linux-amd64 release/versionator-linux-amd64
-        cp bin/versionator-darwin-amd64 release/versionator-darwin-amd64
-        cp bin/versionator-darwin-arm64 release/versionator-darwin-arm64
-        cp bin/versionator-windows-amd64.exe release/versionator-windows-amd64.exe
+        # Get current version
+        CURRENT=$(cat VERSION)
 
-        # Create checksums
-        cd release
-        sha256sum * > checksums.txt
-        ls -la
+        # Bump patch version using versionator itself (dogfooding)
+        ./bin/versionator-linux-amd64 patch increment
 
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: versionator-release
-        path: release/
-        retention-days: 90
+        # Get new version
+        NEW=$(cat VERSION)
+
+        echo "Version bumped: $CURRENT -> $NEW"
+
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Commit version bump
+        git add VERSION
+        git commit -m "chore: bump version to $NEW [skip ci]"
+
+        # Create release branch
+        git checkout -b "release/v$NEW"
+
+        # Push release branch
+        git push origin "release/v$NEW"
+
+        # Switch back to master and push
+        git checkout master
+        git push origin master
+
+        # Create tag using versionator (triggers release.yml)
+        ./bin/versionator-linux-amd64 tag --message "Release v$NEW"
+        git push origin "v$NEW"
+
+        echo "::notice::Released v$NEW - release.yml will handle the full release"
