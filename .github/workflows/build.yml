@@ -155,6 +155,7 @@ jobs:
     needs: mutation-test
     permissions:
       contents: write
+      actions: write  # Required to trigger release workflow
 
     steps:
     - name: Checkout code
@@ -202,12 +203,15 @@ jobs:
         git checkout master
         git push origin master
 
-        # Create tag using versionator (triggers release.yml)
-        # Use --prefix="" since VERSION already has 'v' prefix
+        # Create tag using versionator (use --prefix="" since VERSION already has 'v' prefix)
         if git rev-parse "$NEW" >/dev/null 2>&1; then
           echo "::warning::Tag $NEW already exists, skipping release"
         else
           ./bin/versionator-linux-amd64 tag --prefix="" --message "Release $NEW"
           git push origin "$NEW"
-          echo "::notice::Released $NEW - release.yml will handle the full release"
+
+          # Trigger release workflow via workflow_dispatch
+          # (tag push doesn't trigger workflows when using GITHUB_TOKEN)
+          gh workflow run release.yml -f tag="$NEW"
+          echo "::notice::Released $NEW - triggered release.yml workflow"
         fi
