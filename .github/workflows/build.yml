@@ -192,18 +192,22 @@ jobs:
         git add VERSION
         git commit -m "chore: bump version to $NEW [skip ci]"
 
-        # Create release branch
-        git checkout -b "release/v$NEW"
+        # Create release branch (VERSION already has 'v' prefix)
+        git checkout -b "release/$NEW"
 
         # Push release branch
-        git push origin "release/v$NEW"
+        git push origin "release/$NEW"
 
         # Switch back to master and push
         git checkout master
         git push origin master
 
         # Create tag using versionator (triggers release.yml)
-        ./bin/versionator-linux-amd64 tag --message "Release v$NEW"
-        git push origin "v$NEW"
-
-        echo "::notice::Released v$NEW - release.yml will handle the full release"
+        # Use --prefix="" since VERSION already has 'v' prefix
+        if git rev-parse "$NEW" >/dev/null 2>&1; then
+          echo "::warning::Tag $NEW already exists, skipping release"
+        else
+          ./bin/versionator-linux-amd64 tag --prefix="" --message "Release $NEW"
+          git push origin "$NEW"
+          echo "::notice::Released $NEW - release.yml will handle the full release"
+        fi
