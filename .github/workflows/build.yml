@@ -30,14 +30,15 @@ jobs:
           # Run initialization
           just init
 
-          # Run tests
+          # Build application FIRST (needed for acceptance tests)
+          just build
+
+          # Run tests (including acceptance tests that need the binary)
+          export VERSIONATOR_PROJECT_ROOT=$(pwd)/bin
           just test-coverage
 
           # Run linting
           just lint
-
-          # Build application
-          just build
 
           # Build for multiple platforms
           just build-all
