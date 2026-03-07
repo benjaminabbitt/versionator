@@ -171,6 +171,8 @@ jobs:
         path: bin/
 
     - name: Bump version and release
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         chmod +x bin/versionator-linux-amd64
 
