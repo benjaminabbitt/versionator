@@ -10,17 +10,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var tagCmd = &cobra.Command{
-	Use:   "tag",
+var releaseCmd = &cobra.Command{
+	Use:   "release",
 	Short: "Create git tag and release branch for current version",
 	Long: `Create a git tag and release branch for the current version.
 
 This command will:
 1. Check that you're in a git repository
-2. Verify there are no uncommitted changes
-3. Get the current version
-4. Create a git tag with the version (prefixed with 'v')
-5. Create a release branch (e.g., 'release/v1.2.3') if enabled
+2. If only the VERSION file is dirty, commit it automatically
+3. Verify there are no other uncommitted changes
+4. Get the current version
+5. Create a git tag with the version (prefixed with 'v')
+6. Create a release branch (e.g., 'release/v1.2.3') if enabled
+
+This is the recommended workflow after bumping a version:
+  versionator patch increment
+  versionator release
 
 Release branch creation is enabled by default. Configure in .versionator.yaml:
   release:
@@ -29,22 +34,44 @@ Release branch creation is enabled by default. Configure in .versionator.yaml:
 
 Use --no-branch to skip branch creation for a single invocation.
 
-The command will fail if there are uncommitted changes or if the tag already exists.`,
+The command will fail if there are uncommitted changes (other than VERSION)
+or if the tag already exists.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get active VCS
-		vcs := vcs.GetActiveVCS()
-		if vcs == nil {
+		vcsImpl := vcs.GetActiveVCS()
+		if vcsImpl == nil {
 			return fmt.Errorf("not in a version control repository")
 		}
 
 		// Check if working directory is clean
-		clean, err := vcs.IsWorkingDirectoryClean()
+		clean, err := vcsImpl.IsWorkingDirectoryClean()
 		if err != nil {
-			return fmt.Errorf("error checking %s status: %w", vcs.Name(), err)
+			return fmt.Errorf("error checking %s status: %w", vcsImpl.Name(), err)
 		}
 
 		if !clean {
-			return fmt.Errorf("working directory is not clean. Please commit or stash your changes first")
+			// Check if only VERSION file is dirty
+			dirtyFiles, err := vcsImpl.GetDirtyFiles()
+			if err != nil {
+				return fmt.Errorf("error getting dirty files: %w", err)
+			}
+
+			// Only auto-commit if exactly VERSION file is dirty
+			if len(dirtyFiles) == 1 && dirtyFiles[0] == "VERSION" {
+				// Load version to get the version string for commit message
+				vd, err := version.Load()
+				if err != nil {
+					return fmt.Errorf("error loading version: %w", err)
+				}
+
+				commitMsg := fmt.Sprintf("Release %s", vd.String())
+				if err := vcsImpl.CommitFiles([]string{"VERSION"}, commitMsg); err != nil {
+					return fmt.Errorf("error committing VERSION file: %w", err)
+				}
+				cmd.Printf("Committed VERSION file: %s\n", commitMsg)
+			} else {
+				return fmt.Errorf("working directory is not clean. Please commit or stash your changes first (dirty files: %v)", dirtyFiles)
+			}
 		}
 
 		// Get current version data (includes prefix)
@@ -66,7 +93,7 @@ The command will fail if there are uncommitted changes or if the tag already exi
 		tagName := prefix + vd.String()
 
 		// Check if tag already exists
-		exists, err := vcs.TagExists(tagName)
+		exists, err := vcsImpl.TagExists(tagName)
 		if err != nil {
 			return fmt.Errorf("error checking if tag exists: %w", err)
 		}
@@ -85,11 +112,11 @@ The command will fail if there are uncommitted changes or if the tag already exi
 		}
 
 		// Create the tag
-		if err := vcs.CreateTag(tagName, message); err != nil {
+		if err := vcsImpl.CreateTag(tagName, message); err != nil {
 			return fmt.Errorf("error creating tag: %w", err)
 		}
 
-		cmd.Printf("Successfully created tag '%s' for version %s using %s\n", tagName, vd.String(), vcs.Name())
+		cmd.Printf("Successfully created tag '%s' for version %s using %s\n", tagName, vd.String(), vcsImpl.Name())
 
 		// Read config for release branch settings
 		cfg, err := config.ReadConfig()
@@ -105,7 +132,7 @@ The command will fail if there are uncommitted changes or if the tag already exi
 			branchName := cfg.Release.BranchPrefix + tagName
 
 			// Check if branch already exists
-			branchExists, err := vcs.BranchExists(branchName)
+			branchExists, err := vcsImpl.BranchExists(branchName)
 			if err != nil {
 				return fmt.Errorf("error checking if branch exists: %w", err)
 			}
@@ -116,7 +143,7 @@ The command will fail if there are uncommitted changes or if the tag already exi
 					cmd.Printf("Warning: branch '%s' already exists, skipping branch creation\n", branchName)
 				}
 			} else {
-				if err := vcs.CreateBranch(branchName); err != nil {
+				if err := vcsImpl.CreateBranch(branchName); err != nil {
 					return fmt.Errorf("error creating release branch: %w", err)
 				}
 				cmd.Printf("Successfully created branch '%s'\n", branchName)
@@ -129,8 +156,8 @@ The command will fail if there are uncommitted changes or if the tag already exi
 			cmd.Printf("  Message: %s\n", message)
 
 			// Get current VCS identifier
-			if identifier, err := vcs.GetVCSIdentifier(7); err == nil {
-				cmd.Printf("  %s ID: %s\n", vcs.Name(), identifier)
+			if identifier, err := vcsImpl.GetVCSIdentifier(7); err == nil {
+				cmd.Printf("  %s ID: %s\n", vcsImpl.Name(), identifier)
 			}
 		}
 
@@ -139,12 +166,12 @@ The command will fail if there are uncommitted changes or if the tag already exi
 }
 
 func init() {
-	rootCmd.AddCommand(tagCmd)
+	rootCmd.AddCommand(releaseCmd)
 
 	// Add flags
-	tagCmd.Flags().StringP("message", "m", "", "Tag message (default: 'Release <version>')")
-	tagCmd.Flags().StringP("prefix", "p", "v", "Tag prefix (default: 'v')")
-	tagCmd.Flags().BoolP("force", "f", false, "Force creation even if tag exists")
-	tagCmd.Flags().BoolP("verbose", "v", false, "Show additional information")
-	tagCmd.Flags().Bool("no-branch", false, "Skip creating release branch")
+	releaseCmd.Flags().StringP("message", "m", "", "Tag message (default: 'Release <version>')")
+	releaseCmd.Flags().StringP("prefix", "p", "v", "Tag prefix (default: 'v')")
+	releaseCmd.Flags().BoolP("force", "f", false, "Force creation even if tag exists")
+	releaseCmd.Flags().BoolP("verbose", "v", false, "Show additional information")
+	releaseCmd.Flags().Bool("no-branch", false, "Skip creating release branch")
 }

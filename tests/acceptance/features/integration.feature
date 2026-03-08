@@ -11,9 +11,9 @@ Feature: End-to-End Integration
     Given a VERSION file with prefix "v" and version "1.0.0"
     And a committed file "README.md" with content "# My Project"
     When I run "versionator patch increment"
-    And I commit the VERSION changes
-    And I run "versionator tag -m 'Release v1.0.1'"
+    And I run "versionator release -m 'Release v1.0.1'"
     Then a git tag "v1.0.1" should exist
+    And a git branch "release/v1.0.1" should exist
     And the VERSION should have version "1.0.1"
 
   Scenario: Version injection for Python project
@@ -30,7 +30,7 @@ Feature: End-to-End Integration
   Scenario: Pre-release workflow
     Given a VERSION file with prefix "v", version "2.0.0" and prerelease "beta"
     And a committed file "README.md" with content "# Beta Release"
-    When I run "versionator tag"
+    When I run "versionator release"
     Then a git tag "v2.0.0-beta" should exist
 
   Scenario: Build metadata workflow
@@ -63,11 +63,10 @@ Feature: End-to-End Integration
   Scenario: Multi-commit release cycle
     Given a VERSION file with prefix "v" and version "1.0.0"
     And a committed file "file1.txt" with content "Initial"
-    When I run "versionator tag -m 'Initial release'"
+    When I run "versionator release -m 'Initial release'"
     And I create 5 commits with message prefix "feat:"
     And I run "versionator minor increment"
-    And I commit the VERSION changes
-    And I run "versionator tag -m 'Feature release'"
+    And I run "versionator release -m 'Feature release'"
     Then a git tag "v1.0.0" should exist
     And a git tag "v1.1.0" should exist
     And the tag "v1.1.0" should be 6 commits ahead of "v1.0.0"

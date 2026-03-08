@@ -30,7 +30,7 @@ const sidebars: SidebarsConfig = {
         'commands/prefix',
         'commands/prerelease',
         'commands/metadata',
-        'commands/tag',
+        'commands/release',
         'commands/emit',
         'commands/config',
         'commands/custom',

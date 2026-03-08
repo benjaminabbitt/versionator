@@ -77,12 +77,12 @@ versionator patch increment
 # packages/utils/VERSION: 1.5.1
 ```
 
-### Tag Individual Packages
+### Release Individual Packages
 
 ```bash
 cd packages/core
-versionator tag
-# Creates tag: core-v3.1.0 (if prefix configured)
+versionator release
+# Creates tag: core-v3.1.0 and branch release/core-v3.1.0 (if prefix configured)
 ```
 
 ## Configuration Inheritance

@@ -37,7 +37,7 @@ Versionator takes a different approach: **explicit version management**.
 - **Full SemVer 2.0.0 support**: Major.Minor.Patch with pre-release and metadata
 - **10+ language support**: Go, Rust, C, C++, Java, Python, JavaScript, TypeScript, Ruby, and more
 - **Container-ready**: Embed version in Docker images via OCI labels and compiled binaries
-- **Git integration**: Create annotated tags with `versionator tag`
+- **Git integration**: Create annotated tags and release branches with `versionator release`
 - **Mustache templating**: Flexible output formatting with template variables
 - **Monorepo support**: Independent versions for nested packages
 - **Single binary**: No runtime dependencies, works everywhere
@@ -69,8 +69,8 @@ versionator major increment   # 0.0.0 -> 1.0.0
 versionator minor increment   # 1.0.0 -> 1.1.0
 versionator patch increment   # 1.1.0 -> 1.1.1
 
-# Create git tag
-versionator tag               # Creates tag v1.1.1
+# Create git tag and release branch
+versionator release           # Creates tag v1.1.1 and branch release/v1.1.1
 
 # Generate version file for Python
 versionator emit python --output mypackage/_version.py

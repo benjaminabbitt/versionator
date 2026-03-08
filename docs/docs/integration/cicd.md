@@ -75,14 +75,11 @@ jobs:
       - name: Bump version
         run: versionator ${{ inputs.bump }} increment
 
-      - name: Commit and tag
+      - name: Release
         run: |
-          VERSION=$(versionator version)
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add VERSION
-          git commit -m "Bump version to $VERSION"
-          versionator tag
+          versionator release
           git push
           git push --tags
 ```

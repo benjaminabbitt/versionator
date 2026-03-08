@@ -63,20 +63,23 @@ cat VERSION
 # Output: v1.1.1
 ```
 
-## Create Git Tags
+## Create Releases
 
-Tag your releases in git:
+Create git tags and release branches:
 
 ```bash
-# Commit your changes first
-git add .
-git commit -m "Release v1.1.1"
+# Bump version and release
+versionator patch increment
+versionator release
 
-# Create annotated tag
-versionator tag
+# The release command will:
+# 1. Auto-commit VERSION file (if it's the only dirty file)
+# 2. Create an annotated tag (e.g., v1.1.1)
+# 3. Create a release branch (e.g., release/v1.1.1)
 
-# Push tags to remote
+# Push to remote
 git push --tags
+git push origin release/v1.1.1
 ```
 
 ## Use with Templates
@@ -136,33 +139,28 @@ git checkout -b feature/new-feature
 
 # Make changes...
 
-# Bump minor version
-versionator minor increment
-
-# Commit and merge
+# Commit your changes
 git add .
 git commit -m "Add new feature"
 git checkout main
 git merge feature/new-feature
 
-# Tag the release
-versionator tag
+# Bump version and release
+versionator minor increment
+versionator release
 git push --tags
 ```
 
 ### Bug Fix
 
 ```bash
-# Fix the bug
-# ...
-
-# Bump patch version
-versionator patch increment
-
-# Commit and tag
+# Fix the bug and commit
 git add .
 git commit -m "Fix critical bug"
-versionator tag
+
+# Bump version and release
+versionator patch increment
+versionator release
 git push --tags
 ```
 

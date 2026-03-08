@@ -142,8 +142,8 @@ versionator patch decrement   # 1.1.1 -> 1.1.0
 versionator patch inc         # increment
 versionator minor dec         # decrement
 
-# Create git tag for current version
-versionator tag               # Creates tag v1.1.0
+# Create release (commits VERSION if dirty, creates tag and branch)
+versionator release           # Creates tag v1.1.0 and branch release/v1.1.0
 
 # Full SemVer 2.0.0 with pre-release and metadata
 versionator version \
@@ -156,19 +156,26 @@ versionator version \
 
 ## Git Integration
 
-Versionator can automatically create git tags for your versions:
+Versionator can automatically create git tags and release branches:
 
 ```bash
-# Bump version and tag in one workflow
+# Bump version and release in one workflow
 versionator patch increment
-versionator tag
+versionator release
 
-# This creates an annotated git tag (e.g., v1.0.1) pointing to HEAD
-# Push tags to remote
+# This will:
+# 1. Auto-commit the VERSION file (if it's the only dirty file)
+# 2. Create an annotated git tag (e.g., v1.0.1)
+# 3. Create a release branch (e.g., release/v1.0.1)
+
+# Push tags and branches to remote
 git push --tags
+git push origin release/v1.0.1
 ```
 
 The tag name respects your prefix configuration (e.g., `v1.0.0` with prefix, `1.0.0` without).
+
+For complete documentation, see the [Versionator Documentation](https://benjaminabbitt.github.io/versionator/).
 
 ## Usage
 
@@ -187,7 +194,7 @@ Available Commands:
   config      Manage configuration
   custom      Manage custom key-value pairs
   vars        Show all template variables and their values
-  tag         Create git tag for current version
+  release     Create git tag and release branch for current version
   completion  Generate shell completion scripts
   schema      Generate machine-readable CLI schema (JSON)
   help        Help about any command
