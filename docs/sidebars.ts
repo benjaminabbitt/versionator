@@ -24,6 +24,7 @@ const sidebars: SidebarsConfig = {
       },
       items: [
         'commands/version',
+        'commands/init',
         'commands/major',
         'commands/minor',
         'commands/patch',
@@ -32,7 +33,6 @@ const sidebars: SidebarsConfig = {
         'commands/metadata',
         'commands/release',
         'commands/emit',
-        'commands/config',
         'commands/custom',
         'commands/vars',
       ],

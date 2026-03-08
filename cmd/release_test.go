@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/benjaminabbitt/versionator/internal/vcs"
+	gitVCS "github.com/benjaminabbitt/versionator/internal/vcs/git"
 	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
@@ -59,8 +60,14 @@ func (suite *ReleaseTestSuite) TearDownTest() {
 		suite.ctrl.Finish()
 	}
 
-	// Clean up any registered VCS
+	// Reset command state for other tests
+	rootCmd.SetOut(nil)
+	rootCmd.SetErr(nil)
+	rootCmd.SetArgs(nil)
+
+	// Clean up mock VCS and re-register real git VCS for other tests
 	vcs.UnregisterVCS("git")
+	vcs.RegisterVCS(gitVCS.NewGitVCS())
 }
 
 // resetReleaseCommand resets the release command state between tests
