@@ -87,7 +87,21 @@ const sidebars: SidebarsConfig = {
           ],
         },
         'integration/git',
-        'integration/cicd',
+        {
+          type: 'category',
+          label: 'CI/CD',
+          link: {
+            type: 'doc',
+            id: 'integration/cicd/index',
+          },
+          items: [
+            'integration/cicd/github-actions',
+            'integration/cicd/gitlab-ci',
+            'integration/cicd/azure-devops',
+            'integration/cicd/jenkins',
+            'integration/cicd/circleci',
+          ],
+        },
         'integration/makefiles',
       ],
     },
