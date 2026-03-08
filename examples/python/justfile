@@ -1,11 +1,16 @@
-# Build the sample Python package with version from versionator
-# Demonstrates two approaches: generated file vs environment variable
+# Python example with container support
+# Uses overlay pattern: justfile.container is mounted over justfile inside container
 
 VERSIONATOR := "../../bin/versionator"
+IMAGE_NAME := "versionator-example-python"
+REPO_ROOT := `git rev-parse --show-toplevel`
 
-#
-# Approach 1: Generated Source File (Recommended)
-#
+# Default: run locally
+default: run
+
+# ============================================================================
+# Local execution (uses local versionator binary)
+# ============================================================================
 
 # Generate _version.py from versionator
 version-file:
@@ -26,13 +31,9 @@ build: version-file
 install: version-file
     pip install -e .
 
-# Run the sample application (Approach 1)
+# Run the sample application
 run: version-file
     python -m mypackage.main
-
-#
-# Approach 2: Environment Variable
-#
 
 # Run using environment variable (no file generation)
 env-run:
@@ -43,10 +44,6 @@ env-run:
     print('Sample Python Application')
     print(f'Version: {os.environ.get(\"APP_VERSION\", \"unknown\")}')
     "
-
-#
-# Utility targets
-#
 
 # Clean build artifacts
 clean:
@@ -60,10 +57,6 @@ show-version:
     VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
     echo "Version from versionator: $VERSION"
 
-#
-# Custom template example
-#
-
 # Generate using custom template file
 version-file-template:
     #!/bin/bash
@@ -71,25 +64,32 @@ version-file-template:
     echo "Generating _version.py using template file..."
     {{VERSIONATOR}} emit --template-file mypackage/_version.py.tmpl --output mypackage/_version.py
 
-#
-# Release helpers
-#
+# ============================================================================
+# Container execution (overlay pattern)
+# ============================================================================
 
-# Bump version and rebuild
-release-patch:
-    #!/bin/bash
-    set -e
-    {{VERSIONATOR}} patch increment
-    just build
+# Build the container image
+container-build:
+    podman build -t {{IMAGE_NAME}} -f Containerfile .
 
-release-minor:
-    #!/bin/bash
-    set -e
-    {{VERSIONATOR}} minor increment
-    just build
+# Run command inside container (internal helper)
+_container-run +ARGS:
+    podman run --rm \
+        -v {{REPO_ROOT}}/VERSION:/workspace/VERSION:ro \
+        -v {{justfile_directory()}}/justfile.container:/workspace/justfile:ro \
+        -v {{justfile_directory()}}/mypackage:/workspace/mypackage:rw \
+        -v {{justfile_directory()}}/pyproject.toml:/workspace/pyproject.toml:ro \
+        -w /workspace \
+        {{IMAGE_NAME}} just {{ARGS}}
 
-release-major:
-    #!/bin/bash
-    set -e
-    {{VERSIONATOR}} major increment
-    just build
+# Build inside container
+container-run: container-build
+    just _container-run run
+
+# Clean inside container
+container-clean: container-build
+    just _container-run clean
+
+# Show version inside container
+container-show-version: container-build
+    just _container-run show-version

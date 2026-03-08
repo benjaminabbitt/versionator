@@ -1,0 +1,16 @@
+# JavaScript/Node.js development container with versionator
+
+FROM ghcr.io/benjaminabbitt/versionator:latest AS versionator
+
+FROM node:20-alpine
+
+# Install just command runner and dependencies
+RUN apk add --no-cache bash git curl && \
+    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+# Copy versionator from official image
+COPY --from=versionator /versionator /usr/local/bin/versionator
+
+WORKDIR /workspace
+
+CMD ["just", "run"]

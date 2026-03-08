@@ -1,0 +1,27 @@
+# Container-side justfile for Java example
+
+# Build the sample application with version from versionator
+build:
+    #!/bin/bash
+    set -e
+    echo "Getting version from versionator..."
+    VERSION=$(versionator version 2>/dev/null || echo "NOT SET")
+    echo "Generating BuildTime.java from template..."
+    sed -e "s/@VERSION@/${VERSION}/g" app/BuildTime.tmpl.java > app/BuildTime.java
+    echo "Building sample application with version: $VERSION"
+    javac app/Main.java app/BuildTime.java
+    echo "Build completed: app/Main.class app/BuildTime.class"
+
+# Run the sample application
+run: build
+    java app.Main
+
+# Clean build artifacts
+clean:
+    rm -rf app/*.class app/BuildTime.java
+
+# Show the version that would be used
+show-version:
+    #!/bin/bash
+    VERSION=$(versionator version 2>/dev/null || echo "NOT SET")
+    echo "Version from versionator: $VERSION"

@@ -1,0 +1,16 @@
+# C++ development container with versionator
+
+FROM ghcr.io/benjaminabbitt/versionator:latest AS versionator
+
+FROM alpine:3.19
+
+# Install C++ compiler, just, and dependencies
+RUN apk add --no-cache bash git curl g++ musl-dev && \
+    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+# Copy versionator from official image
+COPY --from=versionator /versionator /usr/local/bin/versionator
+
+WORKDIR /workspace
+
+CMD ["just", "run"]

@@ -1,0 +1,32 @@
+# Container-side justfile for Python example
+
+# Generate _version.py from versionator
+version-file:
+    #!/bin/bash
+    set -e
+    echo "Generating _version.py using versionator emit..."
+    versionator emit python --output mypackage/_version.py
+
+# Build the package (generates _version.py first)
+build: version-file
+    #!/bin/bash
+    set -e
+    echo "Building Python package..."
+    python -m build
+    echo "Build completed: dist/"
+
+# Run the sample application
+run: version-file
+    python -m mypackage.main
+
+# Clean build artifacts
+clean:
+    rm -rf build/ dist/ *.egg-info/
+    rm -f mypackage/_version.py
+    find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+# Show the version that would be used
+show-version:
+    #!/bin/bash
+    VERSION=$(versionator version 2>/dev/null || echo "NOT SET")
+    echo "Version from versionator: $VERSION"
