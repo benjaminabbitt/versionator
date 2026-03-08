@@ -1,88 +1,37 @@
 # Ruby example with container support
-# Uses overlay pattern: justfile.container is mounted over justfile inside container
+# justfile orchestrates container execution; Makefile runs inside container
 
-VERSIONATOR := "../../bin/versionator"
 IMAGE_NAME := "versionator-example-ruby"
 REPO_ROOT := `git rev-parse --show-toplevel`
 
-# Default: run locally
+# Default: run in container
 default: run
 
 # ============================================================================
-# Local execution (uses local versionator binary)
-# ============================================================================
-
-# Generate version.rb from versionator
-version-file:
-    #!/bin/bash
-    set -e
-    echo "Generating version.rb using versionator emit..."
-    {{VERSIONATOR}} emit ruby --output lib/mypackage/version.rb
-
-# Build the gem (generates version.rb first)
-build: version-file
-    #!/bin/bash
-    set -e
-    echo "Building Ruby gem..."
-    gem build mypackage.gemspec
-    echo "Build completed!"
-
-# Install the gem locally
-install: build
-    gem install mypackage-*.gem
-
-# Run the sample application
-run: version-file
-    ruby bin/mypackage
-
-# Clean build artifacts
-clean:
-    rm -f lib/mypackage/version.rb
-    rm -f *.gem
-
-# Show the version that would be used
-show-version:
-    #!/bin/bash
-    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
-    echo "Version from versionator: $VERSION"
-
-# Run tests
-test: version-file
-    bundle exec rspec 2>/dev/null || echo "No tests found or rspec not installed"
-
-# Generate using custom template file
-version-file-template:
-    #!/bin/bash
-    set -e
-    echo "Generating version.rb using template file..."
-    {{VERSIONATOR}} emit --template-file lib/mypackage/version.rb.tmpl --output lib/mypackage/version.rb
-
-# ============================================================================
-# Container execution (overlay pattern)
+# Container execution (justfile orchestrates, Makefile runs inside)
 # ============================================================================
 
 # Build the container image
-container-build:
+build-image:
     podman build -t {{IMAGE_NAME}} -f Containerfile .
 
-# Run command inside container (internal helper)
-_container-run +ARGS:
+# Run make target inside container
+_make +ARGS:
     podman run --rm \
         -v {{REPO_ROOT}}/VERSION:/workspace/VERSION:ro \
-        -v {{justfile_directory()}}/justfile.container:/workspace/justfile:ro \
+        -v {{justfile_directory()}}/Makefile:/workspace/Makefile:ro \
         -v {{justfile_directory()}}/lib:/workspace/lib:rw \
-        -v {{justfile_directory()}}/mypackage.gemspec:/workspace/mypackage.gemspec:ro \
         -w /workspace \
-        {{IMAGE_NAME}} just {{ARGS}}
+        {{IMAGE_NAME}} make {{ARGS}}
 
-# Build inside container
-container-run: container-build
-    just _container-run run
+# Build and run inside container
+run: build-image
+    just _make run
 
 # Clean inside container
-container-clean: container-build
-    just _container-run clean
+clean: build-image
+    just _make clean
 
 # Show version inside container
-container-show-version: container-build
-    just _container-run show-version
+show-version: build-image
+    just _make show-version

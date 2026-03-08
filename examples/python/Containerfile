@@ -2,18 +2,14 @@
 
 FROM ghcr.io/benjaminabbitt/versionator:latest AS versionator
 
-FROM python:3.12-alpine
+FROM docker.io/library/python:3.12-alpine
 
-# Install just command runner and dependencies
-RUN apk add --no-cache bash git curl && \
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+# Install make and dependencies
+RUN apk add --no-cache bash git make
 
 # Copy versionator from official image
 COPY --from=versionator /versionator /usr/local/bin/versionator
 
-# Install build tools
-RUN pip install --no-cache-dir build
-
 WORKDIR /workspace
 
-CMD ["just", "run"]
+CMD ["make", "run"]

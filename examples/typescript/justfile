@@ -1,88 +1,40 @@
 # TypeScript example with container support
-# Uses overlay pattern: justfile.container is mounted over justfile inside container
+# justfile orchestrates container execution; Makefile runs inside container
 
-VERSIONATOR := "../../bin/versionator"
 IMAGE_NAME := "versionator-example-typescript"
 REPO_ROOT := `git rev-parse --show-toplevel`
 
-# Default: run locally
+# Default: run in container
 default: run
 
 # ============================================================================
-# Local execution (uses local versionator binary)
-# ============================================================================
-
-# Generate version.ts from versionator
-version-file:
-    #!/bin/bash
-    set -e
-    echo "Generating version.ts using versionator emit..."
-    {{VERSIONATOR}} emit ts --output src/version.ts
-
-# Build the package (generates version.ts first)
-build: version-file
-    #!/bin/bash
-    set -e
-    echo "Building TypeScript package..."
-    npx tsc
-    echo "Build completed!"
-
-# Install dependencies
-install:
-    npm install
-
-# Run the sample application
-run: build
-    node dist/index.js
-
-# Clean build artifacts
-clean:
-    rm -f src/version.ts
-    rm -rf dist
-    rm -rf node_modules
-
-# Show the version that would be used
-show-version:
-    #!/bin/bash
-    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
-    echo "Version from versionator: $VERSION"
-
-# Generate using custom template file
-version-file-template:
-    #!/bin/bash
-    set -e
-    echo "Generating version.ts using template file..."
-    {{VERSIONATOR}} emit --template-file src/version.tmpl.ts --output src/version.ts
-
-# ============================================================================
-# Container execution (overlay pattern)
+# Container execution (justfile orchestrates, Makefile runs inside)
 # ============================================================================
 
 # Build the container image
-container-build:
+build-image:
     podman build -t {{IMAGE_NAME}} -f Containerfile .
 
-# Run command inside container (internal helper)
-_container-run +ARGS:
+# Run make target inside container
+_make +ARGS:
     podman run --rm \
         -v {{REPO_ROOT}}/VERSION:/workspace/VERSION:ro \
-        -v {{justfile_directory()}}/justfile.container:/workspace/justfile:ro \
+        -v {{justfile_directory()}}/Makefile:/workspace/Makefile:ro \
         -v {{justfile_directory()}}/src:/workspace/src:rw \
-        -v {{justfile_directory()}}/dist:/workspace/dist:rw \
         -v {{justfile_directory()}}/package.json:/workspace/package.json:ro \
+        -v {{justfile_directory()}}/package-lock.json:/workspace/package-lock.json:ro \
         -v {{justfile_directory()}}/tsconfig.json:/workspace/tsconfig.json:ro \
-        -v {{justfile_directory()}}/node_modules:/workspace/node_modules:ro \
         -w /workspace \
-        {{IMAGE_NAME}} just {{ARGS}}
+        {{IMAGE_NAME}} make {{ARGS}}
 
-# Build inside container
-container-run: container-build install
-    just _container-run run
+# Build and run inside container
+run: build-image
+    just _make run
 
 # Clean inside container
-container-clean: container-build
-    just _container-run clean
+clean: build-image
+    just _make clean
 
 # Show version inside container
-container-show-version: container-build
-    just _container-run show-version
+show-version: build-image
+    just _make show-version
