@@ -13,11 +13,13 @@ Versionator is a CLI tool for managing semantic versions following [SemVer 2.0.0
 
 ### The Problem with Auto-Versioning
 
-Many versioning tools (like GitVersion) automatically calculate versions from git history. While convenient, this approach has drawbacks:
+Many versioning tools automatically calculate versions from git history. While convenient, this approach has drawbacks:
 
 - **Non-deterministic**: The same commit can produce different versions depending on branch state
 - **Complex configuration**: Branching strategies require extensive configuration
 - **Debugging difficulty**: Hard to understand why a particular version was generated
+
+See [Competitors](./competitors) for detailed comparisons with GitVersion, semantic-release, and others.
 
 ### The Versionator Approach
 
