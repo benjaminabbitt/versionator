@@ -8,14 +8,14 @@ sidebar_position: 1
 
 Versionator can be configured using a `.versionator.yaml` file in your project directory.
 
-## Generating Default Config
+## Creating Config File
 
 ```bash
-# Print default config to stdout
-versionator config dump
+# Create VERSION and .versionator.yaml with defaults
+versionator init --config
 
-# Write to file
-versionator config dump --output .versionator.yaml
+# Create with custom initial version
+versionator init --config --version 1.0.0 --prefix v
 ```
 
 ## Configuration Options

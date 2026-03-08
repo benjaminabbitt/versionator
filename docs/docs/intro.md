@@ -62,7 +62,7 @@ When you're debugging at 2 AM, you'll know exactly what's running. See [Binary E
 
 ```bash
 # Initialize version (creates VERSION file with 0.0.0)
-versionator version
+versionator init
 
 # Increment versions
 versionator major increment   # 0.0.0 -> 1.0.0

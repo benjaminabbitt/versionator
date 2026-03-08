@@ -127,8 +127,11 @@ versionator completion powershell >> $PROFILE
 ## Quick Start
 
 ```bash
-# Initialize (creates VERSION file automatically on first use)
-versionator version           # Creates VERSION with 0.0.0
+# Initialize (creates VERSION file with 0.0.0)
+versionator init
+
+# Or with specific version and prefix
+versionator init --version 1.0.0 --prefix v
 
 # Increment versions
 versionator major increment   # 0.0.0 -> 1.0.0
@@ -184,17 +187,20 @@ versionator [command]
 
 Available Commands:
   version     Show current version (with template support)
-  emit        Emit version in various language formats
+  init        Initialize versionator in this directory
   major       Increment or decrement major version
   minor       Increment or decrement minor version
   patch       Increment or decrement patch version
   prefix      Manage version prefix in VERSION file
   prerelease  Manage pre-release identifier in VERSION file
   metadata    Manage build metadata in VERSION file
-  config      Manage configuration
+  release     Create git tag and release branch for current version
+  bump        Auto-bump version based on commit messages
+  emit        Emit version in various language formats
+  ci          Output version variables for CI/CD systems
+  mode        Manage versioning mode (release or continuous-delivery)
   custom      Manage custom key-value pairs
   vars        Show all template variables and their values
-  release     Create git tag and release branch for current version
   completion  Generate shell completion scripts
   schema      Generate machine-readable CLI schema (JSON)
   help        Help about any command
@@ -364,14 +370,14 @@ versionator custom delete AppName
 
 Versionator can be configured via a `.versionator.yaml` file in your project root.
 
-### Generate Default Config
+### Create Config File
 
 ```bash
-# Print default config to stdout
-versionator config dump
+# Initialize with VERSION and config file
+versionator init --config
 
-# Write default config to file
-versionator config dump --output .versionator.yaml
+# Initialize with specific version and prefix
+versionator init --config --version 1.0.0 --prefix v
 ```
 
 ### Config File Format
