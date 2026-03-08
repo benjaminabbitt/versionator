@@ -1,0 +1,25 @@
+# Kotlin example Containerfile
+FROM eclipse-temurin:21-jdk AS builder
+
+WORKDIR /app
+
+# Install Kotlin compiler
+RUN apt-get update && apt-get install -y wget unzip && \
+    wget -q https://github.com/JetBrains/kotlin/releases/download/v2.0.0/kotlin-compiler-2.0.0.zip && \
+    unzip -q kotlin-compiler-2.0.0.zip && \
+    rm kotlin-compiler-2.0.0.zip
+
+ENV PATH="/app/kotlinc/bin:${PATH}"
+
+# Copy source files
+COPY Main.kt Version.kt ./
+
+# Build
+RUN kotlinc Main.kt Version.kt -include-runtime -d sample-app.jar
+
+# Runtime stage
+FROM eclipse-temurin:21-jre
+
+COPY --from=builder /app/sample-app.jar /app/sample-app.jar
+
+ENTRYPOINT ["java", "-jar", "/app/sample-app.jar"]

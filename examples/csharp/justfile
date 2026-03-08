@@ -1,0 +1,21 @@
+# C# example justfile
+
+# Generate version file
+version-file:
+    @echo "Generating Version.cs using versionator emit..."
+    versionator emit csharp --output Version.cs
+
+# Build the application
+build: version-file
+    @echo "Building C# application..."
+    dotnet build -c Release -o out
+    @echo "Build completed: out/SampleApp.dll"
+
+# Run the application
+run: build
+    dotnet out/SampleApp.dll
+
+# Clean build artifacts
+clean:
+    rm -rf out bin obj Version.cs
+    @echo "Cleaned build artifacts"

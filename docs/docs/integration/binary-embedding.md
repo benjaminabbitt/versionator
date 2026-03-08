@@ -252,6 +252,122 @@ Version: 0.0.13
 
 ---
 
+### Kotlin
+
+**Location:** [`examples/kotlin/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/kotlin)
+
+Kotlin generates a `Version.kt` object at build time:
+
+```kotlin title="examples/kotlin/Main.kt"
+package app
+
+import version.Version
+
+fun main() {
+    println("Sample Kotlin Application")
+    println("Version: ${Version.VERSION}")
+}
+```
+
+```makefile title="examples/kotlin/Makefile (excerpt)"
+version-file:
+    versionator emit kotlin --output Version.kt
+
+build: version-file
+    kotlinc Main.kt Version.kt -include-runtime -d sample-app.jar
+```
+
+**Run it:**
+```bash
+$ cd examples/kotlin && just run
+Generating Version.kt using versionator emit...
+Building Kotlin application...
+Build completed: sample-app.jar
+java -jar sample-app.jar
+Sample Kotlin Application
+Version: 0.0.16
+```
+
+**Source code:** [`Main.kt`](https://github.com/benjaminabbitt/versionator/blob/master/examples/kotlin/Main.kt) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/kotlin/justfile)
+
+---
+
+### C\#
+
+**Location:** [`examples/csharp/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/csharp)
+
+C# generates a `Version.cs` static class at build time:
+
+```csharp title="examples/csharp/Program.cs"
+using Version;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        Console.WriteLine("Sample C# Application");
+        Console.WriteLine($"Version: {VersionInfo.Version}");
+    }
+}
+```
+
+```makefile title="examples/csharp/Makefile (excerpt)"
+version-file:
+    versionator emit csharp --output Version.cs
+
+build: version-file
+    dotnet build -c Release -o out
+```
+
+**Run it:**
+```bash
+$ cd examples/csharp && just run
+Generating Version.cs using versionator emit...
+Building C# application...
+Build completed: out/SampleApp.dll
+dotnet out/SampleApp.dll
+Sample C# Application
+Version: 0.0.16
+```
+
+**Source code:** [`Program.cs`](https://github.com/benjaminabbitt/versionator/blob/master/examples/csharp/Program.cs) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/csharp/justfile)
+
+---
+
+### Swift
+
+**Location:** [`examples/swift/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/swift)
+
+Swift generates a `Version.swift` file with global constants:
+
+```swift title="examples/swift/main.swift"
+print("Sample Swift Application")
+print("Version: \(VERSION)")
+```
+
+```makefile title="examples/swift/Makefile (excerpt)"
+version-file:
+    versionator emit swift --output Version.swift
+
+build: version-file
+    swiftc -o sample-app main.swift Version.swift
+```
+
+**Run it:**
+```bash
+$ cd examples/swift && just run
+Generating Version.swift using versionator emit...
+Building Swift application...
+Build completed: sample-app
+./sample-app
+Sample Swift Application
+Version: 0.0.16
+```
+
+**Source code:** [`main.swift`](https://github.com/benjaminabbitt/versionator/blob/master/examples/swift/main.swift) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/swift/justfile)
+
+---
+
 ### Python
 
 **Location:** [`examples/python/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/python)
@@ -437,30 +553,6 @@ class Version {
     public const MINOR = 2;
     public const PATCH = 3;
 }
-```
-
----
-
-### Kotlin
-
-```bash
-versionator emit kotlin --output src/main/kotlin/Version.kt
-```
-
----
-
-### C#
-
-```bash
-versionator emit csharp --output src/Version.cs
-```
-
----
-
-### Swift
-
-```bash
-versionator emit swift --output Sources/Version.swift
 ```
 
 ---

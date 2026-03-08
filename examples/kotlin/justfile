@@ -1,0 +1,21 @@
+# Kotlin example justfile
+
+# Generate version file
+version-file:
+    @echo "Generating Version.kt using versionator emit..."
+    versionator emit kotlin --output Version.kt
+
+# Build the application
+build: version-file
+    @echo "Building Kotlin application..."
+    kotlinc Main.kt Version.kt -include-runtime -d sample-app.jar
+    @echo "Build completed: sample-app.jar"
+
+# Run the application
+run: build
+    java -jar sample-app.jar
+
+# Clean build artifacts
+clean:
+    rm -f sample-app.jar Version.kt
+    @echo "Cleaned build artifacts"
