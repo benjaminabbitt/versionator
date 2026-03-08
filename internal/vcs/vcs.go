@@ -25,6 +25,12 @@ type VersionControlSystem interface {
 	// TagExists checks if a tag with the specified name exists
 	TagExists(tagName string) (bool, error)
 
+	// CreateBranch creates a branch with the specified name from the current HEAD
+	CreateBranch(branchName string) error
+
+	// BranchExists checks if a branch with the specified name exists
+	BranchExists(branchName string) (bool, error)
+
 	// GetBranchName returns the current branch name
 	GetBranchName() (string, error)
 

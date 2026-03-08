@@ -15,8 +15,19 @@ type Config struct {
 	Prefix     string            `yaml:"prefix"`
 	PreRelease PreReleaseConfig  `yaml:"prerelease"`
 	Metadata   MetadataConfig    `yaml:"metadata"`
+	Release    ReleaseConfig     `yaml:"release"`
 	Logging    LoggingConfig     `yaml:"logging"`
 	Custom     map[string]string `yaml:"custom,omitempty"`
+}
+
+// ReleaseConfig holds release-related configuration
+type ReleaseConfig struct {
+	// CreateBranch controls whether a release branch is created when tagging
+	// Default: true
+	CreateBranch bool `yaml:"createBranch"`
+	// BranchPrefix is prepended to the tag name to form the branch name
+	// Default: "release/" (e.g., tag "v1.2.3" -> branch "release/v1.2.3")
+	BranchPrefix string `yaml:"branchPrefix"`
 }
 
 // PreReleaseConfig holds pre-release identifier configuration
@@ -74,6 +85,10 @@ func ReadConfig() (*Config, error) {
 			Git: GitConfig{
 				HashLength: 12, // default hash length for MediumHash
 			},
+		},
+		Release: ReleaseConfig{
+			CreateBranch: true,       // create release branches by default
+			BranchPrefix: "release/", // e.g., "release/v1.2.3"
 		},
 		Logging: LoggingConfig{
 			Output: "console", // default to human-readable console output
@@ -265,6 +280,15 @@ metadata:
   git:
     # Length of commit hash for MediumHash variable
     hashLength: 12
+
+# Release configuration
+release:
+  # Create a release branch when tagging (default: true)
+  createBranch: true
+
+  # Branch name prefix (default: "release/")
+  # Tag "v1.2.3" -> Branch "release/v1.2.3"
+  branchPrefix: "release/"
 
 # Logging configuration
 logging:

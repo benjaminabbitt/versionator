@@ -136,6 +136,35 @@ func (mr *MockVersionControlSystemMockRecorder) TagExists(tagName interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagExists", reflect.TypeOf((*MockVersionControlSystem)(nil).TagExists), tagName)
 }
 
+// CreateBranch mock base method.
+func (m *MockVersionControlSystem) CreateBranch(branchName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateBranch", branchName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateBranch indicates an expected call of CreateBranch.
+func (mr *MockVersionControlSystemMockRecorder) CreateBranch(branchName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBranch", reflect.TypeOf((*MockVersionControlSystem)(nil).CreateBranch), branchName)
+}
+
+// BranchExists mock base method.
+func (m *MockVersionControlSystem) BranchExists(branchName string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BranchExists", branchName)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BranchExists indicates an expected call of BranchExists.
+func (mr *MockVersionControlSystemMockRecorder) BranchExists(branchName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BranchExists", reflect.TypeOf((*MockVersionControlSystem)(nil).BranchExists), branchName)
+}
+
 // GetBranchName mock base method.
 func (m *MockVersionControlSystem) GetBranchName() (string, error) {
 	m.ctrl.T.Helper()
