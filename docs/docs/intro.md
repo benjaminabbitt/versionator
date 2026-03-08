@@ -30,13 +30,31 @@ Versionator takes a different approach: **explicit version management**.
 
 ## Key Features
 
-- **Simple VERSION file**: Human-readable plain text file
+- **Version in your binary**: Embed version directly into compiled binaries—know exactly what's running in production
+- **Simple VERSION file**: Human-readable plain text file as single source of truth
 - **Full SemVer 2.0.0 support**: Major.Minor.Patch with pre-release and metadata
-- **17 language code generation**: Python, Go, Rust, JavaScript, TypeScript, and more
+- **10+ language support**: Go, Rust, C, C++, Java, Python, JavaScript, TypeScript, Ruby, and more
+- **Container-ready**: Embed version in Docker images via OCI labels and compiled binaries
 - **Git integration**: Create annotated tags with `versionator tag`
 - **Mustache templating**: Flexible output formatting with template variables
 - **Monorepo support**: Independent versions for nested packages
 - **Single binary**: No runtime dependencies, works everywhere
+
+## The Real Benefit: Version in Your Binary
+
+The VERSION file is just the start. The real power is getting that version **into your compiled binary or container image**:
+
+```bash
+# Build with version embedded
+$ VERSION=$(versionator version)
+$ go build -ldflags "-X main.Version=$VERSION" -o myapp
+
+# Now your binary knows its version
+$ ./myapp --version
+myapp v1.1.1 (commit: abc1234, built: 2024-01-15T10:30:00Z)
+```
+
+When you're debugging at 2 AM, you'll know exactly what's running. See [Binary Embedding](./integration/binary-embedding) for examples in Go, Rust, C, C++, Java, Python, JavaScript, Docker, and more.
 
 ## Quick Example
 

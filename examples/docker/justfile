@@ -1,0 +1,56 @@
+# Build the sample Docker image with version from versionator
+
+VERSIONATOR := "../../bin/versionator"
+IMAGE_NAME := "sample-app"
+
+# Build Docker image with version info
+docker-build:
+    #!/bin/bash
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "dev")
+    COMMIT=$({{VERSIONATOR}} version -t "{{{{ShortHash}}}}" 2>/dev/null || echo "unknown")
+    DATE=$({{VERSIONATOR}} version -t "{{{{BuildDateTimeUTC}}}}" 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
+    echo "Building Docker image with:"
+    echo "  VERSION=$VERSION"
+    echo "  GIT_COMMIT=$COMMIT"
+    echo "  BUILD_DATE=$DATE"
+    docker build \
+        --build-arg VERSION="$VERSION" \
+        --build-arg GIT_COMMIT="$COMMIT" \
+        --build-arg BUILD_DATE="$DATE" \
+        -t {{IMAGE_NAME}}:$VERSION \
+        -t {{IMAGE_NAME}}:latest \
+        .
+
+# Run the Docker container
+docker-run:
+    #!/bin/bash
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "latest")
+    echo "Running {{IMAGE_NAME}}:$VERSION"
+    docker run --rm {{IMAGE_NAME}}:$VERSION
+
+# Build and run
+run: docker-build docker-run
+
+# Inspect image labels
+docker-inspect:
+    #!/bin/bash
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "latest")
+    echo "Inspecting labels for {{IMAGE_NAME}}:$VERSION"
+    docker inspect {{IMAGE_NAME}}:$VERSION --format '{{{{json .Config.Labels}}}}' | python3 -m json.tool
+
+# Show version info
+show-version:
+    #!/bin/bash
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
+    COMMIT=$({{VERSIONATOR}} version -t "{{{{ShortHash}}}}" 2>/dev/null || echo "unknown")
+    DATE=$({{VERSIONATOR}} version -t "{{{{BuildDateTimeUTC}}}}" 2>/dev/null || echo "unknown")
+    echo "Version from versionator:"
+    echo "  VERSION=$VERSION"
+    echo "  GIT_COMMIT=$COMMIT"
+    echo "  BUILD_DATE=$DATE"
+
+# Clean up
+clean:
+    #!/bin/bash
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "latest")
+    docker rmi {{IMAGE_NAME}}:$VERSION {{IMAGE_NAME}}:latest 2>/dev/null || true

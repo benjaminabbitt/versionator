@@ -61,6 +61,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Integration',
       items: [
+        'integration/binary-embedding',
         'integration/git',
         'integration/cicd',
         'integration/makefiles',
