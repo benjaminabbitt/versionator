@@ -7,35 +7,15 @@ import (
 )
 
 func TestExecute_Success(t *testing.T) {
-	// Create a temporary directory for testing
+	// Execute() with no args just shows help - no setup needed
+	// Use a temp dir to avoid affecting real files
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
 	defer os.Chdir(originalDir)
 	os.Chdir(tempDir)
 
-	// Create a VERSION file
-	err := os.WriteFile("VERSION", []byte(`{"major": 1, "minor": 0, "patch": 0}`), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create VERSION file: %v", err)
-	}
-
-	// Create a minimal config file
-	configContent := `prefix: ""
-metadata:
-  enabled: false
-  type: "git"
-  git:
-    hashLength: 7
-logging:
-  output: "console"
-`
-	err = os.WriteFile(".versionator.yaml", []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
-
-	// Test Execute function doesn't panic
-	err = Execute()
+	// Test Execute function doesn't panic and shows help
+	err := Execute()
 	// Since Execute() runs the root command without args, it should show help and return nil
 	if err != nil {
 		t.Errorf("Execute() returned error: %v", err)

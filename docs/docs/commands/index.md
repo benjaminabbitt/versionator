@@ -14,9 +14,9 @@ Versionator provides commands for managing semantic versions.
 |---------|-------------|
 | [`bump`](./bump) | Auto-bump version based on commit messages |
 | [`ci`](./ci) | Output version variables for CI/CD systems |
-| [`config`](./config) | Manage configuration |
 | [`custom`](./custom) | Manage custom key-value pairs in config |
 | [`emit`](./emit) | Emit version in various formats |
+| [`init`](./init) | Initialize versionator in this directory |
 | [`major`](./major) | Manage major version |
 | [`metadata`](./metadata) | Manage build metadata |
 | [`minor`](./minor) | Manage minor version |

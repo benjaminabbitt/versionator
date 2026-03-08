@@ -43,17 +43,14 @@ Feature: Custom Variables and Configuration
     When I run "versionator version -t '{{Var1}}-{{Var2}}' --set Var1=hello --set Var2=world"
     Then the output should be "hello-world"
 
-  # Config dump
-  Scenario: Dump default config to stdout
-    When I run "versionator config dump"
+  # Init command
+  Scenario: Init with force overwrites VERSION file
+    When I run "versionator init --force --version 2.0.0"
     Then the exit code should be 0
-    And the output should contain "prefix:"
-    And the output should contain "prerelease:"
-    And the output should contain "metadata:"
-    And the output should contain "logging:"
+    And the file "VERSION" should contain "2.0.0"
 
-  Scenario: Dump config to file
-    When I run "versionator config dump --output .versionator.yaml"
+  Scenario: Init with config creates config file
+    When I run "versionator init --force --config"
     Then the exit code should be 0
     And the file ".versionator.yaml" should exist
     And the file ".versionator.yaml" should contain "prefix:"
