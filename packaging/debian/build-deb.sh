@@ -21,8 +21,8 @@ mkdir -p "${PKG_DIR}/usr/bin"
 mkdir -p "${PKG_DIR}/usr/share/doc/${PKG_NAME}"
 
 # Copy and configure control file
-sed -e "s/\$VERSION\$/${VERSION}/g" \
-    -e "s/\$ARCH\$/${ARCH}/g" \
+sed -e "s/@VERSION@/${VERSION}/g" \
+    -e "s/@ARCH@/${ARCH}/g" \
     "${SCRIPT_DIR}/DEBIAN/control" > "${PKG_DIR}/DEBIAN/control"
 
 # Copy binary
