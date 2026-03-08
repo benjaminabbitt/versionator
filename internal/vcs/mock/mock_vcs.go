@@ -285,3 +285,18 @@ func (mr *MockVersionControlSystemMockRecorder) GetCommitAuthorEmail() *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitAuthorEmail", reflect.TypeOf((*MockVersionControlSystem)(nil).GetCommitAuthorEmail))
 }
 
+// GetCommitMessagesSinceTag mock base method.
+func (m *MockVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCommitMessagesSinceTag")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCommitMessagesSinceTag indicates an expected call of GetCommitMessagesSinceTag.
+func (mr *MockVersionControlSystemMockRecorder) GetCommitMessagesSinceTag() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitMessagesSinceTag", reflect.TypeOf((*MockVersionControlSystem)(nil).GetCommitMessagesSinceTag))
+}
+

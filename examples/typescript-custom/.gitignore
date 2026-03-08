@@ -1,0 +1,9 @@
+# Generated version file
+src/version.ts
+
+# Build output
+dist/
+
+# Node.js
+node_modules/
+package-lock.json

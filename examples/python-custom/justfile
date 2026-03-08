@@ -1,0 +1,37 @@
+# Python custom template example with container support
+# justfile orchestrates container execution; Makefile runs inside container
+
+IMAGE_NAME := "versionator-example-python-custom"
+REPO_ROOT := `git rev-parse --show-toplevel`
+
+# Default: run in container
+default: run
+
+# ============================================================================
+# Container execution (justfile orchestrates, Makefile runs inside)
+# ============================================================================
+
+# Build the container image
+build-image:
+    podman build -t {{IMAGE_NAME}} -f Containerfile .
+
+# Run make target inside container
+_make +ARGS:
+    podman run --rm \
+        -v {{REPO_ROOT}}/VERSION:/workspace/VERSION:ro \
+        -v {{justfile_directory()}}/Makefile:/workspace/Makefile:ro \
+        -v {{justfile_directory()}}/mypackage:/workspace/mypackage:rw \
+        -w /workspace \
+        {{IMAGE_NAME}} make {{ARGS}}
+
+# Build and run inside container
+run: build-image
+    just _make run
+
+# Clean inside container
+clean: build-image
+    just _make clean
+
+# Show version inside container
+show-version: build-image
+    just _make show-version

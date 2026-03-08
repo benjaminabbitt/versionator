@@ -12,12 +12,50 @@ const configFile = ".versionator.yaml"
 
 // Config holds configuration for version metadata behavior
 type Config struct {
-	Prefix     string            `yaml:"prefix"`
-	PreRelease PreReleaseConfig  `yaml:"prerelease"`
-	Metadata   MetadataConfig    `yaml:"metadata"`
-	Release    ReleaseConfig     `yaml:"release"`
-	Logging    LoggingConfig     `yaml:"logging"`
-	Custom     map[string]string `yaml:"custom,omitempty"`
+	Prefix           string                  `yaml:"prefix"`
+	PreRelease       PreReleaseConfig        `yaml:"prerelease"`
+	Metadata         MetadataConfig          `yaml:"metadata"`
+	Release          ReleaseConfig           `yaml:"release"`
+	BranchVersioning BranchVersioningConfig  `yaml:"branchVersioning"`
+	Mode             ModeConfig              `yaml:"mode"`
+	Logging          LoggingConfig           `yaml:"logging"`
+	Custom           map[string]string       `yaml:"custom,omitempty"`
+}
+
+// ModeConfig holds versioning mode configuration
+type ModeConfig struct {
+	// Type is the versioning mode: "release" (default) or "continuous-delivery"
+	Type string `yaml:"type"`
+	// ContinuousDelivery holds CD mode specific settings
+	ContinuousDelivery CDModeConfig `yaml:"continuousDelivery"`
+}
+
+// CDModeConfig holds continuous delivery mode configuration
+type CDModeConfig struct {
+	// PrereleaseTemplate is a Mustache template for auto-generated pre-release
+	// Default: "build-{{CommitsSinceTag}}"
+	PrereleaseTemplate string `yaml:"prereleaseTemplate"`
+	// MetadataTemplate is a Mustache template for auto-generated metadata
+	// Default: "{{ShortHash}}"
+	MetadataTemplate string `yaml:"metadataTemplate"`
+}
+
+// BranchVersioningConfig holds branch-aware versioning configuration
+type BranchVersioningConfig struct {
+	// Enabled controls whether branch-aware versioning is active
+	// Default: false (opt-in)
+	Enabled bool `yaml:"enabled"`
+	// MainBranches is a list of branch patterns that produce clean versions
+	// Supports exact matches and glob patterns (e.g., "release/*")
+	// Default: ["main", "master", "release/*"]
+	MainBranches []string `yaml:"mainBranches"`
+	// PrereleaseTemplate is a Mustache template for the branch pre-release identifier
+	// Default: "{{EscapedBranchName}}-{{CommitsSinceTag}}"
+	PrereleaseTemplate string `yaml:"prereleaseTemplate"`
+	// Mode controls how branch pre-release interacts with existing pre-release
+	// "replace" (default): Branch pre-release replaces any existing pre-release
+	// "append": Branch pre-release is appended to existing pre-release
+	Mode string `yaml:"mode"`
 }
 
 // ReleaseConfig holds release-related configuration
@@ -90,6 +128,12 @@ func ReadConfig() (*Config, error) {
 			CreateBranch: true,       // create release branches by default
 			BranchPrefix: "release/", // e.g., "release/v1.2.3"
 		},
+		BranchVersioning: BranchVersioningConfig{
+			Enabled:            false, // opt-in
+			MainBranches:       []string{"main", "master", "release/*"},
+			PrereleaseTemplate: "{{EscapedBranchName}}-{{CommitsSinceTag}}",
+			Mode:               "replace",
+		},
 		Logging: LoggingConfig{
 			Output: "console", // default to human-readable console output
 		},
@@ -135,6 +179,14 @@ func (c *Config) Validate() error {
 		if err := ValidateTemplate(c.Metadata.Template); err != nil {
 			return fmt.Errorf("metadata template: %w", err)
 		}
+	}
+	if c.BranchVersioning.PrereleaseTemplate != "" {
+		if err := ValidateTemplate(c.BranchVersioning.PrereleaseTemplate); err != nil {
+			return fmt.Errorf("branch versioning prerelease template: %w", err)
+		}
+	}
+	if c.BranchVersioning.Mode != "" && c.BranchVersioning.Mode != "replace" && c.BranchVersioning.Mode != "append" {
+		return fmt.Errorf("branch versioning mode must be 'replace' or 'append', got '%s'", c.BranchVersioning.Mode)
 	}
 	return nil
 }

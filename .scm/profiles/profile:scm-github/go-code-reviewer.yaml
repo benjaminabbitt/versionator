@@ -1,0 +1,19 @@
+version: "1.0.0"
+description: "Go code review profile with language-specific review checklists"
+tags:
+  - golang
+  - review
+  - code-quality
+
+bundles:
+  # Core review practices
+  - https://github.com/benjaminabbitt/scm-github@v1/bundles/code-review-checklists
+  - https://github.com/benjaminabbitt/scm-github@v1/bundles/core-practices
+
+  # Language-specific context
+  - https://github.com/benjaminabbitt/scm-github@v1/bundles/go-development
+
+  # Tooling for review
+  - https://github.com/benjaminabbitt/scm-github@v1/bundles/git
+  - https://github.com/benjaminabbitt/scm-github@v1/bundles/ast-grep
+  - https://github.com/benjaminabbitt/scm-github@v1/bundles/lsp

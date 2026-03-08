@@ -1,0 +1,15 @@
+# TypeScript/Node.js development container with versionator
+
+FROM ghcr.io/benjaminabbitt/versionator:latest AS versionator
+
+FROM docker.io/library/node:20-alpine
+
+# Install make and dependencies
+RUN apk add --no-cache bash git make
+
+# Copy versionator from official image
+COPY --from=versionator /versionator /usr/local/bin/versionator
+
+WORKDIR /workspace
+
+CMD ["make", "run"]

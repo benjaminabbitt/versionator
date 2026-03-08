@@ -91,6 +91,8 @@ app: main.c
 	$(CC) $(CFLAGS) -o $@ $<
 ```
 
+---
+
 ## Just
 
 [Just](https://github.com/casey/just) is a modern command runner alternative to Make.

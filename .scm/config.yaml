@@ -1,0 +1,7 @@
+defaults:
+    profiles:
+        - profile:scm-github/go-developer
+        - profile:scm-github/prototype
+    llm_plugin: claude-code
+llm:
+    plugins: {}

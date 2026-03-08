@@ -341,7 +341,7 @@ Version: 0.0.13
 TypeScript generates a typed `version.ts` module:
 
 ```typescript title="examples/typescript/src/index.ts"
-import { VERSION } from './version';
+import { VERSION } from './version.js';
 
 function main(): void {
     console.log('Sample TypeScript Application');
@@ -620,7 +620,9 @@ See [Template Variables](../templates/variables) for the complete reference.
 
 ## Custom Templates
 
-Dump and customize built-in templates:
+The examples above use **built-in templates** via `versionator emit <lang>`. For custom namespaces, additional fields, or different file structures, use custom templates with `--template-file`.
+
+### Dump and Customize
 
 ```bash
 # Dump Python template
@@ -631,6 +633,21 @@ versionator emit dump python > custom_python.tmpl
 # Use custom template
 versionator emit --template-file custom_python.tmpl --output _version.py
 ```
+
+### Custom Template Examples
+
+Each interpreted language has a `-custom` example demonstrating the `--template-file` workflow:
+
+| Language | Built-in Template | Custom Template |
+|----------|------------------|-----------------|
+| Python | [`examples/python/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/python) | [`examples/python-custom/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/python-custom) |
+| JavaScript | [`examples/javascript/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript) | [`examples/javascript-custom/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript-custom) |
+| TypeScript | [`examples/typescript/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript) | [`examples/typescript-custom/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript-custom) |
+| Ruby | [`examples/ruby/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby) | [`examples/ruby-custom/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby-custom) |
+
+**Built-in examples** use `versionator emit <lang>` — simple, zero configuration.
+
+**Custom examples** use `versionator emit --template-file` — for custom namespaces (e.g., `Mypackage::VERSION` instead of `Versionator::VERSION`) or additional fields like `GIT_HASH` and `BUILD_DATE`.
 
 ---
 

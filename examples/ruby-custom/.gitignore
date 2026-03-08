@@ -1,0 +1,6 @@
+# Generated version file
+lib/mypackage/version.rb
+
+# Ruby
+*.gem
+Gemfile.lock
