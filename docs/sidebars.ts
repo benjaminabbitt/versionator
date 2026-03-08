@@ -66,17 +66,6 @@ const sidebars: SidebarsConfig = {
         'integration/git',
         'integration/cicd',
         'integration/makefiles',
-        'integration/languages',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Examples',
-      items: [
-        'examples/python',
-        'examples/go',
-        'examples/javascript',
-        'examples/rust',
       ],
     },
   ],

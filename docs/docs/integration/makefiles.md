@@ -246,4 +246,4 @@ docs-generate:
 ## See Also
 
 - [CI/CD Integration](./cicd) - Pipeline integration
-- [Language Integration](./languages) - Language-specific patterns
+- [Binary Embedding](./binary-embedding) - Language-specific examples

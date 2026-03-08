@@ -116,7 +116,7 @@ versionator emit json --output version.json
 versionator emit go
 ```
 
-See [Integration with Languages](./integration/languages) for language-specific best practices.
+See [Binary Embedding](./integration/binary-embedding) for language-specific examples and best practices.
 
 ## View All Variables
 
