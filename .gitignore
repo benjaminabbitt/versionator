@@ -48,3 +48,11 @@ go.work
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Docusaurus documentation
+docs/build/
+docs/.docusaurus/
+docs/node_modules/
+
+# Backup of old docs (can be removed after migration)
+.docs-backup/
