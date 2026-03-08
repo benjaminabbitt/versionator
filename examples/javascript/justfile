@@ -1,6 +1,16 @@
-# Build the sample JavaScript package with version from versionator
+# JavaScript example with container support
+# Uses overlay pattern: justfile.container is mounted over justfile inside container
 
 VERSIONATOR := "../../bin/versionator"
+IMAGE_NAME := "versionator-example-javascript"
+REPO_ROOT := `git rev-parse --show-toplevel`
+
+# Default: run locally
+default: run
+
+# ============================================================================
+# Local execution (uses local versionator binary)
+# ============================================================================
 
 # Generate version.js from versionator
 version-file:
@@ -43,21 +53,32 @@ version-file-template:
     echo "Generating version.js using template file..."
     {{VERSIONATOR}} emit --template-file src/version.tmpl.js --output src/version.js
 
-# Release helpers
-release-patch:
-    #!/bin/bash
-    set -e
-    {{VERSIONATOR}} patch increment
-    just build
+# ============================================================================
+# Container execution (overlay pattern)
+# ============================================================================
 
-release-minor:
-    #!/bin/bash
-    set -e
-    {{VERSIONATOR}} minor increment
-    just build
+# Build the container image
+container-build:
+    podman build -t {{IMAGE_NAME}} -f Containerfile .
 
-release-major:
-    #!/bin/bash
-    set -e
-    {{VERSIONATOR}} major increment
-    just build
+# Run command inside container (internal helper)
+_container-run +ARGS:
+    podman run --rm \
+        -v {{REPO_ROOT}}/VERSION:/workspace/VERSION:ro \
+        -v {{justfile_directory()}}/justfile.container:/workspace/justfile:ro \
+        -v {{justfile_directory()}}/src:/workspace/src:rw \
+        -v {{justfile_directory()}}/package.json:/workspace/package.json:ro \
+        -w /workspace \
+        {{IMAGE_NAME}} just {{ARGS}}
+
+# Build inside container
+container-run: container-build
+    just _container-run run
+
+# Clean inside container
+container-clean: container-build
+    just _container-run clean
+
+# Show version inside container
+container-show-version: container-build
+    just _container-run show-version

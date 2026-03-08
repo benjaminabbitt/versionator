@@ -1,0 +1,22 @@
+# Container-side justfile for JavaScript example
+
+# Generate version.js from versionator
+version-file:
+    #!/bin/bash
+    set -e
+    echo "Generating version.js using versionator emit..."
+    versionator emit js --output src/version.js
+
+# Run the sample application
+run: version-file
+    node src/index.js
+
+# Clean build artifacts
+clean:
+    rm -f src/version.js
+
+# Show the version that would be used
+show-version:
+    #!/bin/bash
+    VERSION=$(versionator version 2>/dev/null || echo "NOT SET")
+    echo "Version from versionator: $VERSION"

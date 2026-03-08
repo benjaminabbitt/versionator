@@ -1,26 +1,68 @@
+# Java example with container support
+# Uses overlay pattern: justfile.container is mounted over justfile inside container
+
+VERSIONATOR := "../../bin/versionator"
+IMAGE_NAME := "versionator-example-java"
+REPO_ROOT := `git rev-parse --show-toplevel`
+
+# Default: run locally
+default: run
+
+# ============================================================================
+# Local execution (uses local versionator binary)
+# ============================================================================
+
 # Build the sample application with version from versionator
 build:
-    #!/bin/zsh
+    #!/bin/bash
     set -e
     echo "Getting version from versionator..."
-    VERSION=$(../../bin/versionator version 2>/dev/null || echo "NOT SET")
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
     echo "Generating BuildTime.java from template..."
-    sed -e "s/@VERSION@/${VERSION}/g" app/BuildTime.java.tmpl > app/BuildTime.java
+    sed -e "s/@VERSION@/${VERSION}/g" app/BuildTime.tmpl.java > app/BuildTime.java
     echo "Building sample application with version: $VERSION"
     javac app/Main.java app/BuildTime.java
     echo "Build completed: app/Main.class app/BuildTime.class"
 
 # Run the sample application
 run: build
-    #!/bin/zsh
     java app.Main
 
 # Clean build artifacts
 clean:
-    rm -rf app BuildTime.java
+    rm -rf app/*.class app/BuildTime.java
 
 # Show the version that would be used
 show-version:
-    #!/bin/zsh
-    VERSION=$(../../bin/versionator version 2>/dev/null || echo "NOT SET")
-    echo "BuildTime from versionator: $VERSION"
+    #!/bin/bash
+    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
+    echo "Version from versionator: $VERSION"
+
+# ============================================================================
+# Container execution (overlay pattern)
+# ============================================================================
+
+# Build the container image
+container-build:
+    podman build -t {{IMAGE_NAME}} -f Containerfile .
+
+# Run command inside container (internal helper)
+_container-run +ARGS:
+    podman run --rm \
+        -v {{REPO_ROOT}}/VERSION:/workspace/VERSION:ro \
+        -v {{justfile_directory()}}/justfile.container:/workspace/justfile:ro \
+        -v {{justfile_directory()}}/app:/workspace/app:ro \
+        -w /workspace \
+        {{IMAGE_NAME}} just {{ARGS}}
+
+# Build inside container
+container-run: container-build
+    just _container-run run
+
+# Clean inside container
+container-clean: container-build
+    just _container-run clean
+
+# Show version inside container
+container-show-version: container-build
+    just _container-run show-version
