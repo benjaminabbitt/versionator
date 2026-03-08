@@ -96,6 +96,8 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^I commit a file "([^"]*)" with content "([^"]*)"$`, iCommitAFileWithContent)
 	sc.Step(`^I commit the VERSION changes$`, iCommitTheVersionChanges)
 	sc.Step(`^I create (\d+) commits with message prefix "([^"]*)"$`, iCreateCommitsWithMessagePrefix)
+	sc.Step(`^I create a commit with message "([^"]*)"$`, iCreateACommitWithMessage)
+	sc.Step(`^I create a git tag "([^"]*)"$`, iCreateAGitTag)
 
 	// Assertion steps
 	sc.Step(`^the output should be "([^"]*)"$`, theOutputShouldBe)
@@ -487,6 +489,21 @@ func iCreateCommitsWithMessagePrefix(count int, prefix string) error {
 		}
 	}
 	return nil
+}
+
+func iCreateACommitWithMessage(message string) error {
+	filename := fmt.Sprintf("commit_%d.txt", len(message))
+	if err := os.WriteFile(filename, []byte(message), 0644); err != nil {
+		return err
+	}
+	if err := runCommand("git", "add", filename); err != nil {
+		return err
+	}
+	return runCommand("git", "commit", "-m", message)
+}
+
+func iCreateAGitTag(tag string) error {
+	return runCommand("git", "tag", tag)
 }
 
 // Assertion steps

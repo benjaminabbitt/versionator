@@ -56,4 +56,8 @@ type VersionControlSystem interface {
 
 	// GetCommitAuthorEmail returns the email of the current commit's author
 	GetCommitAuthorEmail() (string, error)
+
+	// GetCommitMessagesSinceTag returns all commit messages since the most recent tag
+	// Returns commit messages newest first, empty slice if on tagged commit or no tags
+	GetCommitMessagesSinceTag() ([]string, error)
 }

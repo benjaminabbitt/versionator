@@ -733,3 +733,71 @@ func BuildCompleteTemplateData(v *version.Version, prereleaseTemplate, metadataT
 
 	return data
 }
+
+// TemplateDataToStringMap converts TemplateData to map[string]string for use with mode package
+func TemplateDataToStringMap(data TemplateData) map[string]string {
+	m := map[string]string{
+		// Version components
+		"Major":           data.Major,
+		"Minor":           data.Minor,
+		"Patch":           data.Patch,
+		"MajorMinorPatch": data.MajorMinorPatch,
+		"MajorMinor":      data.MajorMinor,
+		"Prefix":          data.Prefix,
+
+		// Pre-release
+		"PreRelease":         data.PreRelease,
+		"PreReleaseWithDash": data.PreReleaseWithDash,
+		"PreReleaseLabel":    data.PreReleaseLabel,
+		"PreReleaseNumber":   data.PreReleaseNumber,
+
+		// Metadata
+		"Metadata":         data.Metadata,
+		"MetadataWithPlus": data.MetadataWithPlus,
+
+		// VCS/Git info
+		"Hash":               data.Hash,
+		"ShortHash":          data.ShortHash,
+		"MediumHash":         data.MediumHash,
+		"BranchName":         data.BranchName,
+		"EscapedBranchName":  data.EscapedBranchName,
+		"CommitsSinceTag":    data.CommitsSinceTag,
+		"BuildNumber":        data.BuildNumber,
+		"BuildNumberPadded":  data.BuildNumberPadded,
+		"UncommittedChanges": data.UncommittedChanges,
+		"Dirty":              data.Dirty,
+		"VersionSourceHash":  data.VersionSourceHash,
+
+		// Commit author
+		"CommitAuthor":      data.CommitAuthor,
+		"CommitAuthorEmail": data.CommitAuthorEmail,
+
+		// Commit timestamps
+		"CommitDate":        data.CommitDate,
+		"CommitDateCompact": data.CommitDateCompact,
+		"CommitDateShort":   data.CommitDateShort,
+		"CommitYear":        data.CommitYear,
+		"CommitMonth":       data.CommitMonth,
+		"CommitDay":         data.CommitDay,
+
+		// Build timestamps
+		"BuildDateTimeUTC":     data.BuildDateTimeUTC,
+		"BuildDateTimeCompact": data.BuildDateTimeCompact,
+		"BuildDateUTC":         data.BuildDateUTC,
+		"BuildYear":            data.BuildYear,
+		"BuildMonth":           data.BuildMonth,
+		"BuildDay":             data.BuildDay,
+	}
+
+	// Merge custom variables
+	for k, v := range data.Custom {
+		m[k] = v
+	}
+
+	// Merge plugin variables
+	for k, v := range data.PluginVariables {
+		m[k] = v
+	}
+
+	return m
+}

@@ -1,0 +1,9 @@
+# Generated version file
+mypackage/_version.py
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/

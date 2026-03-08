@@ -1,0 +1,244 @@
+version: "1.0.0"
+tags:
+  - review
+  - checklists
+  - code-quality
+author: "scm"
+description: "Specialized code review checklists for architecture, performance, concurrency, domain, and standards"
+
+fragments:
+  architect:
+    tags:
+      - review
+      - architecture
+    content: |-
+      # Architect Review
+
+      Review code for structure & maintainability.
+
+      ## Separation of Concerns
+      - Clear responsibility division?
+      - Business logic separate from infra?
+      - Cross-cutting concerns isolated?
+
+      ## Testability
+      - Components testable in isolation?
+      - Dependencies injectable/mockable?
+
+      ## Module Boundaries
+      - Well-defined interfaces?
+      - Minimal coupling, correct dependency direction?
+
+      ## Technical Debt
+      - Unnecessary complexity?
+      - Shortcuts documented (TODOs)?
+      - Solution proportional to problem?
+
+      ## Cohesion
+      - Single purpose per module?
+      - Related functions grouped?
+      - Functionality in right place?
+
+      ## Extensibility
+      - Extendable without modification?
+      - Extension points identified?
+      - Open for future needs, no overengineering?
+
+      ## Consistency
+      - Follows existing patterns?
+      - Similar problems solved similarly?
+      - Fits overall system design?
+    content_hash: sha256:1a37043337e1d75287c66615e9c31f41eb9a974e4b761d0458fbe2ddd01b2124
+    distilled_by: claude-code
+
+  performance:
+    tags:
+      - review
+      - performance
+      - algorithms
+    content: |-
+      # Performance Review
+
+      ## Complexity
+      - Time/space Big-O?
+      - Hidden O(n) in loops?
+      - Better algorithm available?
+
+      ## Data Structures
+      - Right structure for access pattern?
+      - HashMap vs TreeMap (ordering needed?)
+      - Array vs linked list (random vs sequential?)
+      - Set vs list (duplicates?)
+      - Heap/priority queue fit?
+
+      ## Memory
+      - Minimize allocations in hot paths
+      - Avoid unnecessary copies
+      - Stream vs load all
+      - Pass large objects by ref
+
+      ## Caching
+      - Cache expensive repeated computations
+      - Correct invalidation?
+      - Bounded cache sizes
+
+      ## I/O & Network
+      - Batch I/O ops
+      - Paginate large datasets
+      - Minimize round-trips
+      - Use async where appropriate
+
+      ## Loops
+      - Hoist invariants
+      - Early termination
+      - Parallelizable?
+
+      ## Profiling
+      - Actually profiled?
+      - Real bottlenecks identified?
+      - Micro-opts justified by measurement?
+      - Avoid premature optimization
+    content_hash: sha256:a19a8038750c291a6a4700c7cb547e019878d1143fd178292e966a5049d90c3e
+    distilled_by: claude-code
+
+  concurrency:
+    tags:
+      - review
+      - concurrency
+    content: |-
+      # Concurrency Review
+
+      ## Race Conditions
+      - Shared resources protected?
+      - Concurrent access → data corruption?
+      - Check-then-act atomic?
+
+      ## Thread Safety
+      - Data structures thread-safe/synchronized?
+      - Mutable state shared?
+      - Thread-local alternatives?
+
+      ## Synchronization
+      - Lock granularity appropriate?
+      - Locks held minimally?
+      - Lock ordering consistent (deadlock prevention)?
+
+      ## Deadlock Prevention
+      - Circular wait possible?
+      - Nested locks ordered consistently?
+      - Timeouts used?
+
+      ## Atomic Operations
+      - Compound ops atomic when needed?
+      - Atomic primitives correct?
+      - Memory ordering considered?
+
+      ## Resource Management
+      - Resources released in concurrent contexts?
+      - Resource exhaustion under load?
+      - Connection pools sized properly?
+    content_hash: sha256:b13c6d5de2b2d1a5a448362f6e405c56db4ee5711abbd87747ac2f08bab10e03
+    distilled_by: claude-code
+
+  domain-expert:
+    tags:
+      - review
+      - domain
+    content: |-
+      # Domain Expert Review
+
+      Review code w/ deep business domain familiarity.
+
+      ## First: Build Domain Understanding
+
+      Read before reviewing:
+      - `resources/` or `docs/` documentation
+      - `*.feature` files (Cucumber/Gherkin) - expected behavior
+      - READMEs for context
+      - Domain glossary/ubiquitous language definitions
+
+      ## Core Questions
+      - Domain logic correctly implemented?
+      - Business rules properly enforced?
+      - Domain model accurate/complete?
+
+      ## Semantic Accuracy
+      - Domain terms used correctly/consistently?
+      - Code matches ubiquitous language?
+      - Concepts named as domain experts recognize?
+
+      ## Business Rules
+      - All constraints enforced?
+      - Invariants maintained?
+      - State transitions valid per domain rules?
+
+      ## Edge Cases
+      - Business logic edge cases handled?
+      - Boundary conditions addressed?
+      - Exceptional scenarios covered?
+
+      ## Domain Integrity
+      - Aggregates properly bounded?
+      - Domain events raised appropriately?
+      - Domain logic leaking into infrastructure?
+    content_hash: sha256:ffcb20d9eab774e49544c2840b9b079f3c34eb13e1704fdcd0426c3671d9c623
+    distilled_by: claude-code
+
+  standards:
+    tags:
+      - review
+      - readability
+      - standards
+    content: |-
+      # Standards & Readability Review
+
+      Code review focus: canonical patterns, textbook approaches, long-term readability.
+
+      ## Naming
+      - Intent-revealing names
+      - Avoid abbreviations (unless universal)
+      - Function names describe *what*, not *how*
+      - Booleans as questions: isValid, hasItems
+
+      ## Organization
+      - Follow language/framework standards
+      - Files by feature or layer
+      - Group related code
+      - Minimal, organized imports
+
+      ## Functions
+      - Single responsibility
+      - Small, understandable at glance
+      - Minimize/document side effects
+      - Clear signatures
+
+      ## Documentation
+      - Public APIs: purpose, params, returns
+      - Explain non-obvious algorithms
+      - "Why" comments where needed
+      - Keep docs synced with code
+
+      ## Patterns
+      - Use standard design patterns appropriately
+      - Prefer stdlib over reinventing
+      - Follow language idioms
+      - Avoid anti-patterns
+
+      ## Errors
+      - Handle explicitly, never swallow silently
+      - Descriptive, actionable messages
+      - Clear happy path vs error paths
+      - Don't use exceptions for control flow
+
+      ## Readability
+      - Newcomer-understandable
+      - Clarity over cleverness
+      - Break complex expressions into named values
+      - Code reads like prose
+
+      ## Consistency
+      - Consistent style throughout
+      - Similar problems → similar solutions
+      - Follow team/language conventions
+    content_hash: sha256:26078b7ed990937d734140dd57a19399777f3991a92601e996afd991120c5c90
+    distilled_by: claude-code

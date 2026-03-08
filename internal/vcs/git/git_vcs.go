@@ -399,6 +399,53 @@ func (g *GitVersionControlSystem) GetCommitAuthorEmail() (string, error) {
 	return commit.Author.Email, nil
 }
 
+// GetCommitMessagesSinceTag returns all commit messages since the most recent tag
+// Returns commit messages newest first, empty slice if on tagged commit or no tags
+func (g *GitVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) {
+	info, err := g.getTagInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	// No commits since tag (on tagged commit) or no tags exist with 0 commits
+	if info.CommitsSinceTag <= 0 {
+		return []string{}, nil
+	}
+
+	repo, err := g.openRepository()
+	if err != nil {
+		return nil, err
+	}
+
+	ref, err := repo.Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	commitIter, err := repo.Log(&git.LogOptions{From: ref.Hash()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit log: %w", err)
+	}
+
+	messages := make([]string, 0, info.CommitsSinceTag)
+	count := 0
+
+	err = commitIter.ForEach(func(c *object.Commit) error {
+		if count >= info.CommitsSinceTag {
+			return errStopIteration
+		}
+		messages = append(messages, c.Message)
+		count++
+		return nil
+	})
+
+	if err != nil && !errors.Is(err, errStopIteration) {
+		return nil, fmt.Errorf("failed to iterate commits: %w", err)
+	}
+
+	return messages, nil
+}
+
 // Helper methods
 func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 	currentPath := startPath

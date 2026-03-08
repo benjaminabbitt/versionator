@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.scm/bin/scm hook inject-context 67c5433a07c12f12",
+            "timeout": 60,
+            "_scm": "30b2255b3e80563d"
+          }
+        ]
+      }
+    ]
+  }
+}
