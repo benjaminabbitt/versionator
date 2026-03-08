@@ -35,8 +35,8 @@ Every language falls into one of two categories:
 
 | Category | Languages | Mechanism |
 |----------|-----------|-----------|
-| **Compiled** | Go, Rust, C, C++ | Inject values at compile time |
-| **Interpreted** | Python, JavaScript, Ruby | Generate source file at build time |
+| **Compiled** | Go, Rust, C, C++, Java, Kotlin, C#, Swift | Inject values at compile time |
+| **Interpreted** | Python, JavaScript, TypeScript, Ruby, PHP | Generate source file at build time |
 
 Both approaches achieve the same result: version info baked into the final artifact.
 
@@ -417,6 +417,79 @@ Version: 0.0.13
 
 ---
 
+### PHP
+
+PHP generates a version class:
+
+```bash
+versionator emit php --output src/Version.php
+```
+
+Generated file:
+
+```php
+<?php
+namespace MyApp;
+
+class Version {
+    public const VERSION = "1.2.3";
+    public const MAJOR = 1;
+    public const MINOR = 2;
+    public const PATCH = 3;
+}
+```
+
+---
+
+### Kotlin
+
+```bash
+versionator emit kotlin --output src/main/kotlin/Version.kt
+```
+
+---
+
+### C#
+
+```bash
+versionator emit csharp --output src/Version.cs
+```
+
+---
+
+### Swift
+
+```bash
+versionator emit swift --output Sources/Version.swift
+```
+
+---
+
+## JSON / YAML
+
+For configuration files or API responses:
+
+```bash
+# JSON
+versionator emit json --output version.json
+
+# YAML
+versionator emit yaml --output version.yml
+```
+
+JSON output:
+
+```json
+{
+  "version": "1.2.3",
+  "major": 1,
+  "minor": 2,
+  "patch": 3
+}
+```
+
+---
+
 ## Docker / Containers
 
 **Location:** [`examples/docker/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/docker)
@@ -545,9 +618,33 @@ See [Template Variables](../templates/variables) for the complete reference.
 
 ---
 
+## Custom Templates
+
+Dump and customize built-in templates:
+
+```bash
+# Dump Python template
+versionator emit dump python > custom_python.tmpl
+
+# Edit custom_python.tmpl...
+
+# Use custom template
+versionator emit --template-file custom_python.tmpl --output _version.py
+```
+
+---
+
+## Best Practices
+
+1. **Add generated files to .gitignore**: Don't commit version files
+2. **Generate at build time**: Run emit in build scripts, not manually
+3. **Use appropriate approach**: Inject for compiled, generate for interpreted
+4. **Include in CI**: Ensure version files are generated in CI/CD
+
+---
+
 ## See Also
 
-- [Go Example](../examples/go) - Detailed Go walkthrough
-- [Rust Example](../examples/rust) - Detailed Rust walkthrough
-- [Python Example](../examples/python) - Detailed Python walkthrough
 - [CI/CD Integration](./cicd) - Automate version injection in pipelines
+- [Makefiles and Just](./makefiles) - Build tool integration
+- [Template Variables](../templates/variables) - All available template variables
