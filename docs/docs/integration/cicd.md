@@ -46,44 +46,6 @@ Get extended version information:
     echo "full=$(versionator version -t '{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}' --prefix --metadata='{{ShortHash}}')" >> $GITHUB_OUTPUT
 ```
 
-### Automated Version Bump
-
-```yaml
-name: Bump Version
-
-on:
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: 'Version bump type'
-        required: true
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-
-jobs:
-  bump:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install versionator
-        run: go install github.com/benjaminabbitt/versionator@latest
-
-      - name: Bump version
-        run: versionator ${{ inputs.bump }} increment
-
-      - name: Release
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          versionator release
-          git push
-          git push --tags
-```
-
 ### Release Workflow
 
 ```yaml
