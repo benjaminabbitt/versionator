@@ -6,7 +6,7 @@ sidebar_position: 2
 
 # Semantic Versioning
 
-Versionator follows [Semantic Versioning 2.0.0](https://semver.org/) (SemVer) for version management. This page explains the specification and how versionator implements it.
+Versionator helps you follow [Semantic Versioning 2.0.0](https://semver.org/) (SemVer) for your projects. This page explains the specification and how versionator implements it.
 
 ## Version Format
 
