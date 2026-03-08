@@ -83,10 +83,7 @@ chmod 644 "${PKG_DIR}/DEBIAN/control"
 chmod 644 "${PKG_DIR}/usr/share/doc/${PKG_NAME}/copyright"
 chmod 644 "${PKG_DIR}/usr/share/doc/${PKG_NAME}/changelog.Debian.gz"
 
-# Build the package
+# Build the package (output goes to same directory as PKG_DIR)
 dpkg-deb --build --root-owner-group "${PKG_DIR}"
 
-# Move to output location
-mv "${PKG_DIR}.deb" "${SCRIPT_DIR}/build/"
-
-echo "Package built: ${SCRIPT_DIR}/build/${PKG_NAME}_${VERSION}_${ARCH}.deb"
+echo "Package built: ${PKG_DIR}.deb"
