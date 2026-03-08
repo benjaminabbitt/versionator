@@ -1,8 +1,8 @@
 Package: versionator
-Version: $VERSION$
+Version: @VERSION@
 Section: devel
 Priority: optional
-Architecture: $ARCH$
+Architecture: @ARCH@
 Maintainer: Benjamin Abbitt <benjaminabbitt@users.noreply.github.com>
 Homepage: https://github.com/benjaminabbitt/versionator
 Description: A semantic version management CLI tool
