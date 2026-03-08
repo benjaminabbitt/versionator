@@ -1,66 +1,37 @@
 # Rust example with container support
-# Uses overlay pattern: justfile.container is mounted over justfile inside container
+# justfile orchestrates container execution; Makefile runs inside container
 
-VERSIONATOR := "../../bin/versionator"
 IMAGE_NAME := "versionator-example-rust"
 REPO_ROOT := `git rev-parse --show-toplevel`
 
-# Default: run locally
+# Default: run in container
 default: run
 
 # ============================================================================
-# Local execution (uses local versionator binary)
-# ============================================================================
-
-# Build the sample application with version from versionator
-build:
-    #!/bin/bash
-    set -e
-    echo "Getting version from versionator..."
-    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
-    echo "Building sample application with version: $VERSION"
-    VERSION="$VERSION" rustc -o sample-app main.rs
-    echo "Build completed: sample-app"
-
-# Run the sample application
-run: build
-    ./sample-app
-
-# Clean build artifacts
-clean:
-    rm -f sample-app
-
-# Show the version that would be used
-show-version:
-    #!/bin/bash
-    VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
-    echo "Version from versionator: $VERSION"
-
-# ============================================================================
-# Container execution (overlay pattern)
+# Container execution (justfile orchestrates, Makefile runs inside)
 # ============================================================================
 
 # Build the container image
-container-build:
+build-image:
     podman build -t {{IMAGE_NAME}} -f Containerfile .
 
-# Run command inside container (internal helper)
-_container-run +ARGS:
+# Run make target inside container
+_make +ARGS:
     podman run --rm \
         -v {{REPO_ROOT}}/VERSION:/workspace/VERSION:ro \
-        -v {{justfile_directory()}}/justfile.container:/workspace/justfile:ro \
+        -v {{justfile_directory()}}/Makefile:/workspace/Makefile:ro \
         -v {{justfile_directory()}}/main.rs:/workspace/main.rs:ro \
         -w /workspace \
-        {{IMAGE_NAME}} just {{ARGS}}
+        {{IMAGE_NAME}} make {{ARGS}}
 
-# Build inside container
-container-run: container-build
-    just _container-run run
+# Build and run inside container
+run: build-image
+    just _make run
 
 # Clean inside container
-container-clean: container-build
-    just _container-run clean
+clean: build-image
+    just _make clean
 
 # Show version inside container
-container-show-version: container-build
-    just _container-run show-version
+show-version: build-image
+    just _make show-version

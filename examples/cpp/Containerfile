@@ -2,15 +2,14 @@
 
 FROM ghcr.io/benjaminabbitt/versionator:latest AS versionator
 
-FROM alpine:3.19
+FROM docker.io/library/alpine:3.19
 
-# Install C++ compiler, just, and dependencies
-RUN apk add --no-cache bash git curl g++ musl-dev && \
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+# Install C++ compiler, make, and dependencies
+RUN apk add --no-cache bash git make g++ musl-dev
 
 # Copy versionator from official image
 COPY --from=versionator /versionator /usr/local/bin/versionator
 
 WORKDIR /workspace
 
-CMD ["just", "run"]
+CMD ["make", "run"]

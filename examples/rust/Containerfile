@@ -2,15 +2,14 @@
 
 FROM ghcr.io/benjaminabbitt/versionator:latest AS versionator
 
-FROM rust:1.75-alpine
+FROM docker.io/library/rust:1.75-alpine
 
-# Install just command runner and dependencies
-RUN apk add --no-cache bash git curl musl-dev && \
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+# Install make and dependencies
+RUN apk add --no-cache bash git make musl-dev
 
 # Copy versionator from official image
 COPY --from=versionator /versionator /usr/local/bin/versionator
 
 WORKDIR /workspace
 
-CMD ["just", "run"]
+CMD ["make", "run"]

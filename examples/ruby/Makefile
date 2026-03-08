@@ -1,28 +1,18 @@
 # Build the sample Ruby gem with version from versionator
+# This Makefile is used inside the container where versionator is in PATH
 
-SHELL := /bin/bash
-VERSIONATOR := ../../bin/versionator
+.PHONY: build run clean show-version version-file
 
-.PHONY: build run clean show-version version-file install test
+VERSION := $(shell versionator version 2>/dev/null || echo "NOT SET")
 
 # Generate version.rb from versionator
 version-file:
 	@echo "Generating version.rb using versionator emit..."
-	@$(VERSIONATOR) emit ruby --output lib/mypackage/version.rb
-
-# Build the gem (generates version.rb first)
-build: version-file
-	@echo "Building Ruby gem..."
-	gem build mypackage.gemspec
-	@echo "Build completed!"
-
-# Install the gem locally
-install: build
-	gem install mypackage-*.gem
+	versionator emit ruby --output lib/mypackage/version.rb
 
 # Run the sample application
 run: version-file
-	ruby bin/mypackage
+	ruby -I lib -e "require 'mypackage'; Mypackage.hello"
 
 # Clean build artifacts
 clean:
@@ -31,14 +21,4 @@ clean:
 
 # Show the version that would be used
 show-version:
-	@VERSION=$$($(VERSIONATOR) version 2>/dev/null || echo "NOT SET"); \
-	echo "Version from versionator: $$VERSION"
-
-# Run tests
-test: version-file
-	bundle exec rspec 2>/dev/null || echo "No tests found or rspec not installed"
-
-# Generate using custom template file
-version-file-template:
-	@echo "Generating version.rb using template file..."
-	@$(VERSIONATOR) emit --template-file lib/mypackage/version.rb.tmpl --output lib/mypackage/version.rb
+	@echo "Version from versionator: $(VERSION)"
