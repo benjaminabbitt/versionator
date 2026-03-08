@@ -1,0 +1,21 @@
+.PHONY: build run clean version-file
+
+# Generate version file
+version-file:
+	@echo "Generating Version.swift using versionator emit..."
+	@versionator emit swift --output Version.swift
+
+# Build the application
+build: version-file
+	@echo "Building Swift application..."
+	@swiftc -o sample-app main.swift Version.swift
+	@echo "Build completed: sample-app"
+
+# Run the application
+run: build
+	@./sample-app
+
+# Clean build artifacts
+clean:
+	@rm -f sample-app Version.swift
+	@echo "Cleaned build artifacts"

@@ -1,0 +1,17 @@
+# Swift example Containerfile
+FROM swift:5.10 AS builder
+
+WORKDIR /app
+
+# Copy source files
+COPY main.swift Version.swift ./
+
+# Build
+RUN swiftc -o sample-app main.swift Version.swift
+
+# Runtime stage
+FROM swift:5.10-slim
+
+COPY --from=builder /app/sample-app /usr/local/bin/sample-app
+
+ENTRYPOINT ["sample-app"]

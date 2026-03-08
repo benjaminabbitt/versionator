@@ -8,6 +8,10 @@ sidebar_position: 2
 
 Versionator integrates seamlessly with CI/CD pipelines for automated version management and releases.
 
+:::note
+These examples are illustrative and may need tweaking based on your specific CI/CD environment and requirements. Patches with fixes are welcome at [github.com/benjaminabbitt/versionator](https://github.com/benjaminabbitt/versionator).
+:::
+
 ## GitHub Actions
 
 ### Get Version

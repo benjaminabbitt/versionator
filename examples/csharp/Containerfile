@@ -1,0 +1,17 @@
+# C# example Containerfile
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
+
+WORKDIR /app
+
+# Copy project and source files
+COPY SampleApp.csproj Program.cs Version.cs ./
+
+# Build
+RUN dotnet publish -c Release -o out
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/runtime:8.0
+
+COPY --from=builder /app/out /app
+
+ENTRYPOINT ["dotnet", "/app/SampleApp.dll"]
