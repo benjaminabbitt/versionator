@@ -14,7 +14,7 @@ Navigate to your project directory and run:
 
 ```bash
 cd my-project
-versionator version
+versionator init
 ```
 
 This creates a `VERSION` file with the initial version `0.0.0`.
@@ -22,6 +22,11 @@ This creates a `VERSION` file with the initial version `0.0.0`.
 ```bash
 cat VERSION
 # Output: 0.0.0
+
+# Or initialize with a specific version and prefix
+versionator init --version 1.0.0 --prefix v
+cat VERSION
+# Output: v1.0.0
 ```
 
 ## Increment Versions
