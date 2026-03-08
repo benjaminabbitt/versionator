@@ -382,7 +382,7 @@ Version: 0.0.13
 
 **Location:** [`examples/ruby/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby)
 
-Ruby generates a `version.rb` module:
+Ruby generates a `version.rb` module with a `Versionator` namespace:
 
 ```ruby title="examples/ruby/lib/mypackage.rb"
 require_relative "mypackage/version"
@@ -390,7 +390,7 @@ require_relative "mypackage/version"
 module Mypackage
   def self.hello
     puts "Sample Ruby Application"
-    puts "Version: #{VERSION}"
+    puts "Version: #{Versionator::VERSION}"
   end
 end
 ```
@@ -400,7 +400,7 @@ version-file:
     versionator emit ruby --output lib/mypackage/version.rb
 
 run: version-file
-    ruby bin/mypackage
+    ruby -I lib -e "require 'mypackage'; Mypackage.hello"
 ```
 
 **Run it:**
@@ -408,7 +408,7 @@ run: version-file
 $ cd examples/ruby && just run
 Generating version.rb using versionator emit...
 Version 0.0.13 written to lib/mypackage/version.rb
-ruby bin/mypackage
+ruby -I lib -e "require 'mypackage'; Mypackage.hello"
 Sample Ruby Application
 Version: 0.0.13
 ```

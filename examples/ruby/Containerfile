@@ -2,7 +2,7 @@
 
 FROM ghcr.io/benjaminabbitt/versionator:latest AS versionator
 
-FROM ruby:3.2-alpine
+FROM docker.io/library/ruby:3.2-alpine
 
 # Install just command runner and dependencies
 RUN apk add --no-cache bash git curl && \

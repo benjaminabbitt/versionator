@@ -7,6 +7,6 @@ module Mypackage
 
   def self.hello
     puts "Sample Ruby Application"
-    puts "Version: #{VERSION}"
+    puts "Version: #{Versionator::VERSION}"
   end
 end
