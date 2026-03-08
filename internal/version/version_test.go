@@ -627,3 +627,265 @@ func contains(s, substr string) bool {
 	}
 	return false
 }
+
+func TestValidate_InvalidPreReleaseCharacter(t *testing.T) {
+	tests := []struct {
+		name       string
+		preRelease string
+		wantErr    string
+	}{
+		{"space character", "alpha beta", ErrInvalidIdentifierChar},
+		{"underscore", "alpha_1", ErrInvalidIdentifierChar},
+		{"special char @", "alpha@1", ErrInvalidIdentifierChar},
+		{"unicode", "alpha.β", ErrInvalidIdentifierChar},
+		{"empty part", "alpha..beta", ErrEmptyIdentifierPart},
+		{"leading dot", ".alpha", ErrEmptyIdentifierPart},
+		{"trailing dot", "alpha.", ErrEmptyIdentifierPart},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &Version{
+				Major:      1,
+				Minor:      0,
+				Patch:      0,
+				PreRelease: tt.preRelease,
+			}
+			err := v.Validate()
+			if err == nil {
+				t.Errorf("Expected error for pre-release '%s', got nil", tt.preRelease)
+				return
+			}
+			if !contains(err.Error(), tt.wantErr) {
+				t.Errorf("Expected error containing '%s', got '%s'", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestValidate_InvalidBuildMetadataCharacter(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata string
+		wantErr  string
+	}{
+		{"space character", "build 123", ErrInvalidIdentifierChar},
+		{"underscore", "build_123", ErrInvalidIdentifierChar},
+		{"special char #", "build#123", ErrInvalidIdentifierChar},
+		{"empty part", "build..123", ErrEmptyIdentifierPart},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &Version{
+				Major:         1,
+				Minor:         0,
+				Patch:         0,
+				BuildMetadata: tt.metadata,
+			}
+			err := v.Validate()
+			if err == nil {
+				t.Errorf("Expected error for metadata '%s', got nil", tt.metadata)
+				return
+			}
+			if !contains(err.Error(), tt.wantErr) {
+				t.Errorf("Expected error containing '%s', got '%s'", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestValidate_ValidIdentifiers(t *testing.T) {
+	tests := []struct {
+		name       string
+		preRelease string
+		metadata   string
+	}{
+		{"alphanumeric prerelease", "alpha1", ""},
+		{"hyphen in prerelease", "alpha-1", ""},
+		{"numeric prerelease", "123", ""},
+		{"dotted prerelease", "alpha.1.beta", ""},
+		{"alphanumeric metadata", "build123", ""},
+		{"hyphen in metadata", "build-123", ""},
+		{"dotted metadata", "build.123.abc", ""},
+		{"both prerelease and metadata", "alpha", "build123"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &Version{
+				Major:         1,
+				Minor:         0,
+				Patch:         0,
+				PreRelease:    tt.preRelease,
+				BuildMetadata: tt.metadata,
+			}
+			err := v.Validate()
+			if err != nil {
+				t.Errorf("Expected no error for preRelease='%s' metadata='%s', got: %v",
+					tt.preRelease, tt.metadata, err)
+			}
+		})
+	}
+}
+
+func TestSetPrefix_Success(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Create initial version
+	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create VERSION file: %v", err)
+	}
+
+	// Set prefix
+	err = SetPrefix("v")
+	if err != nil {
+		t.Fatalf("Expected no error setting prefix, got: %v", err)
+	}
+
+	// Verify prefix was set
+	prefix, err := GetPrefix()
+	if err != nil {
+		t.Fatalf("Expected no error getting prefix, got: %v", err)
+	}
+	if prefix != "v" {
+		t.Errorf("Expected prefix 'v', got '%s'", prefix)
+	}
+}
+
+func TestGetPrefix_Success(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Create version with prefix
+	err := os.WriteFile(versionFile, []byte("v1.2.3"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create VERSION file: %v", err)
+	}
+
+	prefix, err := GetPrefix()
+	if err != nil {
+		t.Fatalf("Expected no error getting prefix, got: %v", err)
+	}
+	if prefix != "v" {
+		t.Errorf("Expected prefix 'v', got '%s'", prefix)
+	}
+}
+
+func TestSetPreRelease_Success(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Create initial version
+	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create VERSION file: %v", err)
+	}
+
+	// Set pre-release
+	err = SetPreRelease("alpha.1")
+	if err != nil {
+		t.Fatalf("Expected no error setting pre-release, got: %v", err)
+	}
+
+	// Verify pre-release was set
+	v, err := Load()
+	if err != nil {
+		t.Fatalf("Expected no error loading version, got: %v", err)
+	}
+	if v.PreRelease != "alpha.1" {
+		t.Errorf("Expected pre-release 'alpha.1', got '%s'", v.PreRelease)
+	}
+}
+
+func TestSetMetadata_Success(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Create initial version
+	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create VERSION file: %v", err)
+	}
+
+	// Set metadata
+	err = SetMetadata("build.123")
+	if err != nil {
+		t.Fatalf("Expected no error setting metadata, got: %v", err)
+	}
+
+	// Verify metadata was set
+	v, err := Load()
+	if err != nil {
+		t.Fatalf("Expected no error loading version, got: %v", err)
+	}
+	if v.BuildMetadata != "build.123" {
+		t.Errorf("Expected metadata 'build.123', got '%s'", v.BuildMetadata)
+	}
+}
+
+func TestSetPrefix_ErrorWhenNoVersionFile(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Don't create VERSION file - SetPrefix creates one if needed
+	err := SetPrefix("v")
+	if err != nil {
+		t.Fatalf("SetPrefix should create VERSION file if needed, got: %v", err)
+	}
+}
+
+func TestGetPrefix_CreatesVersionFileIfNeeded(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Don't create VERSION file - GetPrefix creates one if needed
+	prefix, err := GetPrefix()
+	if err != nil {
+		t.Fatalf("GetPrefix should create VERSION file if needed, got: %v", err)
+	}
+	// Default prefix from config is "v"
+	if prefix != "v" {
+		t.Errorf("Expected default prefix 'v', got '%s'", prefix)
+	}
+}
+
+func TestSetPreRelease_ErrorWhenNoVersionFile(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Don't create VERSION file - SetPreRelease creates one if needed
+	err := SetPreRelease("alpha")
+	if err != nil {
+		t.Fatalf("SetPreRelease should create VERSION file if needed, got: %v", err)
+	}
+}
+
+func TestSetMetadata_ErrorWhenNoVersionFile(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	os.Chdir(tempDir)
+
+	// Don't create VERSION file - SetMetadata creates one if needed
+	err := SetMetadata("build123")
+	if err != nil {
+		t.Fatalf("SetMetadata should create VERSION file if needed, got: %v", err)
+	}
+}
