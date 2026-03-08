@@ -24,7 +24,7 @@ build: version-file
     #!/bin/bash
     set -e
     echo "Building Python package..."
-    python -m build
+    python3 -m build
     echo "Build completed: dist/"
 
 # Install in development mode
@@ -33,13 +33,13 @@ install: version-file
 
 # Run the sample application
 run: version-file
-    python -m mypackage.main
+    python3 -m mypackage.main
 
 # Run using environment variable (no file generation)
 env-run:
     #!/bin/bash
     echo "Running with version from environment variable..."
-    APP_VERSION=$({{VERSIONATOR}} version) python -c "
+    APP_VERSION=$({{VERSIONATOR}} version) python3 -c "
     import os
     print('Sample Python Application')
     print(f'Version: {os.environ.get(\"APP_VERSION\", \"unknown\")}')

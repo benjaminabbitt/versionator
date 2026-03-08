@@ -44,7 +44,7 @@ Both approaches achieve the same result: version info baked into the final artif
 
 ## Live Demos
 
-All examples below are runnable. Each includes a Makefile with `make run` to see the embedded version in action.
+All examples below are runnable. Each includes a `justfile` with `just run` to see the embedded version in action.
 
 ### Go
 
@@ -74,12 +74,16 @@ build:
 
 **Run it:**
 ```bash
-cd examples/go
-make run
-# Output:
-# Sample Go Application
-# Version: v0.0.12
+$ cd examples/go && just run
+Getting version from versionator...
+Building sample application with version: 0.0.13
+Build completed: sample-app
+./sample-app
+Sample Go Application
+Version: 0.0.13
 ```
+
+**Source code:** [`main.go`](https://github.com/benjaminabbitt/versionator/blob/master/examples/go/main.go) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/go/justfile)
 
 ---
 
@@ -107,12 +111,16 @@ build:
 
 **Run it:**
 ```bash
-cd examples/rust
-make run
-# Output:
-# Sample Rust Application
-# Version: v0.0.12
+$ cd examples/rust && just run
+Getting version from versionator...
+Building sample application with version: 0.0.13
+Build completed: sample-app
+./sample-app
+Sample Rust Application
+Version: 0.0.13
 ```
+
+**Source code:** [`main.rs`](https://github.com/benjaminabbitt/versionator/blob/master/examples/rust/main.rs) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/rust/justfile)
 
 ---
 
@@ -145,12 +153,16 @@ build:
 
 **Run it:**
 ```bash
-cd examples/c
-make run
-# Output:
-# Sample C Application
-# Version: v0.0.12
+$ cd examples/c && just run
+Getting version from versionator...
+Building sample application with version: 0.0.13
+Build completed: sample-app
+./sample-app
+Sample C Application
+Version: 0.0.13
 ```
+
+**Source code:** [`main.c`](https://github.com/benjaminabbitt/versionator/blob/master/examples/c/main.c) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/c/justfile)
 
 ---
 
@@ -183,12 +195,16 @@ build:
 
 **Run it:**
 ```bash
-cd examples/cpp
-make run
-# Output:
-# Sample C++ Application
-# Version: v0.0.12
+$ cd examples/cpp && just run
+Getting version from versionator...
+Building sample application with version: 0.0.13
+Build completed: sample-app
+./sample-app
+Sample C++ Application
+Version: 0.0.13
 ```
+
+**Source code:** [`main.cpp`](https://github.com/benjaminabbitt/versionator/blob/master/examples/cpp/main.cpp) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/cpp/justfile)
 
 ---
 
@@ -222,12 +238,17 @@ build:
 
 **Run it:**
 ```bash
-cd examples/java
-make run
-# Output:
-# Sample Java Application
-# Version: v0.0.12
+$ cd examples/java && just run
+Getting version from versionator...
+Generating BuildTime.java from template...
+Building sample application with version: 0.0.13
+Build completed: app/Main.class app/BuildTime.class
+java app.Main
+Sample Java Application
+Version: 0.0.13
 ```
+
+**Source code:** [`app/Main.java`](https://github.com/benjaminabbitt/versionator/blob/master/examples/java/app/Main.java) | [`app/BuildTime.tmpl.java`](https://github.com/benjaminabbitt/versionator/blob/master/examples/java/app/BuildTime.tmpl.java) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/java/justfile)
 
 ---
 
@@ -262,12 +283,15 @@ run: version-file
 
 **Run it:**
 ```bash
-cd examples/python
-make run
-# Output:
-# Sample Python Application
-# Version: v0.0.12
+$ cd examples/python && just run
+Generating _version.py using versionator emit...
+Version 0.0.13 written to mypackage/_version.py
+python3 -m mypackage.main
+Sample Python Application
+Version: 0.0.13
 ```
+
+**Source code:** [`mypackage/main.py`](https://github.com/benjaminabbitt/versionator/blob/master/examples/python/mypackage/main.py) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/python/justfile)
 
 ---
 
@@ -298,12 +322,15 @@ run: version-file
 
 **Run it:**
 ```bash
-cd examples/javascript
-make run
-# Output:
-# Sample JavaScript Application
-# Version: v0.0.12
+$ cd examples/javascript && just run
+Generating version.js using versionator emit...
+Version 0.0.13 written to src/version.js
+node src/index.js
+Sample JavaScript Application
+Version: 0.0.13
 ```
+
+**Source code:** [`src/index.js`](https://github.com/benjaminabbitt/versionator/blob/master/examples/javascript/src/index.js) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/javascript/justfile)
 
 ---
 
@@ -337,12 +364,17 @@ run: build
 
 **Run it:**
 ```bash
-cd examples/typescript
-npm install && make run
-# Output:
-# Sample TypeScript Application
-# Version: v0.0.12
+$ cd examples/typescript && just run
+Generating version.ts using versionator emit...
+Version 0.0.13 written to src/version.ts
+Building TypeScript package...
+Build completed!
+node dist/index.js
+Sample TypeScript Application
+Version: 0.0.13
 ```
+
+**Source code:** [`src/index.ts`](https://github.com/benjaminabbitt/versionator/blob/master/examples/typescript/src/index.ts) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/typescript/justfile)
 
 ---
 
@@ -373,12 +405,15 @@ run: version-file
 
 **Run it:**
 ```bash
-cd examples/ruby
-make run
-# Output:
-# Sample Ruby Application
-# Version: v0.0.12
+$ cd examples/ruby && just run
+Generating version.rb using versionator emit...
+Version 0.0.13 written to lib/mypackage/version.rb
+ruby bin/mypackage
+Sample Ruby Application
+Version: 0.0.13
 ```
+
+**Source code:** [`lib/mypackage.rb`](https://github.com/benjaminabbitt/versionator/blob/master/examples/ruby/lib/mypackage.rb) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/ruby/justfile)
 
 ---
 
@@ -442,20 +477,26 @@ docker-build:
 
 **Run it:**
 ```bash
-cd examples/docker
-make docker-build docker-run
-# Output:
-# Sample Docker Application
-# Version: v0.0.12 (commit: abc1234, built: 2024-01-15T10:30:00Z)
+$ cd examples/docker && just show-version
+Version from versionator:
+  VERSION=0.0.13
+  GIT_COMMIT=ba4ecb3
+  BUILD_DATE=2026-03-08T18:52:29Z
 
-# Inspect image labels:
-docker inspect sample-app:v0.0.12 --format '{{json .Config.Labels}}' | jq
-# {
-#   "org.opencontainers.image.version": "v0.0.12",
-#   "org.opencontainers.image.revision": "abc1234",
-#   "org.opencontainers.image.created": "2024-01-15T10:30:00Z"
-# }
+$ just docker-build
+Building Docker image with:
+  VERSION=0.0.13
+  GIT_COMMIT=ba4ecb3
+  BUILD_DATE=2026-03-08T18:52:29Z
+...
+
+$ just docker-run
+Running sample-app:0.0.13
+Sample Docker Application
+Version: 0.0.13 (commit: ba4ecb3, built: 2026-03-08T18:52:29Z)
 ```
+
+**Source code:** [`main.go`](https://github.com/benjaminabbitt/versionator/blob/master/examples/docker/main.go) | [`Dockerfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/docker/Dockerfile) | [`justfile`](https://github.com/benjaminabbitt/versionator/blob/master/examples/docker/justfile)
 
 ---
 
@@ -465,12 +506,12 @@ From the repository root:
 
 ```bash
 # Build versionator first
-make build
+just build
 
 # Run all examples
 for dir in examples/*/; do
     echo "=== $dir ==="
-    (cd "$dir" && make run 2>/dev/null || echo "skipped")
+    (cd "$dir" && just run 2>/dev/null || echo "skipped")
 done
 ```
 
