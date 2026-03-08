@@ -277,3 +277,32 @@ acceptance-test-compose-slow:
     docker compose -f tests/acceptance/docker-compose.yml run --build acceptance-tests-slow
     docker compose -f tests/acceptance/docker-compose.yml down
 
+# ==================== Documentation ====================
+
+# Start documentation dev server
+docs-dev:
+    cd docs && npm start
+
+# Build documentation site
+docs-build:
+    cd docs && npm run build
+
+# Generate command reference docs from schema
+docs-generate: build
+    #!/bin/zsh
+    set -e
+    export PATH="$(pwd)/bin:$PATH"
+    node docs/scripts/generate-command-docs.js
+
+# Install documentation dependencies
+docs-install:
+    cd docs && npm install
+
+# Serve built documentation locally
+docs-serve:
+    cd docs && npm run serve
+
+# Clean documentation build
+docs-clean:
+    rm -rf docs/build docs/.docusaurus
+
