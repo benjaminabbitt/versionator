@@ -165,6 +165,145 @@ versionator release
 git push --tags
 ```
 
+## Semantic Commit Automation
+
+Versionator can automatically determine version bumps by analyzing commit messages since the last tag, similar to [semantic-release](https://semantic-release.gitbook.io/).
+
+### The `bump` Command
+
+The `bump` command parses commits and determines the appropriate version bump:
+
+```bash
+# Analyze commits and bump version automatically
+versionator bump
+
+# Preview what would happen without making changes
+versionator bump --dry-run
+
+# Only use +semver: markers
+versionator bump --mode=semver
+
+# Only use conventional commits
+versionator bump --mode=conventional
+```
+
+### Supported Commit Formats
+
+**+semver: markers** (can appear anywhere in commit message):
+
+| Marker | Effect |
+|--------|--------|
+| `+semver:major` | Bump major (1.0.0 → 2.0.0) |
+| `+semver:minor` | Bump minor (1.0.0 → 1.1.0) |
+| `+semver:patch` | Bump patch (1.0.0 → 1.0.1) |
+| `+semver:skip` | Skip version bump entirely |
+
+**Conventional Commits** ([conventionalcommits.org](https://conventionalcommits.org)):
+
+| Commit Type | Effect |
+|-------------|--------|
+| `feat: ...` | Bump minor |
+| `fix: ...` | Bump patch |
+| `feat!: ...` | Bump major (breaking) |
+| `BREAKING CHANGE:` in footer | Bump major |
+
+### Conflict Resolution
+
+- Highest bump level wins (major > minor > patch)
+- `+semver:skip` takes precedence and prevents any bump
+
+### Automated Release Workflow
+
+Combine `bump` and `release` for a fully automated workflow:
+
+```bash
+# After merging feature branches to main
+versionator bump && versionator release && git push && git push --tags
+```
+
+### Lefthook Post-Merge Automation
+
+Automate releases after merging to main with [Lefthook](https://github.com/evilmartians/lefthook):
+
+```yaml
+# lefthook.yml
+post-merge:
+  commands:
+    auto-release:
+      run: |
+        # Only run on main branch
+        if [ "$(git branch --show-current)" = "main" ]; then
+          versionator bump --dry-run
+          if [ $? -eq 0 ]; then
+            versionator bump && versionator release && git push && git push --tags
+          fi
+        fi
+```
+
+### CI Workflow (GitHub Actions)
+
+For teams that prefer CI-based releases:
+
+```yaml
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for commit analysis
+
+      - name: Install versionator
+        run: go install github.com/benjaminabbitt/versionator@latest
+
+      - name: Check for version bump
+        id: bump
+        run: |
+          if versionator bump --dry-run 2>&1 | grep -q "Would bump"; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump and Release
+        if: steps.bump.outputs.should_release == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          versionator bump
+          versionator release
+          git push
+          git push --tags
+```
+
+### Example Workflow
+
+```bash
+# Developer workflow with conventional commits
+git commit -m "feat: add user authentication"
+git commit -m "fix: resolve login timeout issue"
+git commit -m "feat!: redesign API endpoints"  # Breaking change
+
+# Merge to main, then release
+git checkout main
+git merge feature-branch
+
+# Versionator analyzes commits and bumps appropriately
+versionator bump --dry-run
+# Output: Would bump from 1.2.3 to 2.0.0 (major)
+# Triggering commit: feat!: redesign API endpoints
+
+versionator bump
+versionator release
+git push && git push --tags
+```
+
 ## Template Variables from Git
 
 Versionator extracts information from Git for templates:

@@ -40,12 +40,12 @@ GitVersion analyzes your git repository—commits, branches, tags, and merge his
 | Feature | Versionator | GitVersion |
 |---------|-------------|------------|
 | Version source | `VERSION` file | Git history calculation |
-| Bumping | Manual commands | Automatic from commits/branches |
+| Bumping | Manual or automatic (`bump`) | Automatic from commits/branches |
 | Predictability | Deterministic | Can vary with git state |
 | Configuration | Simple YAML | Complex branching rules |
 | Multi-language emit | 17+ languages | Primarily .NET (AssemblyInfo) |
 | Monorepo | Multiple VERSION files | Single version per repo |
-| Commit message parsing | No | Yes (`+semver:` keywords) |
+| Commit message parsing | Yes (`bump` command) | Yes (`+semver:` keywords) |
 | Branch strategy awareness | No | Yes (GitFlow, GitHub Flow) |
 
 ### When to Choose
@@ -89,10 +89,10 @@ It then generates release notes, creates git tags, and publishes to package regi
 | Feature | Versionator | semantic-release |
 |---------|-------------|------------------|
 | Version source | `VERSION` file | Commit analysis |
-| Bumping | Manual commands | Automatic from commits |
+| Bumping | Manual or automatic (`bump`) | Automatic from commits |
 | Changelog | Not included | Auto-generated |
 | Package publishing | Not included | Built-in |
-| Commit conventions | Not required | Required |
+| Commit conventions | Optional (for `bump`) | Required |
 | Runtime | Single Go binary | Node.js required |
 | Multi-language emit | 17+ languages | Via plugins |
 | Scope | Version management | Full release workflow |
@@ -104,6 +104,10 @@ It then generates release notes, creates git tags, and publishes to package regi
 - You don't want to enforce commit message conventions
 - You need version files for compiled languages
 - You want a single binary with no runtime dependencies
+
+:::tip Versionator supports automated bumping too
+If you like Conventional Commits but want versionator's simplicity, use the [`versionator bump`](/integration/git#semantic-commit-automation) command. It parses commits and bumps automatically—without Node.js or plugins.
+:::
 
 **Choose semantic-release if:**
 - You want fully automated releases
@@ -189,9 +193,9 @@ Analyzes commit history since the last tag, determines version bump from commit 
 
 | Feature | Versionator | GitVersion | semantic-release | Changesets |
 |---------|-------------|------------|------------------|------------|
-| **Approach** | Explicit | Auto (git) | Auto (commits) | Explicit |
+| **Approach** | Explicit or Auto | Auto (git) | Auto (commits) | Explicit |
 | **Version file** | `VERSION` | Calculated | `package.json` | `package.json` |
-| **Commit parsing** | No | Yes | Yes | No |
+| **Commit parsing** | Yes (`bump`) | Yes | Yes | No |
 | **Changelog** | No | No | Yes | Yes |
 | **Publishing** | No | No | Yes | Yes |
 | **Multi-lang emit** | 17+ | .NET | Plugins | JS only |
