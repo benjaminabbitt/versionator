@@ -18,8 +18,8 @@ docker-build:
     #!/bin/bash
     set -e
     VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "dev")
-    COMMIT=$({{VERSIONATOR}} version -t "{{ShortHash}}" 2>/dev/null || echo "unknown")
-    DATE=$({{VERSIONATOR}} version -t "{{BuildDateTimeUTC}}" 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
+    COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     echo "Building Docker image with:"
     echo "  VERSION=$VERSION"
     echo "  GIT_COMMIT=$COMMIT"
@@ -47,15 +47,14 @@ docker-inspect:
     #!/bin/bash
     VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "latest")
     echo "Inspecting labels for {{IMAGE_NAME}}:$VERSION"
-    podman inspect {{IMAGE_NAME}}:$VERSION --format '{{json .Config.Labels}}' | python3 -m json.tool 2>/dev/null || \
-    podman inspect {{IMAGE_NAME}}:$VERSION --format '{{json .Config.Labels}}'
+    podman inspect {{IMAGE_NAME}}:$VERSION --format=json | python3 -c "import sys,json; labels=json.load(sys.stdin)[0]['Config']['Labels']; print(json.dumps(labels, indent=2))"
 
 # Show version info that would be embedded
 show-version:
     #!/bin/bash
     VERSION=$({{VERSIONATOR}} version 2>/dev/null || echo "NOT SET")
-    COMMIT=$({{VERSIONATOR}} version -t "{{ShortHash}}" 2>/dev/null || echo "unknown")
-    DATE=$({{VERSIONATOR}} version -t "{{BuildDateTimeUTC}}" 2>/dev/null || echo "unknown")
+    COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     echo "Version from versionator:"
     echo "  VERSION=$VERSION"
     echo "  GIT_COMMIT=$COMMIT"
