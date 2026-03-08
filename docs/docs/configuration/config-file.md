@@ -127,7 +127,7 @@ release:
   branchPrefix: "release/"  # Branch name prefix
 ```
 
-When enabled, `versionator tag` creates both:
+When enabled, `versionator release` creates both:
 - A git tag (e.g., `v1.0.0`)
 - A release branch (e.g., `release/v1.0.0`)
 

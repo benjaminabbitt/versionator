@@ -300,3 +300,32 @@ func (mr *MockVersionControlSystemMockRecorder) GetCommitMessagesSinceTag() *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitMessagesSinceTag", reflect.TypeOf((*MockVersionControlSystem)(nil).GetCommitMessagesSinceTag))
 }
 
+// GetDirtyFiles mock base method.
+func (m *MockVersionControlSystem) GetDirtyFiles() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDirtyFiles")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDirtyFiles indicates an expected call of GetDirtyFiles.
+func (mr *MockVersionControlSystemMockRecorder) GetDirtyFiles() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDirtyFiles", reflect.TypeOf((*MockVersionControlSystem)(nil).GetDirtyFiles))
+}
+
+// CommitFiles mock base method.
+func (m *MockVersionControlSystem) CommitFiles(files []string, message string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CommitFiles", files, message)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CommitFiles indicates an expected call of CommitFiles.
+func (mr *MockVersionControlSystemMockRecorder) CommitFiles(files, message interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitFiles", reflect.TypeOf((*MockVersionControlSystem)(nil).CommitFiles), files, message)
+}
+

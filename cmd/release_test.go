@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// TagTestSuite defines the test suite for tag command tests
-type TagTestSuite struct {
+// ReleaseTestSuite defines the test suite for release command tests
+type ReleaseTestSuite struct {
 	suite.Suite
 	ctrl    *gomock.Controller
 	tempDir string
@@ -21,17 +21,17 @@ type TagTestSuite struct {
 }
 
 // SetupSuite runs once before all tests in the suite
-func (suite *TagTestSuite) SetupSuite() {
+func (suite *ReleaseTestSuite) SetupSuite() {
 	// This runs once for the entire suite
 }
 
 // TearDownSuite runs once after all tests in the suite
-func (suite *TagTestSuite) TearDownSuite() {
+func (suite *ReleaseTestSuite) TearDownSuite() {
 	// This runs once after the entire suite
 }
 
 // SetupTest runs before each test
-func (suite *TagTestSuite) SetupTest() {
+func (suite *ReleaseTestSuite) SetupTest() {
 	// Create a temporary directory for testing
 	suite.tempDir = suite.T().TempDir()
 	var err error
@@ -44,11 +44,11 @@ func (suite *TagTestSuite) SetupTest() {
 	suite.ctrl = gomock.NewController(suite.T())
 
 	// Reset command state to prevent flag pollution
-	suite.resetTagCommand()
+	suite.resetReleaseCommand()
 }
 
 // TearDownTest runs after each test
-func (suite *TagTestSuite) TearDownTest() {
+func (suite *ReleaseTestSuite) TearDownTest() {
 	// Restore original directory
 	if suite.origDir != "" {
 		os.Chdir(suite.origDir)
@@ -63,28 +63,28 @@ func (suite *TagTestSuite) TearDownTest() {
 	vcs.UnregisterVCS("git")
 }
 
-// resetTagCommand resets the tag command state between tests
-func (suite *TagTestSuite) resetTagCommand() {
+// resetReleaseCommand resets the release command state between tests
+func (suite *ReleaseTestSuite) resetReleaseCommand() {
 	// Reset command output and args
 	rootCmd.SetOut(nil)
 	rootCmd.SetErr(nil)
 	rootCmd.SetArgs(nil)
 
-	// Reset tag command flags to their default values
-	tagCmd.Flags().Set("message", "")
-	tagCmd.Flags().Set("prefix", "v")
-	tagCmd.Flags().Set("force", "false")
-	tagCmd.Flags().Set("verbose", "false")
-	tagCmd.Flags().Set("no-branch", "false")
+	// Reset release command flags to their default values
+	releaseCmd.Flags().Set("message", "")
+	releaseCmd.Flags().Set("prefix", "v")
+	releaseCmd.Flags().Set("force", "false")
+	releaseCmd.Flags().Set("verbose", "false")
+	releaseCmd.Flags().Set("no-branch", "false")
 }
 
 // createTestFiles creates the standard test files needed for most tests
-func (suite *TagTestSuite) createTestFiles(version string) {
+func (suite *ReleaseTestSuite) createTestFiles(version string) {
 	suite.createTestFilesWithRelease(version, true)
 }
 
 // createTestFilesWithRelease creates test files with configurable release branching
-func (suite *TagTestSuite) createTestFilesWithRelease(version string, createBranch bool) {
+func (suite *ReleaseTestSuite) createTestFilesWithRelease(version string, createBranch bool) {
 	// Create a VERSION file
 	err := os.WriteFile("VERSION", []byte(version), 0644)
 	suite.Require().NoError(err, "Failed to create VERSION file")
@@ -105,7 +105,7 @@ logging:
 	suite.Require().NoError(err, "Failed to create config file")
 }
 
-func (suite *TagTestSuite) TestTagCommand_Success() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_Success() {
 	// Create test files
 	suite.createTestFiles("1.2.3")
 
@@ -127,11 +127,11 @@ func (suite *TagTestSuite) TestTagCommand_Success() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag", "--verbose"})
+	rootCmd.SetArgs([]string{"release", "--verbose"})
 
-	// Execute the tag command
+	// Execute the release command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed")
+	suite.Require().NoError(err, "release command should succeed")
 
 	// Check output contains success message
 	output := buf.String()
@@ -141,7 +141,66 @@ func (suite *TagTestSuite) TestTagCommand_Success() {
 	suite.Contains(output, "git ID: abc1234", "Should contain verbose git ID output")
 }
 
-func (suite *TagTestSuite) TestTagCommand_CustomPrefix() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_AutoCommitVersionFile() {
+	// Create test files
+	suite.createTestFiles("1.2.3")
+
+	// Setup mock VCS - dirty but only VERSION file
+	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
+	mockVCS.EXPECT().Name().Return("git").AnyTimes()
+	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
+	mockVCS.EXPECT().GetDirtyFiles().Return([]string{"VERSION"}, nil)
+	mockVCS.EXPECT().CommitFiles([]string{"VERSION"}, "Release 1.2.3").Return(nil)
+	mockVCS.EXPECT().TagExists("v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v1.2.3", "Release 1.2.3").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/v1.2.3").Return(nil)
+
+	// Register mock VCS and set as active
+	vcs.RegisterVCS(mockVCS)
+
+	// Capture stdout
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Execute the release command
+	err := rootCmd.Execute()
+	suite.Require().NoError(err, "release command should succeed with auto-commit")
+
+	// Check output contains commit and success message
+	output := buf.String()
+	suite.Contains(output, "Committed VERSION file: Release 1.2.3", "Should contain commit message")
+	suite.Contains(output, "Successfully created tag 'v1.2.3'", "Should contain success message")
+}
+
+func (suite *ReleaseTestSuite) TestReleaseCommand_DirtyWithOtherFiles() {
+	// Create test files
+	suite.createTestFiles("1.0.0")
+
+	// Setup mock VCS - dirty with multiple files
+	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
+	mockVCS.EXPECT().Name().Return("git").AnyTimes()
+	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
+	mockVCS.EXPECT().GetDirtyFiles().Return([]string{"VERSION", "other.txt"}, nil)
+
+	// Register mock VCS and set as active
+	vcs.RegisterVCS(mockVCS)
+
+	// Capture stderr
+	var buf bytes.Buffer
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Execute the release command - should fail
+	err := rootCmd.Execute()
+	suite.Error(err, "Expected release command to fail when other files are dirty")
+}
+
+func (suite *ReleaseTestSuite) TestReleaseCommand_CustomPrefix() {
 	// Create test files
 	suite.createTestFiles("2.0.0")
 
@@ -162,18 +221,18 @@ func (suite *TagTestSuite) TestTagCommand_CustomPrefix() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag", "--prefix", "release-"})
+	rootCmd.SetArgs([]string{"release", "--prefix", "release-"})
 
-	// Execute the tag command
+	// Execute the release command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed")
+	suite.Require().NoError(err, "release command should succeed")
 
 	// Check output contains success message with custom prefix
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'release-2.0.0'", "Should contain success message with custom prefix")
 }
 
-func (suite *TagTestSuite) TestTagCommand_CustomMessage() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_CustomMessage() {
 	// Create test files
 	suite.createTestFiles("1.5.0")
 
@@ -194,18 +253,18 @@ func (suite *TagTestSuite) TestTagCommand_CustomMessage() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag", "--message", "Custom release message"})
+	rootCmd.SetArgs([]string{"release", "--message", "Custom release message"})
 
-	// Execute the tag command
+	// Execute the release command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed")
+	suite.Require().NoError(err, "release command should succeed")
 
 	// Check output contains success message
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'v1.5.0'", "Should contain success message")
 }
 
-func (suite *TagTestSuite) TestTagCommand_NoVCS() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_NoVCS() {
 	// Create test files
 	suite.createTestFiles("1.0.0")
 
@@ -215,37 +274,14 @@ func (suite *TagTestSuite) TestTagCommand_NoVCS() {
 	// Capture stderr
 	var buf bytes.Buffer
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"tag"})
+	rootCmd.SetArgs([]string{"release"})
 
-	// Execute the tag command - should fail
+	// Execute the release command - should fail
 	err := rootCmd.Execute()
-	suite.Error(err, "Expected tag command to fail when no VCS is available")
+	suite.Error(err, "Expected release command to fail when no VCS is available")
 }
 
-func (suite *TagTestSuite) TestTagCommand_DirtyWorkingDirectory() {
-	// Create test files
-	suite.createTestFiles("1.0.0")
-
-	// Setup mock VCS
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
-
-	// Register mock VCS and set as active
-	vcs.RegisterVCS(mockVCS)
-
-	// Capture stderr
-	var buf bytes.Buffer
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"tag"})
-
-	// Execute the tag command - should fail
-	err := rootCmd.Execute()
-	suite.Error(err, "Expected tag command to fail when working directory is dirty")
-}
-
-func (suite *TagTestSuite) TestTagCommand_TagExists_NoForce() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_NoForce() {
 	// Create test files
 	suite.createTestFiles("1.0.0")
 
@@ -263,14 +299,14 @@ func (suite *TagTestSuite) TestTagCommand_TagExists_NoForce() {
 	// Capture stderr
 	var buf bytes.Buffer
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"tag"})
+	rootCmd.SetArgs([]string{"release"})
 
-	// Execute the tag command - should fail
+	// Execute the release command - should fail
 	err := rootCmd.Execute()
-	suite.Error(err, "Expected tag command to fail when tag exists and force is not used")
+	suite.Error(err, "Expected release command to fail when tag exists and force is not used")
 }
 
-func (suite *TagTestSuite) TestTagCommand_TagExists_WithForce() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_WithForce() {
 	// Create test files
 	suite.createTestFiles("1.0.0")
 
@@ -291,18 +327,18 @@ func (suite *TagTestSuite) TestTagCommand_TagExists_WithForce() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag", "--force"})
+	rootCmd.SetArgs([]string{"release", "--force"})
 
-	// Execute the tag command
+	// Execute the release command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed with force flag")
+	suite.Require().NoError(err, "release command should succeed with force flag")
 
 	// Check output contains success message
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'v1.0.0'", "Should contain success message")
 }
 
-func (suite *TagTestSuite) TestTagCommand_NoVersionFile() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_NoVersionFile() {
 	// Create only config file (no VERSION file)
 	configContent := `prefix: ""
 metadata:
@@ -335,18 +371,18 @@ logging:
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag"})
+	rootCmd.SetArgs([]string{"release"})
 
-	// Execute the tag command - should succeed with default version
+	// Execute the release command - should succeed with default version
 	err = rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed with default version")
+	suite.Require().NoError(err, "release command should succeed with default version")
 
 	// Check output contains success message with default version
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'v0.0.0' for version 0.0.0", "Should contain success message with default version")
 }
 
-func (suite *TagTestSuite) TestTagCommand_NoBranchFlag() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_NoBranchFlag() {
 	// Create test files with branch creation enabled
 	suite.createTestFiles("1.0.0")
 
@@ -366,11 +402,11 @@ func (suite *TagTestSuite) TestTagCommand_NoBranchFlag() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag", "--no-branch"})
+	rootCmd.SetArgs([]string{"release", "--no-branch"})
 
-	// Execute the tag command
+	// Execute the release command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed")
+	suite.Require().NoError(err, "release command should succeed")
 
 	// Check output
 	output := buf.String()
@@ -378,7 +414,7 @@ func (suite *TagTestSuite) TestTagCommand_NoBranchFlag() {
 	suite.NotContains(output, "Successfully created branch", "Should NOT contain branch success message")
 }
 
-func (suite *TagTestSuite) TestTagCommand_BranchDisabledInConfig() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_BranchDisabledInConfig() {
 	// Create test files with branch creation disabled
 	suite.createTestFilesWithRelease("1.0.0", false)
 
@@ -398,11 +434,11 @@ func (suite *TagTestSuite) TestTagCommand_BranchDisabledInConfig() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag"})
+	rootCmd.SetArgs([]string{"release"})
 
-	// Execute the tag command
+	// Execute the release command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed")
+	suite.Require().NoError(err, "release command should succeed")
 
 	// Check output
 	output := buf.String()
@@ -410,7 +446,7 @@ func (suite *TagTestSuite) TestTagCommand_BranchDisabledInConfig() {
 	suite.NotContains(output, "Successfully created branch", "Should NOT contain branch success message")
 }
 
-func (suite *TagTestSuite) TestTagCommand_BranchAlreadyExists() {
+func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyExists() {
 	// Create test files with branch creation enabled
 	suite.createTestFiles("1.0.0")
 
@@ -431,11 +467,11 @@ func (suite *TagTestSuite) TestTagCommand_BranchAlreadyExists() {
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"tag"})
+	rootCmd.SetArgs([]string{"release"})
 
-	// Execute the tag command
+	// Execute the release command
 	err := rootCmd.Execute()
-	suite.Require().NoError(err, "tag command should succeed")
+	suite.Require().NoError(err, "release command should succeed")
 
 	// Check output contains warning about existing branch
 	output := buf.String()
@@ -443,7 +479,7 @@ func (suite *TagTestSuite) TestTagCommand_BranchAlreadyExists() {
 	suite.Contains(output, "Warning: branch 'release/v1.0.0' already exists", "Should contain warning about existing branch")
 }
 
-// TestTagTestSuite runs the tag test suite
-func TestTagTestSuite(t *testing.T) {
-	suite.Run(t, new(TagTestSuite))
+// TestReleaseTestSuite runs the release test suite
+func TestReleaseTestSuite(t *testing.T) {
+	suite.Run(t, new(ReleaseTestSuite))
 }

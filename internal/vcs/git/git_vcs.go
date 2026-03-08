@@ -446,6 +446,76 @@ func (g *GitVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) 
 	return messages, nil
 }
 
+// GetDirtyFiles returns the list of files with uncommitted changes
+func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
+	repo, err := g.openRepository()
+	if err != nil {
+		return nil, err
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working tree: %w", err)
+	}
+
+	status, err := worktree.Status()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git status: %w", err)
+	}
+
+	var files []string
+	for file := range status {
+		files = append(files, file)
+	}
+	return files, nil
+}
+
+// CommitFiles stages and commits the specified files with the given message
+func (g *GitVersionControlSystem) CommitFiles(files []string, message string) error {
+	repo, err := g.openRepository()
+	if err != nil {
+		return err
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get working tree: %w", err)
+	}
+
+	// Stage each file
+	for _, file := range files {
+		_, err := worktree.Add(file)
+		if err != nil {
+			return fmt.Errorf("failed to stage file %s: %w", file, err)
+		}
+	}
+
+	// Get author info from last commit
+	head, err := repo.Head()
+	if err != nil {
+		return fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	commit, err := repo.CommitObject(head.Hash())
+	if err != nil {
+		return fmt.Errorf("failed to get commit object: %w", err)
+	}
+
+	// Create commit
+	_, err = worktree.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  commit.Author.Name,
+			Email: commit.Author.Email,
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create commit: %w", err)
+	}
+
+	return nil
+}
+
 // Helper methods
 func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 	currentPath := startPath

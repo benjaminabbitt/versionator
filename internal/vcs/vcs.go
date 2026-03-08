@@ -60,4 +60,11 @@ type VersionControlSystem interface {
 	// GetCommitMessagesSinceTag returns all commit messages since the most recent tag
 	// Returns commit messages newest first, empty slice if on tagged commit or no tags
 	GetCommitMessagesSinceTag() ([]string, error)
+
+	// GetDirtyFiles returns the list of files with uncommitted changes
+	// Returns relative paths from the repository root
+	GetDirtyFiles() ([]string, error)
+
+	// CommitFiles stages and commits the specified files with the given message
+	CommitFiles(files []string, message string) error
 }

@@ -39,18 +39,18 @@ Feature: Error Handling
     Then the exit code should not be 0
 
   # Git/VCS errors
-  Scenario: Tag command outside git repository
+  Scenario: Release command outside git repository
     Given a VERSION file with version "1.0.0"
     # Note: Background creates git repo, we need to test outside it
     # This scenario tests the error message format
-    When I run "versionator tag"
+    When I run "versionator release"
     Then the exit code should be 0
 
-  Scenario: Tag with dirty working directory
+  Scenario: Release with dirty working directory (other files dirty)
     Given a VERSION file with version "1.0.0"
     And a committed file "README.md" with content "initial"
     And a file "uncommitted.txt" with content "dirty"
-    When I run "versionator tag"
+    When I run "versionator release"
     Then the exit code should not be 0
     And the output should contain "not clean"
 

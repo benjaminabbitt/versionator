@@ -8,21 +8,37 @@ sidebar_position: 1
 
 Versionator integrates with Git to create annotated tags and release branches for your versions.
 
-## Creating Tags
+## Creating Releases
 
-The `tag` command creates an annotated Git tag for the current version:
+The `release` command creates an annotated Git tag and release branch for the current version:
 
 ```bash
-# Create tag for current version
-versionator tag
-# Creates: v1.0.0 (if prefix is enabled)
+# Bump version and release
+versionator patch increment
+versionator release
+# Creates: tag v1.0.0 and branch release/v1.0.0
 
 # With custom message
-versionator tag -m "Release 1.0.0 with new features"
+versionator release -m "Release 1.0.0 with new features"
 
 # Force overwrite existing tag
-versionator tag --force
+versionator release --force
 ```
+
+### Auto-Commit Behavior
+
+The `release` command will **automatically commit the VERSION file** if:
+- The working directory is dirty
+- The VERSION file is the **only** dirty file
+
+This enables a clean workflow:
+
+```bash
+versionator patch increment    # VERSION file is now dirty
+versionator release            # Auto-commits VERSION, creates tag and branch
+```
+
+If other files are dirty, the command will fail with a list of dirty files.
 
 ### Tag Naming
 
@@ -35,32 +51,15 @@ The tag name follows your version format:
 | `release-1.0.0` | `release-1.0.0` |
 | `v1.0.0-beta.1` | `v1.0.0-beta.1` |
 
-### Requirements
-
-Before creating a tag:
-- Working directory must be clean (no uncommitted changes)
-- The current commit will be tagged
-
-```bash
-# Check status first
-git status
-
-# Stage and commit any changes
-git add .
-git commit -m "Prepare release v1.0.0"
-
-# Now tag
-versionator tag
-```
-
 ## Release Branches
 
-By default, `versionator tag` creates **both a tag and a release branch**:
+By default, `versionator release` creates **both a tag and a release branch**:
 
 ```bash
-versionator tag
+versionator release
 # Output:
-# Successfully created tag 'v1.0.0' for version 1.0.0 using Git
+# Committed VERSION file: Release 1.0.0
+# Successfully created tag 'v1.0.0' for version 1.0.0 using git
 # Successfully created branch 'release/v1.0.0'
 ```
 
@@ -96,7 +95,7 @@ release:
 For a single invocation:
 
 ```bash
-versionator tag --no-branch
+versionator release --no-branch
 ```
 
 To disable globally:
@@ -109,7 +108,7 @@ release:
 
 ## Pushing to Remote
 
-Tags are local by default. Push them to your remote:
+Tags and branches are local by default. Push them to your remote:
 
 ```bash
 # Push specific tag
@@ -125,28 +124,23 @@ git push origin release/v1.0.0
 
 ## Version Bump Workflow
 
-A typical release workflow:
+A typical release workflow with versionator:
 
 ```bash
-# 1. Ensure working directory is clean
+# 1. Make sure other changes are committed
 git status
 
-# 2. Bump version
+# 2. Bump version and release
 versionator minor increment
+versionator release
 
-# 3. Stage the VERSION file change
-git add VERSION
-
-# 4. Commit
-git commit -m "Bump version to 1.1.0"
-
-# 5. Create tag
-versionator tag
-
-# 6. Push commit and tag
+# 3. Push everything
 git push
 git push --tags
+git push origin release/v1.1.0
 ```
+
+The `release` command handles the VERSION file commit automatically.
 
 ## Pre-release Workflow
 
@@ -155,24 +149,19 @@ For pre-release versions:
 ```bash
 # Set pre-release
 versionator prerelease set alpha.1
-git add VERSION
-git commit -m "Start alpha release cycle"
+versionator release
 
 # Iterate on alpha
 versionator prerelease set alpha.2
-git add VERSION
-git commit -m "Alpha 2"
+versionator release
 
 # Move to beta
 versionator prerelease set beta.1
-git add VERSION
-git commit -m "Start beta release cycle"
+versionator release
 
-# Release
+# Final release
 versionator prerelease clear
-git add VERSION
-git commit -m "Release 1.1.0"
-versionator tag
+versionator release
 git push --tags
 ```
 
@@ -249,8 +238,8 @@ See [CI/CD Integration](./cicd) for detailed GitHub Actions workflows.
 
 ## Best Practices
 
-1. **Commit VERSION changes**: Always commit the VERSION file change before tagging
-2. **Clean working directory**: Ensure no uncommitted changes before tagging
+1. **Use release command**: Let `versionator release` handle VERSION commits
+2. **Clean working directory**: Commit other changes before bumping version
 3. **Semantic commits**: Use descriptive commit messages for version bumps
 4. **Push tags explicitly**: Tags don't push automatically with `git push`
 5. **Use annotated tags**: Versionator creates annotated tags by default
@@ -259,3 +248,4 @@ See [CI/CD Integration](./cicd) for detailed GitHub Actions workflows.
 
 - [CI/CD Integration](./cicd) - Automation workflows
 - [Template Variables](../templates/variables) - Git-related variables
+- [Release Command](../commands/release) - Command reference

@@ -56,9 +56,7 @@ bump-patch:
 	@echo "Version: $(shell versionator version)"
 
 release: bump-patch
-	git add VERSION
-	git commit -m "Release $(shell versionator version)"
-	versionator tag
+	versionator release
 	git push
 	git push --tags
 ```
@@ -147,14 +145,10 @@ release bump="patch":
     #!/bin/bash
     set -e
 
-    # Bump version
+    # Bump version and release
     versionator {{bump}} increment
+    versionator release
     VERSION=$(versionator version)
-
-    # Commit and tag
-    git add VERSION
-    git commit -m "Release $VERSION"
-    versionator tag
 
     # Push
     git push

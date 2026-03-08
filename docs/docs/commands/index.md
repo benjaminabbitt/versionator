@@ -12,16 +12,19 @@ Versionator provides commands for managing semantic versions.
 
 | Command | Description |
 |---------|-------------|
+| [`bump`](./bump) | Auto-bump version based on commit messages |
+| [`ci`](./ci) | Output version variables for CI/CD systems |
 | [`config`](./config) | Manage configuration |
 | [`custom`](./custom) | Manage custom key-value pairs in config |
 | [`emit`](./emit) | Emit version in various formats |
 | [`major`](./major) | Manage major version |
 | [`metadata`](./metadata) | Manage build metadata |
 | [`minor`](./minor) | Manage minor version |
+| [`mode`](./mode) | Manage versioning mode (release or continuous-delivery) |
 | [`patch`](./patch) | Manage patch version |
 | [`prefix`](./prefix) | Manage version prefix |
 | [`prerelease`](./prerelease) | Manage pre-release identifier |
-| [`tag`](./tag) | Create git tag for current version |
+| [`release`](./release) | Create git tag and release branch for current version |
 | [`vars`](./vars) | Show all template variables and their current values |
 | [`version`](./version) | Show current version |
 
