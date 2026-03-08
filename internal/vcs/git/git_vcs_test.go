@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -789,5 +790,103 @@ func TestPackageLevel_GetGitShortHash_ReturnsHash(t *testing.T) {
 
 	if len(hash) != 7 {
 		t.Errorf("expected hash length 7, got %d", len(hash))
+	}
+}
+
+func TestCreateBranch_Success(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+
+	h.CreateCommit("initial commit")
+
+	vcs := NewGitVCS()
+	err := vcs.CreateBranch("release/v1.0.0")
+	if err != nil {
+		t.Fatalf("CreateBranch() error: %v", err)
+	}
+
+	// Verify branch was created
+	exists, err := vcs.BranchExists("release/v1.0.0")
+	if err != nil {
+		t.Fatalf("BranchExists() error: %v", err)
+	}
+	if !exists {
+		t.Error("expected branch to exist after creation")
+	}
+}
+
+func TestBranchExists_ExistingBranch_ReturnsTrue(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+
+	h.CreateCommit("initial commit")
+
+	vcs := NewGitVCS()
+
+	// Master/main branch should exist after commit
+	// First check what branches exist
+	branches, err := h.repo.Branches()
+	if err != nil {
+		t.Fatalf("failed to get branches: %v", err)
+	}
+
+	var branchName string
+	err = branches.ForEach(func(ref *plumbing.Reference) error {
+		branchName = ref.Name().Short()
+		return errStopIteration
+	})
+
+	// Check that the branch exists
+	exists, err := vcs.BranchExists(branchName)
+	if err != nil {
+		t.Fatalf("BranchExists() error: %v", err)
+	}
+	if !exists {
+		t.Errorf("expected branch '%s' to exist", branchName)
+	}
+}
+
+func TestBranchExists_NonExistingBranch_ReturnsFalse(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+
+	h.CreateCommit("initial commit")
+
+	vcs := NewGitVCS()
+	exists, err := vcs.BranchExists("non-existent-branch-xyz")
+	if err != nil {
+		t.Fatalf("BranchExists() error: %v", err)
+	}
+	if exists {
+		t.Error("expected non-existent branch to return false")
+	}
+}
+
+func TestCreateBranch_MultipleBranches(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+
+	h.CreateCommit("initial commit")
+
+	vcs := NewGitVCS()
+
+	// Create multiple release branches
+	branches := []string{"release/v1.0.0", "release/v1.1.0", "release/v2.0.0"}
+	for _, branch := range branches {
+		err := vcs.CreateBranch(branch)
+		if err != nil {
+			t.Fatalf("CreateBranch(%s) error: %v", branch, err)
+		}
+	}
+
+	// Verify all branches exist
+	for _, branch := range branches {
+		exists, err := vcs.BranchExists(branch)
+		if err != nil {
+			t.Fatalf("BranchExists(%s) error: %v", branch, err)
+		}
+		if !exists {
+			t.Errorf("expected branch '%s' to exist", branch)
+		}
 	}
 }

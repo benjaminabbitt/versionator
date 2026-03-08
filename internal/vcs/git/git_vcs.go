@@ -214,6 +214,61 @@ func (g *GitVersionControlSystem) TagExists(tagName string) (bool, error) {
 	return exists, nil
 }
 
+// CreateBranch creates a branch with the specified name from the current HEAD
+func (g *GitVersionControlSystem) CreateBranch(branchName string) error {
+	repo, err := g.openRepository()
+	if err != nil {
+		return err
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		return fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	// Create the branch reference
+	refName := plumbing.NewBranchReferenceName(branchName)
+	ref := plumbing.NewHashReference(refName, head.Hash())
+
+	err = repo.Storer.SetReference(ref)
+	if err != nil {
+		return fmt.Errorf("failed to create branch: %w", err)
+	}
+
+	return nil
+}
+
+// BranchExists checks if a branch with the specified name exists
+func (g *GitVersionControlSystem) BranchExists(branchName string) (bool, error) {
+	repo, err := g.openRepository()
+	if err != nil {
+		return false, err
+	}
+
+	branches, err := repo.Branches()
+	if err != nil {
+		return false, fmt.Errorf("failed to get branches: %w", err)
+	}
+
+	exists := false
+	err = branches.ForEach(func(branch *plumbing.Reference) error {
+		if branch.Name().Short() == branchName {
+			exists = true
+			return errStopIteration // Early exit once found
+		}
+		return nil
+	})
+
+	if errors.Is(err, errStopIteration) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to iterate branches: %w", err)
+	}
+
+	return exists, nil
+}
+
 // GetBranchName returns the current branch name
 func (g *GitVersionControlSystem) GetBranchName() (string, error) {
 	repo, err := g.openRepository()
