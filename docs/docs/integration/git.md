@@ -55,22 +55,56 @@ versionator tag
 
 ## Release Branches
 
-Configure automatic release branch creation in `.versionator.yaml`:
+By default, `versionator tag` creates **both a tag and a release branch**:
+
+```bash
+versionator tag
+# Output:
+# Successfully created tag 'v1.0.0' for version 1.0.0 using Git
+# Successfully created branch 'release/v1.0.0'
+```
+
+### Why Release Branches?
+
+Release branches serve important purposes:
+
+- **Hotfix isolation**: Apply patches to a specific release without pulling in main branch changes
+- **Support multiple versions**: Maintain `release/v1.x` and `release/v2.x` simultaneously
+- **CI/CD triggers**: Many pipelines trigger on `release/*` branch patterns
+- **Clear release history**: Each release has a named branch for easy navigation
+
+### Configuration
+
+Configure release branches in `.versionator.yaml`:
 
 ```yaml
 release:
-  createBranch: true
-  branchPrefix: "release/"
+  createBranch: true        # Enable/disable (default: true)
+  branchPrefix: "release/"  # Prefix for branch names
 ```
 
-With this configuration, `versionator tag` creates:
-- A tag (e.g., `v1.0.0`)
-- A branch (e.g., `release/v1.0.0`)
+### What Gets Created
+
+| VERSION | Tag | Branch |
+|---------|-----|--------|
+| `1.0.0` | `v1.0.0` | `release/v1.0.0` |
+| `1.0.0-beta.1` | `v1.0.0-beta.1` | `release/v1.0.0-beta.1` |
+| `2.0.0-rc.1` | `v2.0.0-rc.1` | `release/v2.0.0-rc.1` |
 
 ### Skip Branch Creation
 
+For a single invocation:
+
 ```bash
 versionator tag --no-branch
+```
+
+To disable globally:
+
+```yaml
+# .versionator.yaml
+release:
+  createBranch: false
 ```
 
 ## Pushing to Remote
