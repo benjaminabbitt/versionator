@@ -18,10 +18,10 @@ const TEMPLATES_DIR = path.join(DOCS_DIR, 'templates');
 // Generate schema from versionator
 function getSchema() {
   try {
-    const output = execSync('versionator schema', { encoding: 'utf-8' });
+    const output = execSync('versionator support schema', { encoding: 'utf-8' });
     return JSON.parse(output);
   } catch (error) {
-    console.error('Error running versionator schema:', error.message);
+    console.error('Error running versionator support schema:', error.message);
     console.error('Make sure versionator is installed and in your PATH');
     process.exit(1);
   }
