@@ -145,7 +145,7 @@ dev-setup:
     just build
     echo "Development environment ready!"
 
-# Build for all platforms with static linking
+# Build for all platforms with static linking and UPX compression
 build-all: fix-perms fix-git-dubious-ownership-warning
     #!/bin/zsh
     set -e
@@ -162,11 +162,11 @@ build-all: fix-perms fix-git-dubious-ownership-warning
     echo "Building for Linux arm64..."
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-linux-arm64 .
 
-    # macOS amd64 (Intel)
+    # macOS amd64 (Intel) - no UPX (breaks code signing)
     echo "Building for macOS amd64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-darwin-amd64 .
 
-    # macOS arm64 (Apple Silicon)
+    # macOS arm64 (Apple Silicon) - no UPX (breaks code signing)
     echo "Building for macOS arm64..."
     CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-darwin-arm64 .
 
@@ -182,9 +182,22 @@ build-all: fix-perms fix-git-dubious-ownership-warning
     echo "Building for FreeBSD amd64..."
     CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 GO111MODULE=on go build -ldflags="$LDFLAGS" -trimpath -o bin/versionator-freebsd-amd64 .
 
+    # UPX compression (Linux, Windows, FreeBSD - not macOS due to code signing issues)
+    if command -v upx >/dev/null 2>&1; then
+        echo "Compressing binaries with UPX..."
+        upx --best --lzma bin/versionator-linux-amd64 || true
+        upx --best --lzma bin/versionator-linux-arm64 || true
+        upx --best --lzma bin/versionator-windows-amd64.exe || true
+        upx --best --lzma bin/versionator-windows-arm64.exe || true
+        upx --best --lzma bin/versionator-freebsd-amd64 || true
+        echo "UPX compression completed!"
+    else
+        echo "UPX not found, skipping compression (install with: apt install upx)"
+    fi
+
     echo "All builds completed successfully!"
     echo "Build artifacts:"
-    ls -la bin/
+    ls -lh bin/
 
 # Show project status
 status:

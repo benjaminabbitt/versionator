@@ -171,3 +171,288 @@ versionator emit dump [flags]
 | `-t, --template` | string | - | Custom Mustache template string |
 | `-f, --template-file` | string | - | Path to template file |
 
+## Language Reference
+
+Languages sorted by [TIOBE Index](https://www.tiobe.com/tiobe-index/) popularity.
+
+### Python
+
+```bash
+versionator emit python --output mypackage/_version.py
+```
+
+```python
+# Generated output
+VERSION = "1.2.3"
+MAJOR = 1
+MINOR = 2
+PATCH = 3
+```
+
+### C
+
+```bash
+versionator emit c --output version.c
+versionator emit c-header --output version.h
+```
+
+```c
+// version.h
+#ifndef VERSION_H
+#define VERSION_H
+#define VERSION "1.2.3"
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 2
+#define VERSION_PATCH 3
+#endif
+```
+
+### C++ {#cpp}
+
+```bash
+versionator emit cpp --output version.cpp
+versionator emit cpp-header --output version.hpp
+```
+
+```cpp
+// version.hpp
+#pragma once
+namespace version {
+    constexpr const char* VERSION = "1.2.3";
+    constexpr int MAJOR = 1;
+    constexpr int MINOR = 2;
+    constexpr int PATCH = 3;
+}
+```
+
+### Java
+
+```bash
+versionator emit java --output src/main/java/com/example/Version.java
+```
+
+```java
+public final class Version {
+    public static final String VERSION = "1.2.3";
+    public static final int MAJOR = 1;
+    public static final int MINOR = 2;
+    public static final int PATCH = 3;
+}
+```
+
+### C# {#csharp}
+
+```bash
+versionator emit csharp --output Version.cs
+```
+
+```csharp
+public static class Version {
+    public const string VERSION = "1.2.3";
+    public const int MAJOR = 1;
+    public const int MINOR = 2;
+    public const int PATCH = 3;
+}
+```
+
+### JavaScript
+
+```bash
+versionator emit js --output src/version.js
+```
+
+```javascript
+export const VERSION = "1.2.3";
+export const MAJOR = 1;
+export const MINOR = 2;
+export const PATCH = 3;
+```
+
+### Go
+
+```bash
+versionator emit go --output internal/version/generated.go
+```
+
+```go
+package version
+
+const (
+    Version = "1.2.3"
+    Major   = 1
+    Minor   = 2
+    Patch   = 3
+)
+```
+
+### TypeScript
+
+```bash
+versionator emit ts --output src/version.ts
+```
+
+```typescript
+export const VERSION: string = "1.2.3";
+export const MAJOR: number = 1;
+export const MINOR: number = 2;
+export const PATCH: number = 3;
+```
+
+### PHP
+
+```bash
+versionator emit php --output src/Version.php
+```
+
+```php
+<?php
+class Version {
+    public const VERSION = "1.2.3";
+    public const MAJOR = 1;
+    public const MINOR = 2;
+    public const PATCH = 3;
+}
+```
+
+### Swift
+
+```bash
+versionator emit swift --output Sources/Version.swift
+```
+
+```swift
+public struct Version {
+    public static let version = "1.2.3"
+    public static let major = 1
+    public static let minor = 2
+    public static let patch = 3
+}
+```
+
+### Kotlin
+
+```bash
+versionator emit kotlin --output src/main/kotlin/Version.kt
+```
+
+```kotlin
+object Version {
+    const val VERSION = "1.2.3"
+    const val MAJOR = 1
+    const val MINOR = 2
+    const val PATCH = 3
+}
+```
+
+### Rust
+
+```bash
+versionator emit rust --output src/version.rs
+```
+
+```rust
+pub const VERSION: &str = "1.2.3";
+pub const MAJOR: u32 = 1;
+pub const MINOR: u32 = 2;
+pub const PATCH: u32 = 3;
+```
+
+### Ruby
+
+```bash
+versionator emit ruby --output lib/version.rb
+```
+
+```ruby
+module MyApp
+  VERSION = "1.2.3"
+  MAJOR = 1
+  MINOR = 2
+  PATCH = 3
+end
+```
+
+## Data Formats
+
+### JSON
+
+```bash
+versionator emit json --output version.json
+```
+
+```json
+{
+  "version": "1.2.3",
+  "major": 1,
+  "minor": 2,
+  "patch": 3
+}
+```
+
+### YAML
+
+```bash
+versionator emit yaml --output version.yaml
+```
+
+```yaml
+version: "1.2.3"
+major: 1
+minor: 2
+patch: 3
+```
+
+## Containers
+
+For container files (Docker, Podman, etc.), use the VERSION file directly or custom templates.
+
+### Containerfile / Dockerfile
+
+```dockerfile
+# Option 1: Read VERSION at build time
+ARG VERSION
+# Set during build: docker build --build-arg VERSION=$(cat VERSION) .
+# Or with Podman: podman build --build-arg VERSION=$(cat VERSION) .
+
+# Option 2: Copy VERSION file
+COPY VERSION /app/VERSION
+
+# Option 3: Use versionator in multi-stage build
+FROM alpine AS version
+COPY VERSION .
+RUN apk add --no-cache curl && \
+    curl -sSL https://github.com/benjaminabbitt/versionator/releases/latest/download/versionator-linux-amd64 -o /usr/local/bin/versionator && \
+    chmod +x /usr/local/bin/versionator && \
+    versionator emit json --output /version.json
+
+FROM alpine
+COPY --from=version /version.json /app/version.json
+```
+
+### compose.yml (Docker Compose / Podman Compose)
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      args:
+        VERSION: "${VERSION:-0.0.0}"
+    labels:
+      - "version=${VERSION}"
+```
+
+Use with:
+```bash
+VERSION=$(cat VERSION) docker compose up
+# or
+VERSION=$(cat VERSION) podman-compose up
+```
+
+### Custom Template for Containers
+
+```bash
+# Create a template for your container needs
+versionator emit --template 'LABEL version="{{MajorMinorPatch}}"' >> Containerfile
+```
+
