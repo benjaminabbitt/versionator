@@ -90,12 +90,12 @@ jobs:
         echo "1.0.0" > VERSION
 
         # Test version reading
-        VERSION=$(./bin/versionator-linux-amd64 version)
+        VERSION=$(./bin/versionator-linux-amd64 output version)
         echo "Current version: $VERSION"
 
         # Test version incrementing
-        ./bin/versionator-linux-amd64 patch increment
-        NEW_VERSION=$(./bin/versionator-linux-amd64 version)
+        ./bin/versionator-linux-amd64 bump patch increment
+        NEW_VERSION=$(./bin/versionator-linux-amd64 output version)
         echo "New version: $NEW_VERSION"
 
         # Verify version changed
