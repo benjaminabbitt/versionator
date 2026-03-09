@@ -17,6 +17,23 @@
    - IMPORTANT: The BSD 3-Clause license does NOT remove CC BY 3.0
      attribution requirements. You must credit Tom Preston-Werner and
      the SemVer project when using SemVer-derived portions of this grammar.
+
+   -----------------------------------------------------------------------
+
+   A note on scope:
+
+   This grammar is, by any reasonable measure, excessive. A regex would
+   parse 99% of version strings correctly. Instead, we have 370 lines of
+   formal grammar covering SemVer, Go pseudo-versions, .NET assembly
+   versions, NuGet, npm, CalVer, and template variables.
+
+   This is a hobby project. The grammar was written on a Sunday afternoon
+   because formal grammars are fun, correctness matters, and passion
+   projects permit glorious digressions. A regex solves the problem;
+   a grammar solves it *right*.
+
+   If you find this useful, enjoy. If you find it excessive, you're
+   not wrong—but you're also missing the point.
    ======================================================================= *)
 
 (* -----------------------------------------------------------------------

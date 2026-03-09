@@ -62,6 +62,14 @@ versionator patch +     # 0.0.1 -> 0.0.2  (aliases: increment, inc, +)
 versionator release     # Create tag v0.0.2
 ```
 
+## About This Project
+
+Versionator is a hobby project solving a real problem. It could be solved with less—a regex parses most version strings just fine. Instead, there's a [370-line formal EBNF grammar](docs/grammar/version.ebnf) covering SemVer, Go pseudo-versions, .NET assembly versions, and more. Written on a Sunday afternoon because formal grammars are fun and passion projects permit glorious digressions.
+
+The grammar might have value to someone, sometime. If it doesn't, that's fine too. It has value to me.
+
+See [Grammar-Based Parser](https://benjaminabbitt.github.io/versionator/concepts/grammar) for the full philosophy.
+
 ## License
 
 BSD-3-Clause
