@@ -4,37 +4,21 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to release (e.g., v0.0.5)'
-        required: true
-        type: string
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      version: ${{ steps.tag_version.outputs.version }}
-      tag: ${{ steps.tag_version.outputs.tag }}
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        ref: ${{ inputs.tag || github.ref }}
 
     - name: Extract tag version
       id: tag_version
       run: |
-        # Handle both tag push and workflow_dispatch
-        if [ -n "${{ inputs.tag }}" ]; then
-          TAG="${{ inputs.tag }}"
-        else
-          TAG=${GITHUB_REF#refs/tags/}
-        fi
+        TAG=${GITHUB_REF#refs/tags/}
         VERSION=${TAG#v}
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -55,16 +39,7 @@ jobs:
           # Create release directory
           mkdir -p release
 
-          # Copy and rename binaries with version
-          cp bin/versionator-linux-amd64 release/versionator-${{ steps.tag_version.outputs.version }}-linux-amd64
-          cp bin/versionator-linux-arm64 release/versionator-${{ steps.tag_version.outputs.version }}-linux-arm64
-          cp bin/versionator-darwin-amd64 release/versionator-${{ steps.tag_version.outputs.version }}-darwin-amd64
-          cp bin/versionator-darwin-arm64 release/versionator-${{ steps.tag_version.outputs.version }}-darwin-arm64
-          cp bin/versionator-windows-amd64.exe release/versionator-${{ steps.tag_version.outputs.version }}-windows-amd64.exe
-          cp bin/versionator-windows-arm64.exe release/versionator-${{ steps.tag_version.outputs.version }}-windows-arm64.exe
-          cp bin/versionator-freebsd-amd64 release/versionator-${{ steps.tag_version.outputs.version }}-freebsd-amd64
-
-          # Create generic copies without version for convenience
+          # Copy binaries (generic names for easy download)
           cp bin/versionator-linux-amd64 release/versionator-linux-amd64
           cp bin/versionator-linux-arm64 release/versionator-linux-arm64
           cp bin/versionator-darwin-amd64 release/versionator-darwin-amd64
@@ -78,24 +53,6 @@ jobs:
           sha256sum * > checksums.txt
           ls -la
 
-    - name: Install syft for SBOM generation
-      uses: anchore/sbom-action/download-syft@v0
-
-    - name: Generate SBOMs for binaries
-      run: |
-        # Generate SBOM for the Go module (source)
-        syft dir:. -o spdx-json > release/sbom-source-spdx.json
-        syft dir:. -o cyclonedx-json > release/sbom-source-cyclonedx.json
-
-        echo "SBOMs generated for source code"
-
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: versionator-release-${{ steps.tag_version.outputs.version }}
-        path: release/
-        retention-days: 90
-
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
@@ -106,88 +63,35 @@ jobs:
 
           ### Installation
 
-          #### Go Install (Recommended for Go developers)
+          Download the appropriate binary for your platform and add it to your PATH.
+
+          #### Linux/macOS
           ```bash
-          go install github.com/benjaminabbitt/versionator@v${{ steps.tag_version.outputs.version }}
+          curl -LO https://github.com/benjaminabbitt/versionator/releases/download/${{ steps.tag_version.outputs.tag }}/versionator-linux-amd64
+          chmod +x versionator-linux-amd64
+          sudo mv versionator-linux-amd64 /usr/local/bin/versionator
           ```
 
-          #### Homebrew (macOS/Linux)
-          ```bash
-          brew tap benjaminabbitt/tap
-          brew install versionator
-          ```
+          #### Windows
+          Download `versionator-windows-amd64.exe`, rename to `versionator.exe`, and add to your PATH.
 
-          #### Chocolatey (Windows)
-          ```powershell
-          choco install versionator
-          ```
-
-          #### Debian/Ubuntu (.deb)
-          ```bash
-          # Download the .deb package for your architecture
-          wget https://github.com/benjaminabbitt/versionator/releases/download/v${{ steps.tag_version.outputs.version }}/versionator_${{ steps.tag_version.outputs.version }}_amd64.deb
-          sudo dpkg -i versionator_${{ steps.tag_version.outputs.version }}_amd64.deb
-          ```
-
-          #### Docker
-          ```bash
-          docker pull ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.version }}
-
-          # Run directly
-          docker run --rm -v $(pwd):/work -w /work ghcr.io/benjaminabbitt/versionator:latest version
-
-          # Use in CI/CD
-          docker run --rm -v $(pwd):/work -w /work ghcr.io/benjaminabbitt/versionator:latest emit python -o _version.py
-          ```
-
-          #### Manual Download
-          Download the appropriate binary for your platform below.
-
-          ### Downloads
+          ### Available Binaries
 
           | Platform | Architecture | Binary |
           |----------|--------------|--------|
-          | Docker | amd64/arm64 | `ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.version }}` |
           | Linux | x64 | `versionator-linux-amd64` |
           | Linux | arm64 | `versionator-linux-arm64` |
-          | Linux | x64 (.deb) | `versionator_${{ steps.tag_version.outputs.version }}_amd64.deb` |
-          | Linux | arm64 (.deb) | `versionator_${{ steps.tag_version.outputs.version }}_arm64.deb` |
           | macOS | Intel | `versionator-darwin-amd64` |
           | macOS | Apple Silicon | `versionator-darwin-arm64` |
           | Windows | x64 | `versionator-windows-amd64.exe` |
           | Windows | arm64 | `versionator-windows-arm64.exe` |
           | FreeBSD | x64 | `versionator-freebsd-amd64` |
 
-          ### Manual Installation
-
-          1. Download the appropriate binary for your platform
-          2. Make it executable (Linux/macOS): `chmod +x versionator-*`
-          3. Move to your PATH: `sudo mv versionator-* /usr/local/bin/versionator`
-
           ### Verification
 
-          **Binary checksums:**
           All binaries are provided with SHA256 checksums in `checksums.txt`.
           ```bash
           sha256sum -c checksums.txt --ignore-missing
-          ```
-
-          **Docker image signature (cosign):**
-          ```bash
-          cosign verify ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.version }} \
-            --certificate-identity-regexp='https://github.com/benjaminabbitt/versionator/.*' \
-            --certificate-oidc-issuer='https://token.actions.githubusercontent.com'
-          ```
-
-          ### Software Bill of Materials (SBOM)
-
-          SBOMs are provided in both SPDX and CycloneDX formats:
-          - `sbom-source-spdx.json` - Source code dependencies (SPDX)
-          - `sbom-source-cyclonedx.json` - Source code dependencies (CycloneDX)
-
-          Docker image SBOM is attached to the container image and can be retrieved:
-          ```bash
-          cosign download sbom ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.version }}
           ```
 
         files: |
@@ -197,365 +101,3 @@ jobs:
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Update Homebrew tap formula
-  update-homebrew:
-    runs-on: ubuntu-latest
-    needs: release
-    if: success()
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download release artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: versionator-release-${{ needs.release.outputs.version }}
-        path: release/
-
-    - name: Calculate checksums and update formula
-      id: checksums
-      run: |
-        VERSION="${{ needs.release.outputs.version }}"
-
-        # Extract checksums from the checksums.txt file
-        SHA256_DARWIN_AMD64=$(grep "versionator-darwin-amd64$" release/checksums.txt | cut -d' ' -f1)
-        SHA256_DARWIN_ARM64=$(grep "versionator-darwin-arm64$" release/checksums.txt | cut -d' ' -f1)
-        SHA256_LINUX_AMD64=$(grep "versionator-linux-amd64$" release/checksums.txt | cut -d' ' -f1)
-        SHA256_LINUX_ARM64=$(grep "versionator-linux-arm64$" release/checksums.txt | cut -d' ' -f1)
-
-        echo "sha256_darwin_amd64=$SHA256_DARWIN_AMD64" >> $GITHUB_OUTPUT
-        echo "sha256_darwin_arm64=$SHA256_DARWIN_ARM64" >> $GITHUB_OUTPUT
-        echo "sha256_linux_amd64=$SHA256_LINUX_AMD64" >> $GITHUB_OUTPUT
-        echo "sha256_linux_arm64=$SHA256_LINUX_ARM64" >> $GITHUB_OUTPUT
-
-    - name: Generate Homebrew formula
-      run: |
-        VERSION="${{ needs.release.outputs.version }}"
-
-        cat > versionator.rb << 'FORMULA'
-        # typed: false
-        # frozen_string_literal: true
-
-        class Versionator < Formula
-          desc "A semantic version management CLI tool"
-          homepage "https://github.com/benjaminabbitt/versionator"
-          version "${{ needs.release.outputs.version }}"
-          license "BSD-3-Clause"
-
-          on_macos do
-            if Hardware::CPU.arm?
-              url "https://github.com/benjaminabbitt/versionator/releases/download/v${{ needs.release.outputs.version }}/versionator-darwin-arm64"
-              sha256 "${{ steps.checksums.outputs.sha256_darwin_arm64 }}"
-
-              def install
-                bin.install "versionator-darwin-arm64" => "versionator"
-              end
-            else
-              url "https://github.com/benjaminabbitt/versionator/releases/download/v${{ needs.release.outputs.version }}/versionator-darwin-amd64"
-              sha256 "${{ steps.checksums.outputs.sha256_darwin_amd64 }}"
-
-              def install
-                bin.install "versionator-darwin-amd64" => "versionator"
-              end
-            end
-          end
-
-          on_linux do
-            if Hardware::CPU.arm?
-              url "https://github.com/benjaminabbitt/versionator/releases/download/v${{ needs.release.outputs.version }}/versionator-linux-arm64"
-              sha256 "${{ steps.checksums.outputs.sha256_linux_arm64 }}"
-
-              def install
-                bin.install "versionator-linux-arm64" => "versionator"
-              end
-            else
-              url "https://github.com/benjaminabbitt/versionator/releases/download/v${{ needs.release.outputs.version }}/versionator-linux-amd64"
-              sha256 "${{ steps.checksums.outputs.sha256_linux_amd64 }}"
-
-              def install
-                bin.install "versionator-linux-amd64" => "versionator"
-              end
-            end
-          end
-
-          test do
-            (testpath/"VERSION").write("1.0.0")
-            assert_match "1.0.0", shell_output("#{bin}/versionator version")
-          end
-        end
-        FORMULA
-
-        echo "Generated formula:"
-        cat versionator.rb
-
-    - name: Upload formula artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: homebrew-formula
-        path: versionator.rb
-        retention-days: 90
-
-  # Build Chocolatey package
-  build-chocolatey:
-    runs-on: windows-latest
-    needs: release
-    if: success()
-    environment: Build
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download release artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: versionator-release-${{ needs.release.outputs.version }}
-        path: release/
-
-    - name: Get Windows binary checksum
-      id: checksum
-      shell: pwsh
-      run: |
-        $checksum = (Get-Content release/checksums.txt | Select-String "versionator-windows-amd64.exe$").ToString().Split(" ")[0]
-        echo "checksum=$checksum" >> $env:GITHUB_OUTPUT
-
-    - name: Prepare Chocolatey package
-      shell: pwsh
-      run: |
-        $version = "${{ needs.release.outputs.version }}"
-        $checksum = "${{ steps.checksum.outputs.checksum }}"
-
-        # Create package directory
-        New-Item -ItemType Directory -Force -Path choco-pkg/tools
-
-        # Copy and update nuspec (UTF-8 with BOM)
-        $nuspec = Get-Content packaging/chocolatey/versionator.nuspec -Raw
-        $nuspec = $nuspec -replace '\$version\$', $version
-        $Utf8Bom = New-Object System.Text.UTF8Encoding $true
-        [System.IO.File]::WriteAllText("$PWD/choco-pkg/versionator.nuspec", $nuspec, $Utf8Bom)
-
-        # Copy and update install script (UTF-8 with BOM for PowerShell)
-        $install = Get-Content packaging/chocolatey/tools/chocolateyInstall.ps1 -Raw
-        $install = $install -replace '\$checksum64\$', $checksum
-        [System.IO.File]::WriteAllText("$PWD/choco-pkg/tools/chocolateyInstall.ps1", $install, $Utf8Bom)
-
-        # Copy and update uninstall script (UTF-8 with BOM)
-        $uninstall = Get-Content packaging/chocolatey/tools/chocolateyUninstall.ps1 -Raw
-        [System.IO.File]::WriteAllText("$PWD/choco-pkg/tools/chocolateyUninstall.ps1", $uninstall, $Utf8Bom)
-
-        # Copy and update beforeModify script (UTF-8 with BOM)
-        $beforeModify = Get-Content packaging/chocolatey/tools/chocolateyBeforeModify.ps1 -Raw
-        [System.IO.File]::WriteAllText("$PWD/choco-pkg/tools/chocolateyBeforeModify.ps1", $beforeModify, $Utf8Bom)
-
-        # Copy and update VERIFICATION.txt
-        $verification = Get-Content packaging/chocolatey/tools/VERIFICATION.txt -Raw
-        $verification = $verification -replace '\$version\$', $version
-        $verification = $verification -replace '\$checksum64\$', $checksum
-        [System.IO.File]::WriteAllText("$PWD/choco-pkg/tools/VERIFICATION.txt", $verification, $Utf8Bom)
-
-        Write-Host "Package contents:"
-        Get-ChildItem -Recurse choco-pkg
-
-    - name: Build Chocolatey package
-      shell: pwsh
-      run: |
-        cd choco-pkg
-        choco pack versionator.nuspec --verbose
-        Get-ChildItem *.nupkg
-
-    - name: Push to Chocolatey Community Repository
-      env:
-        CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
-      shell: pwsh
-      run: |
-        cd choco-pkg
-        $nupkg = Get-ChildItem *.nupkg | Select-Object -First 1
-        Write-Host "Pushing $($nupkg.Name) to Chocolatey..."
-        choco push $nupkg.Name --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
-        Write-Host "Package pushed successfully!"
-
-    - name: Upload Chocolatey package
-      uses: actions/upload-artifact@v4
-      with:
-        name: chocolatey-package
-        path: choco-pkg/*.nupkg
-        retention-days: 90
-
-  # Build Debian packages
-  build-debian:
-    runs-on: ubuntu-latest
-    needs: release
-    if: success()
-    permissions:
-      contents: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download release artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: versionator-release-${{ needs.release.outputs.version }}
-        path: release/
-
-    - name: Build Debian packages
-      run: |
-        VERSION="${{ needs.release.outputs.version }}"
-
-        # Make build script executable
-        chmod +x packaging/debian/build-deb.sh
-
-        # Build amd64 package
-        ./packaging/debian/build-deb.sh "$VERSION" amd64 release/versionator-linux-amd64
-
-        # Build arm64 package
-        ./packaging/debian/build-deb.sh "$VERSION" arm64 release/versionator-linux-arm64
-
-        # List built packages
-        ls -la packaging/debian/build/
-
-    - name: Upload Debian packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: debian-packages
-        path: packaging/debian/build/*.deb
-        retention-days: 90
-
-    - name: Upload to GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ needs.release.outputs.tag }}
-        files: packaging/debian/build/*.deb
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Build and push Docker image with signing and SBOM
-  build-docker:
-    runs-on: ubuntu-latest
-    needs: release
-    if: success()
-    permissions:
-      contents: read
-      packages: write
-      id-token: write  # Required for keyless cosign signing
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Install cosign
-      uses: sigstore/cosign-installer@v3
-
-    - name: Install syft for SBOM generation
-      uses: anchore/sbom-action/download-syft@v0
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract metadata for Docker
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/${{ github.repository }}
-        tags: |
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
-          type=raw,value=latest
-
-    - name: Build and push Docker image
-      id: build-push
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        build-args: |
-          VERSION=${{ needs.release.outputs.version }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-    - name: Sign container image with cosign (keyless)
-      env:
-        DIGEST: ${{ steps.build-push.outputs.digest }}
-        TAGS: ${{ steps.meta.outputs.tags }}
-      run: |
-        images=""
-        for tag in ${TAGS}; do
-          images+="${tag}@${DIGEST} "
-        done
-        cosign sign --yes ${images}
-
-    - name: Generate and attach SBOM
-      env:
-        DIGEST: ${{ steps.build-push.outputs.digest }}
-      run: |
-        IMAGE="ghcr.io/${{ github.repository }}@${DIGEST}"
-
-        # Generate SBOM in SPDX format
-        syft "${IMAGE}" -o spdx-json > sbom-spdx.json
-
-        # Generate SBOM in CycloneDX format
-        syft "${IMAGE}" -o cyclonedx-json > sbom-cyclonedx.json
-
-        # Attach SBOMs to image using cosign
-        cosign attach sbom --sbom sbom-spdx.json "${IMAGE}"
-
-        echo "SBOM generated and attached to image"
-
-    - name: Upload SBOMs as artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: docker-sboms
-        path: |
-          sbom-spdx.json
-          sbom-cyclonedx.json
-        retention-days: 90
-
-    - name: Output image info
-      run: |
-        echo "Docker image pushed to:"
-        echo "  ghcr.io/${{ github.repository }}:${{ needs.release.outputs.version }}"
-        echo "  ghcr.io/${{ github.repository }}:latest"
-        echo ""
-        echo "Image signed with cosign (keyless/Sigstore)"
-        echo "SBOM attached in SPDX format"
-        echo ""
-        echo "Verify signature:"
-        echo "  cosign verify ghcr.io/${{ github.repository }}:${{ needs.release.outputs.version }} \\"
-        echo "    --certificate-identity-regexp='https://github.com/${{ github.repository }}/.*' \\"
-        echo "    --certificate-oidc-issuer='https://token.actions.githubusercontent.com'"
-
-  notify:
-    runs-on: ubuntu-latest
-    needs: [release, update-homebrew, build-chocolatey, build-debian, build-docker]
-    if: always()
-
-    steps:
-    - name: Release notification
-      run: |
-        echo "Release Versionator ${{ needs.release.outputs.version }} completed!"
-        echo ""
-        echo "Installation methods:"
-        echo "  go install github.com/benjaminabbitt/versionator@v${{ needs.release.outputs.version }}"
-        echo "  brew tap benjaminabbitt/tap && brew install versionator"
-        echo "  choco install versionator (after publishing to Chocolatey)"
-        echo "  sudo dpkg -i versionator_${{ needs.release.outputs.version }}_amd64.deb"
-        echo "  docker pull ghcr.io/${{ github.repository }}:${{ needs.release.outputs.version }}"
-        echo ""
-        echo "Release: https://github.com/${{ github.repository }}/releases/tag/${{ needs.release.outputs.tag }}"

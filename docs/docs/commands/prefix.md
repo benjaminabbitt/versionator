@@ -48,14 +48,16 @@ versionator prefix enable
 
 Set version prefix
 
-Set a custom version prefix in both config and VERSION file.
+Set the version prefix in both config and VERSION file.
+Only `v` or `V` prefixes are allowed per SemVer convention.
 
 This updates:
 1. The config file (.versionator.yaml) - so 'prefix enable' can restore it
 2. The VERSION file - the source of truth for the current version
 
 ```bash
-versionator prefix set
+versionator prefix set v
+versionator prefix set V
 ```
 
 ### status
