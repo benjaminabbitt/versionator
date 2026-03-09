@@ -6,7 +6,32 @@ sidebar_position: 2
 
 # Competitors
 
-This page compares versionator to other popular semantic versioning tools. Each tool has its own philosophy and strengths—the right choice depends on your workflow.
+## Our Philosophy
+
+Versionator aspires to be the go-to tool for version management. Not release management. Not changelog generation. Not package publishing. Just versions.
+
+This is deliberate. Following the [Unix philosophy](https://en.wikipedia.org/wiki/Unix_philosophy), versionator does one thing and does it well:
+
+- **Read** a version from a `VERSION` file
+- **Write** that version to source files in 17+ languages
+- **Bump** it when you decide to
+- **Tag** it in git when you're ready
+
+That's it. Everything else—changelogs, release notes, package publishing, deployment pipelines—is someone else's job. Versionator is a composable tool designed to fit into your workflow, not replace it.
+
+```bash
+# Versionator plays well with others
+versionator bump patch increment
+versionator emit go --output internal/version/version.go
+git-chglog > CHANGELOG.md
+goreleaser release
+```
+
+The tools that try to do everything often do nothing quite right for your specific needs. Versionator does versions. Compose it with whatever else you need.
+
+---
+
+This page compares versionator to other popular versioning tools. Each has its own philosophy and strengths—the right choice depends on your workflow.
 
 ## Philosophy Comparison
 
