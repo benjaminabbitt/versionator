@@ -38,6 +38,8 @@ RUN apt-get update && apt-get install -y \
     zsh \
     just \
     gh \
+    upx \
+    zip \
     && rm -rf /var/lib/apt/lists/*
 
 
