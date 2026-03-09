@@ -14,12 +14,15 @@ Optionally creates a .versionator.yaml configuration file.
 
 Only 'v' or 'V' prefixes are allowed per SemVer convention.
 
-Examples:
-  versionator init                        # Create VERSION with 0.0.1
-  versionator init --version 1.0.0        # Create VERSION with 1.0.0
-  versionator init --prefix v             # Create VERSION with v0.0.1
-  versionator init --config               # Also create .versionator.yaml
-  versionator init --force                # Overwrite existing files
+**Examples:**
+
+```bash
+versionator init                        # Create VERSION with 0.0.1
+versionator init --version 1.0.0        # Create VERSION with 1.0.0
+versionator init --prefix v             # Create VERSION with v0.0.1
+versionator init --config               # Also create .versionator.yaml
+versionator init --force                # Overwrite existing files
+```
 
 ## Usage
 
@@ -47,9 +50,12 @@ The hook only triggers when the commit message contains:
   +semver:minor - Bump minor version
   +semver:patch - Bump patch version
 
-Examples:
-  versionator init hook              # Install the post-commit hook
-  versionator init hook --uninstall  # Remove the post-commit hook
+**Examples:**
+
+```bash
+versionator init hook              # Install the post-commit hook
+versionator init hook --uninstall  # Remove the post-commit hook
+```
 
 ```bash
 versionator init hook [flags]
