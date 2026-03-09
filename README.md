@@ -2,6 +2,8 @@
 
 A semantic version management CLI tool that manages versions in a plain text `VERSION` file.
 
+**Documentation:** https://benjaminabbitt.github.io/versionator/
+
 ## Features
 
 - **Single source of truth**: Plain text VERSION file
