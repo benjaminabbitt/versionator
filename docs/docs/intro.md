@@ -61,11 +61,11 @@ When you're debugging at 2 AM, you'll know exactly what's running. See [Binary E
 ## Quick Example
 
 ```bash
-# Initialize version (creates VERSION file with 0.0.0)
+# Initialize version (creates VERSION file with 0.0.1)
 versionator init
 
 # Increment versions
-versionator major increment   # 0.0.0 -> 1.0.0
+versionator major increment   # 0.0.1 -> 1.0.0
 versionator minor increment   # 1.0.0 -> 1.1.0
 versionator patch increment   # 1.1.0 -> 1.1.1
 
@@ -85,6 +85,52 @@ Versionator is ideal for:
 - **Projects** that want predictable, reproducible versioning
 - **Teams** that prefer deliberate version management over auto-calculation
 - **Multi-language projects** needing version info in multiple formats
+
+## Examples
+
+Complete working examples for each supported language and scenario:
+
+### Compiled Languages
+
+| Example | Description |
+|---------|-------------|
+| [Go](https://github.com/benjaminabbitt/versionator/tree/master/examples/go) | Version embedding via `-ldflags` |
+| [Rust](https://github.com/benjaminabbitt/versionator/tree/master/examples/rust) | Compile-time version with `option_env!()` |
+| [C](https://github.com/benjaminabbitt/versionator/tree/master/examples/c) | Preprocessor defines |
+| [C++](https://github.com/benjaminabbitt/versionator/tree/master/examples/cpp) | Preprocessor defines |
+
+### JVM Languages
+
+| Example | Description |
+|---------|-------------|
+| [Java](https://github.com/benjaminabbitt/versionator/tree/master/examples/java) | Generated source file |
+| [Kotlin](https://github.com/benjaminabbitt/versionator/tree/master/examples/kotlin) | `versionator emit kotlin` |
+
+### .NET & Apple
+
+| Example | Description |
+|---------|-------------|
+| [C#](https://github.com/benjaminabbitt/versionator/tree/master/examples/csharp) | `versionator emit csharp` |
+| [Swift](https://github.com/benjaminabbitt/versionator/tree/master/examples/swift) | `versionator emit swift` |
+
+### Interpreted Languages
+
+| Example | Description |
+|---------|-------------|
+| [Python](https://github.com/benjaminabbitt/versionator/tree/master/examples/python) | `versionator emit python` |
+| [Python (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/python-custom) | Custom template |
+| [JavaScript](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript) | `versionator emit js` |
+| [JavaScript (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript-custom) | Custom template |
+| [TypeScript](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript) | `versionator emit ts` |
+| [TypeScript (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript-custom) | Custom template |
+| [Ruby](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby) | `versionator emit ruby` |
+| [Ruby (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby-custom) | Custom template |
+
+### Containers
+
+| Example | Description |
+|---------|-------------|
+| [Docker](https://github.com/benjaminabbitt/versionator/tree/master/examples/docker) | Build args + OCI labels |
 
 ## Getting Started
 

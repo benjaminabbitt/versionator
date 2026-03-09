@@ -27,9 +27,9 @@ Optionally creates a .versionator.yaml configuration file.
 Only 'v' or 'V' prefixes are allowed per SemVer convention.
 
 Examples:
-  versionator init                        # Create VERSION with 0.0.0
+  versionator init                        # Create VERSION with 0.0.1
   versionator init --version 1.0.0        # Create VERSION with 1.0.0
-  versionator init --prefix v             # Create VERSION with v0.0.0
+  versionator init --prefix v             # Create VERSION with v0.0.1
   versionator init --config               # Also create .versionator.yaml
   versionator init --force                # Overwrite existing files`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -85,7 +85,7 @@ Examples:
 }
 
 func init() {
-	initCmd.Flags().StringVarP(&initVersion, "version", "v", "0.0.0", "Initial version")
+	initCmd.Flags().StringVarP(&initVersion, "version", "v", "0.0.1", "Initial version")
 	initCmd.Flags().StringVarP(&initPrefix, "prefix", "p", "", "Version prefix ('v' or 'V' only)")
 	initCmd.Flags().BoolVar(&initWithConfig, "config", false, "Also create .versionator.yaml")
 	initCmd.Flags().BoolVarP(&initForce, "force", "f", false, "Overwrite existing files")

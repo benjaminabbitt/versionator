@@ -25,8 +25,8 @@ func TestGetCurrentVersion_NoVersionFile_NoVCS(t *testing.T) {
 		t.Fatalf("Expected no error when creating default version, got: %v", err)
 	}
 
-	if version != "0.0.0" {
-		t.Errorf("Expected default version '0.0.0', got '%s'", version)
+	if version != "0.0.1" {
+		t.Errorf("Expected default version '0.0.1', got '%s'", version)
 	}
 
 	// Verify VERSION file was created
@@ -62,8 +62,8 @@ func TestGetCurrentVersion_NoVersionFile_WithVCS(t *testing.T) {
 		t.Fatalf("Expected no error when creating default version, got: %v", err)
 	}
 
-	if version != "0.0.0" {
-		t.Errorf("Expected default version '0.0.0', got '%s'", version)
+	if version != "0.0.1" {
+		t.Errorf("Expected default version '0.0.1', got '%s'", version)
 	}
 
 	// Verify VERSION file was created in repository root
@@ -198,8 +198,8 @@ func TestGetCurrentVersion_VCSError(t *testing.T) {
 		t.Fatalf("Expected no error when VCS fails (should fallback), got: %v", err)
 	}
 
-	if version != "0.0.0" {
-		t.Errorf("Expected default version '0.0.0', got '%s'", version)
+	if version != "0.0.1" {
+		t.Errorf("Expected default version '0.0.1', got '%s'", version)
 	}
 
 	// Verify VERSION file was created in current directory (fallback)

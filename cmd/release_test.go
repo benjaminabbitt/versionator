@@ -367,10 +367,10 @@ logging:
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
 	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
-	mockVCS.EXPECT().TagExists("v0.0.0").Return(false, nil)
-	mockVCS.EXPECT().CreateTag("v0.0.0", "Release 0.0.0").Return(nil)
-	mockVCS.EXPECT().BranchExists("release/v0.0.0").Return(false, nil)
-	mockVCS.EXPECT().CreateBranch("release/v0.0.0").Return(nil)
+	mockVCS.EXPECT().TagExists("v0.0.1").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v0.0.1", "Release 0.0.1").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/v0.0.1").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/v0.0.1").Return(nil)
 
 	// Register mock VCS and set as active
 	vcs.RegisterVCS(mockVCS)
@@ -386,7 +386,7 @@ logging:
 
 	// Check output contains success message with default version
 	output := buf.String()
-	suite.Contains(output, "Successfully created tag 'v0.0.0' for version 0.0.0", "Should contain success message with default version")
+	suite.Contains(output, "Successfully created tag 'v0.0.1' for version 0.0.1", "Should contain success message with default version")
 }
 
 func (suite *ReleaseTestSuite) TestReleaseCommand_NoBranchFlag() {

@@ -58,7 +58,7 @@ func TestPatchCommand(t *testing.T) {
 			name:            "increment from default version",
 			args:            []string{"patch", "increment"},
 			initialVersion:  "", // No VERSION file
-			expectedVersion: "0.0.1",
+			expectedVersion: "0.0.2",
 			expectError:     false,
 		},
 		{

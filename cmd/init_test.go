@@ -39,7 +39,7 @@ func (suite *InitTestSuite) TearDownTest() {
 	rootCmd.SetArgs(nil)
 
 	// Reset flags to defaults
-	initVersion = "0.0.0"
+	initVersion = "0.0.1"
 	initPrefix = ""
 	initWithConfig = false
 	initForce = false
@@ -53,7 +53,7 @@ func (suite *InitTestSuite) TestInitCommand_Default() {
 	// Verify VERSION file was created
 	content, err := os.ReadFile("VERSION")
 	suite.Require().NoError(err, "Should be able to read VERSION file")
-	suite.Equal("0.0.0", strings.TrimSpace(string(content)), "VERSION should contain '0.0.0'")
+	suite.Equal("0.0.1", strings.TrimSpace(string(content)), "VERSION should contain '0.0.1'")
 
 	// Verify config was NOT created
 	_, err = os.Stat(".versionator.yaml")
@@ -77,7 +77,7 @@ func (suite *InitTestSuite) TestInitCommand_WithPrefix() {
 
 	content, err := os.ReadFile("VERSION")
 	suite.Require().NoError(err, "Should be able to read VERSION file")
-	suite.Equal("v0.0.0", strings.TrimSpace(string(content)), "VERSION should contain 'v0.0.0'")
+	suite.Equal("v0.0.1", strings.TrimSpace(string(content)), "VERSION should contain 'v0.0.1'")
 }
 
 func (suite *InitTestSuite) TestInitCommand_WithVersionAndPrefix() {

@@ -60,7 +60,7 @@ Feature: VERSION File Discovery
   Scenario: Create VERSION in current directory when not found
     And a subdirectory "newproject"
     When I run "versionator version" in subdirectory "newproject"
-    Then the output should be "0.0.0"
+    Then the output should be "0.0.1"
     And the file "newproject/VERSION" should exist
 
   Scenario: Multiple levels of nested projects
