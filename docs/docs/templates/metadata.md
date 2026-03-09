@@ -15,17 +15,17 @@ Build metadata provides additional information about a build without affecting v
 Set a fixed metadata value:
 
 ```bash
-versionator metadata set build.123
+versionator config metadata set build.123
 # VERSION: 1.0.0+build.123
 
-versionator metadata set 20241212
+versionator config metadata set 20241212
 # VERSION: 1.0.0+20241212
 ```
 
 Clear metadata:
 
 ```bash
-versionator metadata clear
+versionator config metadata clear
 # VERSION: 1.0.0
 ```
 
@@ -34,7 +34,7 @@ versionator metadata clear
 Use templates for values computed at build time:
 
 ```bash
-versionator version \
+versionator output version \
   -t "{{MajorMinorPatch}}{{MetadataWithPlus}}" \
   --metadata="{{BuildDateTimeCompact}}.{{ShortHash}}"
 # Output: 1.0.0+20241211103045.abc1234
@@ -56,7 +56,7 @@ metadata:
 Then use with the flag:
 
 ```bash
-versionator version -t "{{MajorMinorPatch}}{{MetadataWithPlus}}" --metadata
+versionator output version -t "{{MajorMinorPatch}}{{MetadataWithPlus}}" --metadata
 # Output: 1.0.0+20241211103045.abc1234
 ```
 
@@ -133,7 +133,7 @@ Result: `1.0.0+abc1234def01`
 Sets a static value in the VERSION file:
 
 ```bash
-versionator metadata set build.123
+versionator config metadata set build.123
 # VERSION: 1.0.0+build.123
 ```
 
@@ -142,7 +142,7 @@ versionator metadata set build.123
 Sets a template in config and renders it to VERSION:
 
 ```bash
-versionator metadata template "{{BuildDateTimeCompact}}.{{ShortHash}}"
+versionator config metadata template "{{BuildDateTimeCompact}}.{{ShortHash}}"
 # Config: template = "{{BuildDateTimeCompact}}.{{ShortHash}}"
 # VERSION: 1.0.0+20241211103045.abc1234
 ```
@@ -152,7 +152,7 @@ versionator metadata template "{{BuildDateTimeCompact}}.{{ShortHash}}"
 Renders the config template to VERSION:
 
 ```bash
-versionator metadata enable
+versionator config metadata enable
 # Reads template from config
 # VERSION: 1.0.0+20241211103045.abc1234
 ```
@@ -162,7 +162,7 @@ versionator metadata enable
 Clears metadata from VERSION (preserves config template):
 
 ```bash
-versionator metadata disable
+versionator config metadata disable
 # VERSION: 1.0.0
 # Config template still saved
 ```
@@ -172,7 +172,7 @@ versionator metadata disable
 Clears metadata from VERSION:
 
 ```bash
-versionator metadata clear
+versionator config metadata clear
 # VERSION: 1.0.0
 ```
 
@@ -181,7 +181,7 @@ versionator metadata clear
 Shows current state:
 
 ```bash
-versionator metadata status
+versionator config metadata status
 # Metadata: ENABLED
 # Value: 20241211103045.abc1234
 ```
@@ -244,7 +244,7 @@ metadata:
 Include CI build information:
 
 ```bash
-versionator version --metadata="ci.$CI_BUILD_NUMBER.$CI_COMMIT_SHA"
+versionator output version --metadata="ci.$CI_BUILD_NUMBER.$CI_COMMIT_SHA"
 ```
 
 ### Nightly Builds

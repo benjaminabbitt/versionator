@@ -110,7 +110,7 @@ In the VERSION file and output, pre-release components use **dashes** (`-`):
 When specifying pre-release templates, you provide the dashes:
 
 ```bash
-versionator version --prerelease="alpha-{{CommitsSinceTag}}"
+versionator output version --prerelease="alpha-{{CommitsSinceTag}}"
 # Output: 1.2.3-alpha-5
 ```
 
@@ -126,7 +126,7 @@ Build metadata components use **dots** (`.`):
 When specifying metadata templates:
 
 ```bash
-versionator version --metadata="{{BuildDateTimeCompact}}.{{ShortHash}}"
+versionator output version --metadata="{{BuildDateTimeCompact}}.{{ShortHash}}"
 # Output: 1.2.3+20241211103045.abc1234
 ```
 
@@ -156,21 +156,21 @@ Versions are compared for precedence according to SemVer:
 ```bash
 # Development starts
 versionator minor increment
-versionator prerelease set alpha
+versionator config prerelease set alpha
 # Result: 1.1.0-alpha
 
 # Alpha iterations
-versionator prerelease set alpha.2
-versionator prerelease set alpha.3
+versionator config prerelease set alpha.2
+versionator config prerelease set alpha.3
 
 # Move to beta
-versionator prerelease set beta
+versionator config prerelease set beta
 
 # Release candidate
-versionator prerelease set rc.1
+versionator config prerelease set rc.1
 
 # Final release
-versionator prerelease clear
+versionator config prerelease clear
 # Result: 1.1.0
 ```
 
@@ -179,7 +179,7 @@ versionator prerelease clear
 Using metadata for build identification:
 
 ```bash
-versionator version \
+versionator output version \
   -t "{{MajorMinorPatch}}{{MetadataWithPlus}}" \
   --metadata="{{BuildDateTimeCompact}}.{{ShortHash}}"
 # Output: 1.1.0+20241211103045.abc1234

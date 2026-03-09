@@ -15,20 +15,20 @@ Pre-release identifiers mark versions as unstable or in-progress (e.g., `1.0.0-a
 Set a fixed pre-release value:
 
 ```bash
-versionator prerelease set alpha
+versionator config prerelease set alpha
 # VERSION: 1.0.0-alpha
 
-versionator prerelease set beta.1
+versionator config prerelease set beta.1
 # VERSION: 1.0.0-beta.1
 
-versionator prerelease set rc.2
+versionator config prerelease set rc.2
 # VERSION: 1.0.0-rc.2
 ```
 
 Clear when ready to release:
 
 ```bash
-versionator prerelease clear
+versionator config prerelease clear
 # VERSION: 1.0.0
 ```
 
@@ -37,7 +37,7 @@ versionator prerelease clear
 Use templates for values that change (like commit count):
 
 ```bash
-versionator version \
+versionator output version \
   -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}" \
   --prerelease="alpha-{{CommitsSinceTag}}"
 # Output: 1.0.0-alpha-5
@@ -57,7 +57,7 @@ prerelease:
 Then use with the flag:
 
 ```bash
-versionator version -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}" --prerelease
+versionator output version -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}" --prerelease
 # Output: 1.0.0-alpha-5
 ```
 
@@ -111,21 +111,21 @@ Result: `1.0.0-build-0042`
 
 ```bash
 # Alpha phase
-versionator prerelease set alpha
+versionator config prerelease set alpha
 
 # Alpha iterations
-versionator prerelease set alpha.2
-versionator prerelease set alpha.3
+versionator config prerelease set alpha.2
+versionator config prerelease set alpha.3
 
 # Move to beta
-versionator prerelease set beta
+versionator config prerelease set beta
 
 # Release candidate
-versionator prerelease set rc.1
-versionator prerelease set rc.2
+versionator config prerelease set rc.1
+versionator config prerelease set rc.2
 
 # Final release
-versionator prerelease clear
+versionator config prerelease clear
 ```
 
 ## Enable/Disable Commands
@@ -135,7 +135,7 @@ versionator prerelease clear
 Sets a static value in the VERSION file:
 
 ```bash
-versionator prerelease set alpha
+versionator config prerelease set alpha
 # VERSION: 1.0.0-alpha
 ```
 
@@ -144,7 +144,7 @@ versionator prerelease set alpha
 Sets a template in config and renders it to VERSION:
 
 ```bash
-versionator prerelease template "alpha-{{CommitsSinceTag}}"
+versionator config prerelease template "alpha-{{CommitsSinceTag}}"
 # Config: template = "alpha-{{CommitsSinceTag}}"
 # VERSION: 1.0.0-alpha-5
 ```
@@ -154,7 +154,7 @@ versionator prerelease template "alpha-{{CommitsSinceTag}}"
 Renders the config template to VERSION:
 
 ```bash
-versionator prerelease enable
+versionator config prerelease enable
 # Reads template from config
 # VERSION: 1.0.0-alpha-5
 ```
@@ -164,7 +164,7 @@ versionator prerelease enable
 Clears pre-release from VERSION (preserves config template):
 
 ```bash
-versionator prerelease disable
+versionator config prerelease disable
 # VERSION: 1.0.0
 # Config template still saved
 ```
@@ -174,7 +174,7 @@ versionator prerelease disable
 Clears pre-release from VERSION:
 
 ```bash
-versionator prerelease clear
+versionator config prerelease clear
 # VERSION: 1.0.0
 ```
 
@@ -183,7 +183,7 @@ versionator prerelease clear
 Shows current state:
 
 ```bash
-versionator prerelease status
+versionator config prerelease status
 # Pre-release: ENABLED
 # Value: alpha-5
 ```

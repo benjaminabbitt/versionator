@@ -13,6 +13,8 @@ const sidebars: SidebarsConfig = {
         'concepts/version-file',
         'concepts/semver',
         'concepts/monorepo',
+        'concepts/version-grammar',
+        'concepts/grammar',
       ],
     },
     {
@@ -77,6 +79,7 @@ const sidebars: SidebarsConfig = {
             'integration/languages/javascript',
             'integration/languages/typescript',
             'integration/languages/ruby',
+            'integration/languages/php',
             'integration/languages/docker',
           ],
         },

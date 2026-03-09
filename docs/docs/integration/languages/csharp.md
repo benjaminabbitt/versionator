@@ -8,7 +8,7 @@ sidebar_position: 7
 
 **Location:** [`examples/csharp/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/csharp)
 
-C# generates a `Version.cs` static class at build time using `versionator emit`:
+C# generates a `Version.cs` static class at build time using `versionator output emit`:
 
 ```csharp title="examples/csharp/Program.cs"
 using Version;
@@ -25,7 +25,7 @@ class Program
 
 ```makefile title="examples/csharp/Makefile (excerpt)"
 version-file:
-    versionator emit csharp --output Version.cs
+    versionator output emit csharp --output Version.cs
 
 build: version-file
     dotnet build -c Release -o out

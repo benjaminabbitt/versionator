@@ -65,8 +65,8 @@ metadata:
 ```
 
 You'll need versionator installed in your CI container to:
-- Generate code embeddings (`versionator emit`)
-- Set CI/CD environment variables (`versionator ci`)
+- Generate code embeddings (`versionator output emit`)
+- Set CI/CD environment variables (`versionator output ci`)
 - Render templates with current git/build context
 
 Versionator is a **static binary** with no dependencies, making installation straightforward:
@@ -119,20 +119,20 @@ myproject/
     └── web/             # No VERSION file
 ```
 
-Running `versionator version` from different directories:
+Running `versionator output version` from different directories:
 
 ```bash
 # From myproject/
-versionator version          # 1.0.0
+versionator output version          # 1.0.0
 
 # From myproject/packages/core/
-versionator version          # 3.0.0
+versionator output version          # 3.0.0
 
 # From myproject/packages/core/src/
-versionator version          # 3.0.0 (walks up to packages/core/)
+versionator output version          # 3.0.0 (walks up to packages/core/)
 
 # From myproject/apps/web/
-versionator version          # Creates VERSION with 0.0.1
+versionator output version          # Creates VERSION with 0.0.1
 ```
 
 ## Creating the VERSION File
@@ -141,11 +141,11 @@ The VERSION file is created automatically on first use:
 
 ```bash
 # In a directory without VERSION
-versionator version
+versionator output version
 # Creates VERSION with: 0.0.1
 
 # With prefix enabled in config
-versionator version
+versionator output version
 # Creates VERSION with: v0.0.1
 ```
 
@@ -166,13 +166,13 @@ versionator minor increment
 versionator patch increment
 
 # Set prefix
-versionator prefix set v
+versionator config prefix set v
 
 # Set pre-release
-versionator prerelease set alpha.1
+versionator config prerelease set alpha.1
 
 # Set metadata
-versionator metadata set build.123
+versionator config metadata set build.123
 ```
 
 This ensures the version remains valid SemVer format.

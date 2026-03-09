@@ -53,15 +53,15 @@ myproject/
 
 ```bash
 # From myproject/packages/core/
-versionator version
+versionator output version
 # Output: 3.0.0
 
 # From myproject/packages/cli/ (no VERSION file)
-versionator version
+versionator output version
 # Output: 2.0.0 (from packages/VERSION)
 
 # From myproject/
-versionator version
+versionator output version
 # Output: 1.0.0
 ```
 
@@ -191,7 +191,7 @@ Generate version files for each package:
 # Generate Python version file for each package
 for pkg in core utils cli; do
   cd packages/$pkg
-  versionator emit python --output src/_version.py
+  versionator output emit python --output src/_version.py
   cd ../..
 done
 ```

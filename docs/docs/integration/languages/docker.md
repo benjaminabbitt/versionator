@@ -53,8 +53,8 @@ ENTRYPOINT ["sample-app"]
 ```makefile title="examples/docker/Makefile (excerpt)"
 docker-build:
     VERSION=$$(versionator version); \
-    COMMIT=$$(versionator version -t "{{ShortHash}}"); \
-    DATE=$$(versionator version -t "{{BuildDateTimeUTC}}"); \
+    COMMIT=$$(versionator output version -t "{{ShortHash}}"); \
+    DATE=$$(versionator output version -t "{{BuildDateTimeUTC}}"); \
     docker build \
         --build-arg VERSION=$$VERSION \
         --build-arg GIT_COMMIT=$$COMMIT \

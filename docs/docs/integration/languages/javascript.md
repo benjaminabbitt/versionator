@@ -8,7 +8,7 @@ sidebar_position: 10
 
 **Location:** [`examples/javascript/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript)
 
-JavaScript generates a `version.js` module using `versionator emit`:
+JavaScript generates a `version.js` module using `versionator output emit`:
 
 ```javascript title="examples/javascript/src/index.js"
 import { VERSION } from './version.js';
@@ -23,7 +23,7 @@ main();
 
 ```makefile title="examples/javascript/Makefile (excerpt)"
 version-file:
-    versionator emit js --output src/version.js
+    versionator output emit js --output src/version.js
 
 run: version-file
     node src/index.js

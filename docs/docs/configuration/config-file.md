@@ -77,7 +77,7 @@ prerelease:
   template: "alpha-{{CommitsSinceTag}}"
 ```
 
-The template is rendered when using `--prerelease` flag or `versionator prerelease enable`.
+The template is rendered when using `--prerelease` flag or `versionator config prerelease enable`.
 
 **Separator Convention**: Use dashes (`-`) between pre-release components:
 
@@ -147,17 +147,17 @@ custom:
 Use in templates:
 
 ```bash
-versionator version -t "{{AppName}} v{{MajorMinorPatch}}"
+versionator output version -t "{{AppName}} v{{MajorMinorPatch}}"
 # Output: MyApp v1.0.0
 ```
 
 Manage via CLI:
 
 ```bash
-versionator custom set AppName "MyApp"
-versionator custom get AppName
-versionator custom list
-versionator custom delete AppName
+versionator config custom set AppName "MyApp"
+versionator config custom get AppName
+versionator config custom list
+versionator config custom delete AppName
 ```
 
 ## Config File Discovery

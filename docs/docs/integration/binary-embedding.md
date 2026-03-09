@@ -271,7 +271,7 @@ fun main() {
 
 ```makefile title="examples/kotlin/Makefile (excerpt)"
 version-file:
-    versionator emit kotlin --output Version.kt
+    versionator output emit kotlin --output Version.kt
 
 build: version-file
     kotlinc Main.kt Version.kt -include-runtime -d sample-app.jar
@@ -313,7 +313,7 @@ class Program
 
 ```makefile title="examples/csharp/Makefile (excerpt)"
 version-file:
-    versionator emit csharp --output Version.cs
+    versionator output emit csharp --output Version.cs
 
 build: version-file
     dotnet build -c Release -o out
@@ -347,7 +347,7 @@ print("Version: \(VERSION)")
 
 ```makefile title="examples/swift/Makefile (excerpt)"
 version-file:
-    versionator emit swift --output Version.swift
+    versionator output emit swift --output Version.swift
 
 build: version-file
     swiftc -o sample-app main.swift Version.swift
@@ -372,7 +372,7 @@ Version: 0.0.16
 
 **Location:** [`examples/python/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/python)
 
-Python uses `versionator emit` to generate a `_version.py` module:
+Python uses `versionator output emit` to generate a `_version.py` module:
 
 ```python title="examples/python/mypackage/main.py"
 """Sample application entry point."""
@@ -391,7 +391,7 @@ if __name__ == "__main__":
 
 ```makefile title="examples/python/Makefile (excerpt)"
 version-file:
-    versionator emit python --output mypackage/_version.py
+    versionator output emit python --output mypackage/_version.py
 
 run: version-file
     python -m mypackage.main
@@ -430,7 +430,7 @@ main();
 
 ```makefile title="examples/javascript/Makefile (excerpt)"
 version-file:
-    versionator emit js --output src/version.js
+    versionator output emit js --output src/version.js
 
 run: version-file
     node src/index.js
@@ -469,7 +469,7 @@ main();
 
 ```makefile title="examples/typescript/Makefile (excerpt)"
 version-file:
-    versionator emit ts --output src/version.ts
+    versionator output emit ts --output src/version.ts
 
 build: version-file
     npx tsc
@@ -513,7 +513,7 @@ end
 
 ```makefile title="examples/ruby/Makefile (excerpt)"
 version-file:
-    versionator emit ruby --output lib/mypackage/version.rb
+    versionator output emit ruby --output lib/mypackage/version.rb
 
 run: version-file
     ruby -I lib -e "require 'mypackage'; Mypackage.hello"
@@ -538,7 +538,7 @@ Version: 0.0.13
 PHP generates a version class:
 
 ```bash
-versionator emit php --output src/Version.php
+versionator output emit php --output src/Version.php
 ```
 
 Generated file:
@@ -563,10 +563,10 @@ For configuration files or API responses:
 
 ```bash
 # JSON
-versionator emit json --output version.json
+versionator output emit json --output version.json
 
 # YAML
-versionator emit yaml --output version.yml
+versionator output emit yaml --output version.yml
 ```
 
 JSON output:
@@ -631,8 +631,8 @@ ENTRYPOINT ["sample-app"]
 ```makefile title="examples/docker/Makefile (excerpt)"
 docker-build:
     VERSION=$$(versionator version); \
-    COMMIT=$$(versionator version -t "{{ShortHash}}"); \
-    DATE=$$(versionator version -t "{{BuildDateTimeUTC}}"); \
+    COMMIT=$$(versionator output version -t "{{ShortHash}}"); \
+    DATE=$$(versionator output version -t "{{BuildDateTimeUTC}}"); \
     docker build \
         --build-arg VERSION=$$VERSION \
         --build-arg GIT_COMMIT=$$COMMIT \
@@ -686,7 +686,7 @@ done
 
 Every example follows the same pattern:
 
-1. **Makefile** calls `versionator version` to get the current version
+1. **Makefile** calls `versionator output version` to get the current version
 2. **Build step** injects that version (compile-time for compiled languages, file generation for interpreted)
 3. **Application** displays the embedded version at runtime
 
@@ -712,18 +712,18 @@ See [Template Variables](../templates/variables) for the complete reference.
 
 ## Custom Templates
 
-The examples above use **built-in templates** via `versionator emit <lang>`. For custom namespaces, additional fields, or different file structures, use custom templates with `--template-file`.
+The examples above use **built-in templates** via `versionator output emit <lang>`. For custom namespaces, additional fields, or different file structures, use custom templates with `--template-file`.
 
 ### Dump and Customize
 
 ```bash
 # Dump Python template
-versionator emit dump python > custom_python.tmpl
+versionator output emit dump python > custom_python.tmpl
 
 # Edit custom_python.tmpl...
 
 # Use custom template
-versionator emit --template-file custom_python.tmpl --output _version.py
+versionator output emit --template-file custom_python.tmpl --output _version.py
 ```
 
 ### Custom Template Examples
@@ -737,9 +737,9 @@ Each interpreted language has a `-custom` example demonstrating the `--template-
 | TypeScript | [`examples/typescript/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript) | [`examples/typescript-custom/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript-custom) |
 | Ruby | [`examples/ruby/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby) | [`examples/ruby-custom/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby-custom) |
 
-**Built-in examples** use `versionator emit <lang>` — simple, zero configuration.
+**Built-in examples** use `versionator output emit <lang>` — simple, zero configuration.
 
-**Custom examples** use `versionator emit --template-file` — for custom namespaces (e.g., `Mypackage::VERSION` instead of `Versionator::VERSION`) or additional fields like `GIT_HASH` and `BUILD_DATE`.
+**Custom examples** use `versionator output emit --template-file` — for custom namespaces (e.g., `Mypackage::VERSION` instead of `Versionator::VERSION`) or additional fields like `GIT_HASH` and `BUILD_DATE`.
 
 ---
 

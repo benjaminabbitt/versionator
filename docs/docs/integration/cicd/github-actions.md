@@ -41,7 +41,7 @@ Get extended version information:
   id: version
   run: |
     echo "version=$(versionator version)" >> $GITHUB_OUTPUT
-    echo "full=$(versionator version -t '{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}' --prefix --metadata='{{ShortHash}}')" >> $GITHUB_OUTPUT
+    echo "full=$(versionator output version -t '{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}' --prefix --metadata='{{ShortHash}}')" >> $GITHUB_OUTPUT
 ```
 
 ## Release Workflow
