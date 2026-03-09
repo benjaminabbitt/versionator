@@ -127,14 +127,14 @@ versionator completion powershell >> $PROFILE
 ## Quick Start
 
 ```bash
-# Initialize (creates VERSION file with 0.0.0)
+# Initialize (creates VERSION file with 0.0.1)
 versionator init
 
 # Or with specific version and prefix
 versionator init --version 1.0.0 --prefix v
 
 # Increment versions
-versionator major increment   # 0.0.0 -> 1.0.0
+versionator major increment   # 0.0.1 -> 1.0.0
 versionator minor increment   # 1.0.0 -> 1.1.0
 versionator patch increment   # 1.1.0 -> 1.1.1
 
@@ -310,7 +310,7 @@ versionator version          # 3.0.0
 versionator version          # 3.0.0 (walks up to packages/core/)
 
 # From myproject/apps/web/
-versionator version          # Creates new VERSION with 0.0.0
+versionator version          # Creates new VERSION with 0.0.1
 ```
 
 This enables:

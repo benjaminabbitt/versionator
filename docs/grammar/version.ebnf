@@ -26,14 +26,11 @@ version-core = semver
 (* -----------------------------------------------------------------------
    Prefix
 
-   Optional version prefix. Common prefixes include:
-   - "v" or "V" (Go, npm, git tags)
-   - "release-", "ver-", etc. (custom schemes)
+   Optional version prefix per SemVer convention.
+   Only "v" or "V" prefixes are allowed (Go, npm, git tags).
    ----------------------------------------------------------------------- *)
 
-prefix = "v" | "V" | prefix-word, "-" ;
-
-prefix-word = letter, { letter | digit } ;
+prefix = "v" | "V" ;
 
 (* -----------------------------------------------------------------------
    SemVer 2.0.0

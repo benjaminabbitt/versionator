@@ -58,8 +58,8 @@ Feature: Version Management
     Then the output should be "2.1"
 
   Scenario: Set prefix
-    When I run "versionator prefix set release-"
-    Then the VERSION should have prefix "release-"
+    When I run "versionator prefix set v"
+    Then the VERSION should have prefix "v"
 
   Scenario: Clear prefix
     Given a VERSION file with prefix "v" and version "1.0.0"
@@ -146,10 +146,10 @@ Feature: Version Management
     Then the VERSION should have prefix "v"
 
   Scenario: Prefix status when enabled
-    When I run "versionator prefix set release-"
+    When I run "versionator prefix set v"
     And I run "versionator prefix status"
     Then the output should contain "ENABLED"
-    And the output should contain "release-"
+    And the output should contain "v"
 
   Scenario: Prefix status when disabled
     When I run "versionator prefix status"

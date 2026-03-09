@@ -151,7 +151,7 @@ func getVersionPath() (string, error) {
 }
 
 // Load reads the VERSION file and returns the parsed Version
-// If VERSION doesn't exist, creates a default 0.0.0 (using config prefix if set)
+// If VERSION doesn't exist, creates a default 0.0.1 (using config prefix if set)
 // VERSION file content is the source of truth - it takes priority over config
 func Load() (*Version, error) {
 	logger := logging.GetLogger()
@@ -183,7 +183,7 @@ func Load() (*Version, error) {
 			defaultPrefix = cfg.Prefix
 		}
 
-		v := &Version{Major: 0, Minor: 0, Patch: 0, Prefix: defaultPrefix}
+		v := &Version{Major: 0, Minor: 0, Patch: 1, Prefix: defaultPrefix}
 		logger.Info(LogVersionCreated,
 			zap.String("path", path),
 			zap.String("version", v.String()))

@@ -17,11 +17,11 @@ cd my-project
 versionator init
 ```
 
-This creates a `VERSION` file with the initial version `0.0.0`.
+This creates a `VERSION` file with the initial version `0.0.1`.
 
 ```bash
 cat VERSION
-# Output: 0.0.0
+# Output: 0.0.1
 
 # Or initialize with a specific version and prefix
 versionator init --version 1.0.0 --prefix v
