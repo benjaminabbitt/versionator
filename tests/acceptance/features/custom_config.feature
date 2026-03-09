@@ -9,38 +9,38 @@ Feature: Custom Variables and Configuration
 
   # Custom variable management
   Scenario: Set custom variable
-    When I run "versionator custom set AppName MyApplication"
+    When I run "versionator config custom set AppName MyApplication"
     Then the exit code should be 0
 
   Scenario: Get custom variable
-    When I run "versionator custom set BuildEnv production"
-    And I run "versionator custom get BuildEnv"
+    When I run "versionator config custom set BuildEnv production"
+    And I run "versionator config custom get BuildEnv"
     Then the output should contain "production"
 
   Scenario: List custom variables
-    When I run "versionator custom set Var1 value1"
-    And I run "versionator custom set Var2 value2"
-    And I run "versionator custom list"
+    When I run "versionator config custom set Var1 value1"
+    And I run "versionator config custom set Var2 value2"
+    And I run "versionator config custom list"
     Then the output should contain "Var1"
     And the output should contain "Var2"
 
   Scenario: Delete custom variable
-    When I run "versionator custom set TempVar tempvalue"
-    And I run "versionator custom delete TempVar"
+    When I run "versionator config custom set TempVar tempvalue"
+    And I run "versionator config custom delete TempVar"
     Then the exit code should be 0
 
   Scenario: Use custom variable in template
-    When I run "versionator custom set Environment staging"
-    And I run "versionator version -t '{{MajorMinorPatch}}-{{Environment}}'"
+    When I run "versionator config custom set Environment staging"
+    And I run "versionator output version -t '{{MajorMinorPatch}}-{{Environment}}'"
     Then the output should be "1.0.0-staging"
 
   Scenario: Override custom variable with --set flag
-    When I run "versionator custom set Env dev"
-    And I run "versionator version -t '{{MajorMinorPatch}}-{{Env}}' --set Env=prod"
+    When I run "versionator config custom set Env dev"
+    And I run "versionator output version -t '{{MajorMinorPatch}}-{{Env}}' --set Env=prod"
     Then the output should be "1.0.0-prod"
 
   Scenario: Multiple --set flags
-    When I run "versionator version -t '{{Var1}}-{{Var2}}' --set Var1=hello --set Var2=world"
+    When I run "versionator output version -t '{{Var1}}-{{Var2}}' --set Var1=hello --set Var2=world"
     Then the output should be "hello-world"
 
   # Init command
@@ -57,18 +57,18 @@ Feature: Custom Variables and Configuration
 
   # Vars command
   Scenario: Show template variables
-    When I run "versionator vars"
+    When I run "versionator config vars"
     Then the exit code should be 0
     And the output should contain "Major"
     And the output should contain "Minor"
     And the output should contain "Patch"
 
   Scenario: Vars shows VCS info
-    When I run "versionator vars"
+    When I run "versionator config vars"
     Then the output should contain "ShortHash"
     And the output should contain "BranchName"
 
   Scenario: Vars shows build timestamps
-    When I run "versionator vars"
+    When I run "versionator config vars"
     Then the output should contain "BuildDateTimeUTC"
     And the output should contain "BuildYear"

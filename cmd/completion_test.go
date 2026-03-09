@@ -10,7 +10,7 @@ func TestCompletion_Bash_GeneratesOutput(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"completion", "bash"})
+	rootCmd.SetArgs([]string{"support", "completion", "bash"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -35,7 +35,7 @@ func TestCompletion_Zsh_GeneratesOutput(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"completion", "zsh"})
+	rootCmd.SetArgs([]string{"support", "completion", "zsh"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -57,7 +57,7 @@ func TestCompletion_Fish_GeneratesOutput(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"completion", "fish"})
+	rootCmd.SetArgs([]string{"support", "completion", "fish"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -79,7 +79,7 @@ func TestCompletion_PowerShell_GeneratesOutput(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"completion", "powershell"})
+	rootCmd.SetArgs([]string{"support", "completion", "powershell"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -101,7 +101,7 @@ func TestCompletion_InvalidShell_ReturnsError(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"completion", "invalid"})
+	rootCmd.SetArgs([]string{"support", "completion", "invalid"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -118,7 +118,7 @@ func TestCompletion_NoArgs_ReturnsError(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"completion"})
+	rootCmd.SetArgs([]string{"support", "completion"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)

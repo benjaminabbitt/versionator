@@ -263,8 +263,8 @@ func init() {
 	// Add --set flag for custom variables (can be used multiple times)
 	versionCmd.Flags().StringArrayVar(&setVars, "set", nil, "Set custom variable (key=value), can be repeated")
 
-	// Add version command to show current version
-	rootCmd.AddCommand(versionCmd)
+	// Add version command under output
+	outputCmd.AddCommand(versionCmd)
 }
 
 // parseSetFlags parses --set key=value flags into a map

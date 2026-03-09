@@ -100,7 +100,7 @@ The schema is generated from the actual command tree, ensuring accuracy.`,
 
 func init() {
 	schemaCmd.Flags().StringVarP(&schemaOutput, "output", "o", "", "Output file path (default: stdout)")
-	rootCmd.AddCommand(schemaCmd)
+	supportCmd.AddCommand(schemaCmd)
 }
 
 func buildSchema(root *cobra.Command) CLISchema {

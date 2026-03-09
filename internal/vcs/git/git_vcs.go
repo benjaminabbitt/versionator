@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -787,6 +788,38 @@ func TagExists(tagName string) (bool, error) {
 	}
 
 	return gitVCS.TagExists(tagName)
+}
+
+// PushTag pushes a tag to the remote repository
+func (g *GitVersionControlSystem) PushTag(tagName string) error {
+	root, err := g.GetRepositoryRoot()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("git", "push", "origin", tagName)
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to push tag: %w: %s", err, string(output))
+	}
+	return nil
+}
+
+// PushBranch pushes a branch to the remote repository
+func (g *GitVersionControlSystem) PushBranch(branchName string) error {
+	root, err := g.GetRepositoryRoot()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("git", "push", "-u", "origin", branchName)
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to push branch: %w: %s", err, string(output))
+	}
+	return nil
 }
 
 // Auto-registration as both VCS and plugin

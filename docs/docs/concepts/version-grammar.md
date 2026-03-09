@@ -310,4 +310,5 @@ The `{{...}}` parts are replaced with actual values when you run versionator.
 
 - [VERSION File](./version-file) - How versionator stores versions
 - [Semantic Versioning](./semver) - SemVer 2.0.0 explained
+- [Grammar-Based Parser](./grammar) - How versionator parses versions (technical)
 - [EBNF Grammar](https://github.com/benjaminabbitt/versionator/blob/master/docs/grammar/version.ebnf) - Formal grammar specification

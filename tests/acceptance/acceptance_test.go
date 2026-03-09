@@ -154,7 +154,7 @@ func teardownTestContext(c context.Context) (context.Context, error) {
 
 	// Change back to original directory
 	if ctx.originalDir != "" {
-		os.Chdir(ctx.originalDir)
+		_ = os.Chdir(ctx.originalDir)
 	}
 
 	// Remove temp directory

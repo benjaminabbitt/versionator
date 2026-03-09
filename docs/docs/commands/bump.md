@@ -48,6 +48,33 @@ versionator bump [flags]
 | `--mode` | string | all | Parse mode: semver, conventional, or all |
 | `--no-amend` | bool | false | Update VERSION file but do not amend the last commit |
 
+## Manual Version Bumping
+
+For manual version control, use the nested subcommands:
+
+```bash
+# Increment versions
+versionator bump major increment   # or: bump major inc, bump major +, bump major up
+versionator bump minor increment   # or: bump minor inc, bump minor +, bump minor up
+versionator bump patch increment   # or: bump patch inc, bump patch +, bump patch up
+
+# Decrement versions
+versionator bump major decrement   # or: bump major dec, bump major -, bump major down
+versionator bump minor decrement   # or: bump minor dec, bump minor -, bump minor down
+versionator bump patch decrement   # or: bump patch dec, bump patch -, bump patch down
+```
+
+### Subcommands
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `bump major increment` | `inc`, `+`, `up` | Increment major version (resets minor and patch to 0) |
+| `bump major decrement` | `dec`, `-`, `down` | Decrement major version |
+| `bump minor increment` | `inc`, `+`, `up` | Increment minor version (resets patch to 0) |
+| `bump minor decrement` | `dec`, `-`, `down` | Decrement minor version |
+| `bump patch increment` | `inc`, `+`, `up` | Increment patch version |
+| `bump patch decrement` | `dec`, `-`, `down` | Decrement patch version |
+
 ## Automatic Bumping with Git Hook
 
 You can install a post-commit hook to automatically bump the VERSION file when commits contain `+semver:` tags:

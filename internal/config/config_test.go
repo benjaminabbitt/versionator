@@ -9,8 +9,8 @@ func TestReadConfig_DefaultConfig(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Test reading config when file doesn't exist (should return defaults)
 	config, err := ReadConfig()
@@ -34,8 +34,8 @@ func TestReadConfig_ValidConfigFile(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a valid config file
 	configContent := `prefix: "version-"
@@ -81,8 +81,8 @@ func TestReadConfig_InvalidYAML(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create an invalid YAML file
 	invalidYAML := `prefix: "test"
@@ -111,8 +111,8 @@ func TestReadConfig_PermissionError(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a config file
 	err := os.WriteFile(configFile, []byte("prefix: test"), 0644)
@@ -125,7 +125,7 @@ func TestReadConfig_PermissionError(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot change file permissions on this system")
 	}
-	defer os.Chmod(configFile, 0644) // Restore permissions for cleanup
+	defer func() { _ = os.Chmod(configFile, 0644) }() // Restore permissions for cleanup
 
 	// Try to read the config
 	_, err = ReadConfig()
@@ -142,8 +142,8 @@ func TestWriteConfig_Success(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a config to write
 	config := &Config{
@@ -195,8 +195,8 @@ func TestWriteConfig_ReadBack(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a config to write
 	originalConfig := &Config{
@@ -249,15 +249,15 @@ func TestWriteConfig_PermissionError(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Make the directory read-only (this test might not work on all systems)
 	err := os.Chmod(tempDir, 0444)
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
-	defer os.Chmod(tempDir, 0755) // Restore permissions for cleanup
+	defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions for cleanup
 
 	config := &Config{
 		Prefix: "v",
@@ -283,8 +283,8 @@ func TestWriteConfig_InvalidConfig(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a config with values that might cause marshaling issues
 	// Note: YAML marshaling is quite robust, so this test mainly ensures
@@ -382,8 +382,8 @@ func TestConfig_Validate_InvalidMetadataTemplate(t *testing.T) {
 func TestWriteConfig_InvalidTemplateRejected(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	config := &Config{
 		Prefix: "v",

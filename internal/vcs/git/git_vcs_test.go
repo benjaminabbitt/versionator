@@ -59,7 +59,7 @@ func NewTestHelper(t *testing.T) *TestHelper {
 
 // Cleanup restores original directory and removes temp directory
 func (h *TestHelper) Cleanup() {
-	os.Chdir(h.origDir)
+	_ = os.Chdir(h.origDir)
 	os.RemoveAll(h.dir)
 }
 
@@ -161,7 +161,7 @@ func TestIsRepository_NotInGitRepo_ReturnsFalse(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(dir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
@@ -202,7 +202,7 @@ func TestGetRepositoryRoot_NotInRepo_ReturnsError(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	if err := os.Chdir(dir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
@@ -831,7 +831,7 @@ func TestBranchExists_ExistingBranch_ReturnsTrue(t *testing.T) {
 	}
 
 	var branchName string
-	err = branches.ForEach(func(ref *plumbing.Reference) error {
+	_ = branches.ForEach(func(ref *plumbing.Reference) error {
 		branchName = ref.Name().Short()
 		return errStopIteration
 	})

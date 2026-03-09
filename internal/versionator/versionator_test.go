@@ -9,8 +9,8 @@ import (
 func TestGetPreReleaseTemplate_NoConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// No config file exists - should return defaults (empty template)
 	template, err := GetPreReleaseTemplate()
@@ -27,8 +27,8 @@ func TestGetPreReleaseTemplate_NoConfigFile(t *testing.T) {
 func TestGetPreReleaseTemplate_WithConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create config file with pre-release template
 	configContent := `prerelease:
@@ -52,8 +52,8 @@ func TestGetPreReleaseTemplate_WithConfigFile(t *testing.T) {
 func TestGetMetadataTemplate_NoConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// No config file exists - should return defaults (empty template)
 	template, err := GetMetadataTemplate()
@@ -70,8 +70,8 @@ func TestGetMetadataTemplate_NoConfigFile(t *testing.T) {
 func TestGetMetadataTemplate_WithConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create config file with metadata template
 	configContent := `metadata:
@@ -95,8 +95,8 @@ func TestGetMetadataTemplate_WithConfigFile(t *testing.T) {
 func TestRenderPreRelease_EmptyTemplate(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create VERSION file
 	err := os.WriteFile("VERSION", []byte("1.2.3"), 0644)
@@ -119,8 +119,8 @@ func TestRenderPreRelease_EmptyTemplate(t *testing.T) {
 func TestRenderPreRelease_WithTemplate(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create VERSION file
 	err := os.WriteFile("VERSION", []byte("1.2.3"), 0644)
@@ -150,8 +150,8 @@ func TestRenderPreRelease_WithTemplate(t *testing.T) {
 func TestRenderPreRelease_ConfigReadError(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create invalid config file (malformed YAML)
 	err := os.WriteFile(".versionator.yaml", []byte("invalid: yaml: content:"), 0644)
@@ -168,8 +168,8 @@ func TestRenderPreRelease_ConfigReadError(t *testing.T) {
 func TestRenderPreRelease_VersionLoadError(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create config with non-empty template (to exercise version.Load path)
 	configContent := `prerelease:
@@ -204,8 +204,8 @@ func TestRenderPreRelease_VersionLoadError(t *testing.T) {
 func TestRenderMetadata_EmptyTemplate(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create VERSION file
 	err := os.WriteFile("VERSION", []byte("1.2.3"), 0644)
@@ -228,8 +228,8 @@ func TestRenderMetadata_EmptyTemplate(t *testing.T) {
 func TestRenderMetadata_WithTemplate(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create VERSION file
 	err := os.WriteFile("VERSION", []byte("2.5.9"), 0644)
@@ -259,8 +259,8 @@ func TestRenderMetadata_WithTemplate(t *testing.T) {
 func TestRenderMetadata_ConfigReadError(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create invalid config file (malformed YAML)
 	err := os.WriteFile(".versionator.yaml", []byte("invalid: yaml: content:"), 0644)
@@ -277,8 +277,8 @@ func TestRenderMetadata_ConfigReadError(t *testing.T) {
 func TestRenderMetadata_VersionLoadError(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create config with non-empty template (to exercise version.Load path)
 	configContent := `metadata:

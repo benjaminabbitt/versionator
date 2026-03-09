@@ -194,5 +194,5 @@ func sortStrings(s []string) {
 }
 
 func init() {
-	rootCmd.AddCommand(varsCmd)
+	configCmd.AddCommand(varsCmd)
 }

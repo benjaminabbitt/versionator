@@ -10,7 +10,7 @@ Feature: End-to-End Integration
   Scenario: Complete release workflow
     Given a VERSION file with prefix "v" and version "1.0.0"
     And a committed file "README.md" with content "# My Project"
-    When I run "versionator patch increment"
+    When I run "versionator bump patch increment"
     And I run "versionator release -m 'Release v1.0.1'"
     Then a git tag "v1.0.1" should exist
     And a git branch "release/v1.0.1" should exist
@@ -19,12 +19,12 @@ Feature: End-to-End Integration
   Scenario: Version injection for Python project
     Given a VERSION file with version "1.2.3"
     And a file "mypackage/__init__.py" with content "# placeholder"
-    When I run "versionator emit python --output mypackage/_version.py"
+    When I run "versionator output emit python --output mypackage/_version.py"
     Then the file "mypackage/_version.py" should contain '__version__ = "1.2.3"'
 
   Scenario: Version injection for Go project
     Given a VERSION file with version "0.5.0"
-    When I run "versionator emit go --output version_info.go"
+    When I run "versionator output emit go --output version_info.go"
     Then the file "version_info.go" should contain 'Version     = "0.5.0"'
 
   Scenario: Pre-release workflow
@@ -36,7 +36,7 @@ Feature: End-to-End Integration
   Scenario: Build metadata workflow
     Given a VERSION file with prefix "v" and version "1.0.0"
     And a committed file "README.md" with content "# Initial commit"
-    When I run "versionator version -t '{{MajorMinorPatch}}+{{ShortHash}}' --metadata"
+    When I run "versionator output version -t '{{MajorMinorPatch}}+{{ShortHash}}' --metadata"
     Then the output should match pattern "1.0.0\+[a-f0-9]{7}"
 
   Scenario: Configuration file usage
@@ -46,17 +46,17 @@ Feature: End-to-End Integration
         template: "{{BuildDateUTC}}"
       """
     And a VERSION file with version "3.0.0"
-    When I run "versionator version -t '{{Prefix}}{{MajorMinorPatch}}{{MetadataWithPlus}}' --prefix --metadata"
+    When I run "versionator output version -t '{{Prefix}}{{MajorMinorPatch}}{{MetadataWithPlus}}' --prefix --metadata"
     Then the output should match pattern "v3.0.0\+\d{4}-\d{2}-\d{2}"
 
   Scenario: Custom variables in template
     Given a VERSION file with version "1.0.0" and custom variable "BuildEnv" set to "production"
-    When I run "versionator version -t '{{MajorMinorPatch}}-{{BuildEnv}}'"
+    When I run "versionator output version -t '{{MajorMinorPatch}}-{{BuildEnv}}'"
     Then the output should be "1.0.0-production"
 
   Scenario: Override custom variables via CLI
     Given a VERSION file with version "1.0.0" and custom variable "Env" set to "dev"
-    When I run "versionator version -t '{{MajorMinorPatch}}-{{Env}}' --set Env=staging"
+    When I run "versionator output version -t '{{MajorMinorPatch}}-{{Env}}' --set Env=staging"
     Then the output should be "1.0.0-staging"
 
   @slow
@@ -65,7 +65,7 @@ Feature: End-to-End Integration
     And a committed file "file1.txt" with content "Initial"
     When I run "versionator release -m 'Initial release'"
     And I create 5 commits with message prefix "feat:"
-    And I run "versionator minor increment"
+    And I run "versionator bump minor increment"
     And I run "versionator release -m 'Feature release'"
     Then a git tag "v1.0.0" should exist
     And a git tag "v1.1.0" should exist

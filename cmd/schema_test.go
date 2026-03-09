@@ -10,7 +10,7 @@ func TestSchema_GeneratesValidJSON(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"schema"})
+	rootCmd.SetArgs([]string{"support", "schema"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -40,11 +40,11 @@ func TestSchema_GeneratesValidJSON(t *testing.T) {
 	}
 }
 
-func TestSchema_IncludesVersionCommand(t *testing.T) {
+func TestSchema_IncludesOutputCommand(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"schema"})
+	rootCmd.SetArgs([]string{"support", "schema"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -61,27 +61,35 @@ func TestSchema_IncludesVersionCommand(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	found := false
+	// Find output command and verify it has version subcommand
 	for _, cmd := range schema.Commands {
-		if cmd.Name == "version" {
-			found = true
+		if cmd.Name == "output" {
 			if cmd.Short == "" {
-				t.Error("version command should have short description")
+				t.Error("output command should have short description")
 			}
-			break
+			// Check for version subcommand
+			hasVersion := false
+			for _, sub := range cmd.Subcommands {
+				if sub.Name == "version" {
+					hasVersion = true
+					break
+				}
+			}
+			if !hasVersion {
+				t.Error("output command should have version subcommand")
+			}
+			return
 		}
 	}
 
-	if !found {
-		t.Error("version command not found in schema")
-	}
+	t.Error("output command not found in schema")
 }
 
 func TestSchema_IncludesSubcommands(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"schema"})
+	rootCmd.SetArgs([]string{"support", "schema"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -98,35 +106,35 @@ func TestSchema_IncludesSubcommands(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	// Find major command and verify it has subcommands
+	// Find bump command and verify it has subcommands
 	for _, cmd := range schema.Commands {
-		if cmd.Name == "major" {
+		if cmd.Name == "bump" {
 			if len(cmd.Subcommands) == 0 {
-				t.Error("major command should have subcommands (increment, decrement)")
+				t.Error("bump command should have subcommands (major, minor, patch)")
 			}
-			// Check for increment subcommand
-			hasIncrement := false
+			// Check for major subcommand
+			hasMajor := false
 			for _, sub := range cmd.Subcommands {
-				if sub.Name == "increment" {
-					hasIncrement = true
+				if sub.Name == "major" {
+					hasMajor = true
 					break
 				}
 			}
-			if !hasIncrement {
-				t.Error("major command should have increment subcommand")
+			if !hasMajor {
+				t.Error("bump command should have major subcommand")
 			}
 			return
 		}
 	}
 
-	t.Error("major command not found in schema")
+	t.Error("bump command not found in schema")
 }
 
 func TestSchema_IncludesGlobalFlags(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"schema"})
+	rootCmd.SetArgs([]string{"support", "schema"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -161,7 +169,7 @@ func TestSchema_IncludesTemplateVariables(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"schema"})
+	rootCmd.SetArgs([]string{"support", "schema"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -203,7 +211,7 @@ func TestSchema_IncludesCommandFlags(t *testing.T) {
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"schema"})
+	rootCmd.SetArgs([]string{"support", "schema"})
 	defer func() {
 		rootCmd.SetOut(nil)
 		rootCmd.SetErr(nil)
@@ -220,15 +228,21 @@ func TestSchema_IncludesCommandFlags(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	// Find emit command - it should have flags
+	// Find output command and then emit subcommand - it should have flags
 	for _, cmd := range schema.Commands {
-		if cmd.Name == "emit" {
-			if len(cmd.Flags) == 0 {
-				t.Error("emit command should have flags")
+		if cmd.Name == "output" {
+			for _, sub := range cmd.Subcommands {
+				if sub.Name == "emit" {
+					if len(sub.Flags) == 0 {
+						t.Error("emit command should have flags")
+					}
+					return
+				}
 			}
+			t.Error("emit subcommand not found under output")
 			return
 		}
 	}
 
-	t.Error("emit command not found in schema")
+	t.Error("output command not found in schema")
 }

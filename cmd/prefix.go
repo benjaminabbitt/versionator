@@ -160,7 +160,7 @@ Also shows the configured prefix from .versionator.yaml that will be used on 'pr
 }
 
 func init() {
-	rootCmd.AddCommand(prefixCmd)
+	configCmd.AddCommand(prefixCmd)
 	prefixCmd.AddCommand(prefixEnableCmd)
 	prefixCmd.AddCommand(prefixDisableCmd)
 	prefixCmd.AddCommand(prefixSetCmd)

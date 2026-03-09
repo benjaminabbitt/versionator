@@ -36,7 +36,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(modeCmd)
+	configCmd.AddCommand(modeCmd)
 
 	modeCmd.Flags().String("prerelease", "", "Pre-release template for CD mode (Mustache)")
 	modeCmd.Flags().String("metadata", "", "Metadata template for CD mode (Mustache)")

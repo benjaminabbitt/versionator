@@ -43,12 +43,66 @@ Examples:
 	RunE: runBump,
 }
 
+// makeLevelCmd creates a parent command for a version level with increment/decrement subcommands
+func makeLevelCmd(level version.VersionLevel, name string) *cobra.Command {
+	titleName := strings.ToUpper(name[:1]) + name[1:]
+
+	cmd := &cobra.Command{
+		Use:   name,
+		Short: fmt.Sprintf("Manage %s version", name),
+		Long:  fmt.Sprintf("Commands to increment or decrement the %s version component", name),
+	}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:     "increment",
+		Aliases: []string{"inc", "+", "up"},
+		Short:   fmt.Sprintf("Increment %s version", name),
+		Long:    fmt.Sprintf("Increment the %s version", name),
+		RunE: func(c *cobra.Command, args []string) error {
+			if err := version.Increment(level); err != nil {
+				return err
+			}
+			ver, err := version.GetCurrentVersion()
+			if err != nil {
+				return fmt.Errorf("error reading updated version: %w", err)
+			}
+			fmt.Printf("%s version incremented to: %s\n", titleName, ver)
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:     "decrement",
+		Aliases: []string{"dec", "-", "down"},
+		Short:   fmt.Sprintf("Decrement %s version", name),
+		Long:    fmt.Sprintf("Decrement the %s version", name),
+		RunE: func(c *cobra.Command, args []string) error {
+			if err := version.Decrement(level); err != nil {
+				return err
+			}
+			ver, err := version.GetCurrentVersion()
+			if err != nil {
+				return fmt.Errorf("error reading updated version: %w", err)
+			}
+			fmt.Printf("%s version decremented to: %s\n", titleName, ver)
+			return nil
+		},
+	})
+
+	return cmd
+}
+
 func init() {
 	rootCmd.AddCommand(bumpCmd)
 
 	bumpCmd.Flags().Bool("dry-run", false, "Show what would happen without making changes")
 	bumpCmd.Flags().Bool("no-amend", false, "Update VERSION file but do not amend the last commit")
 	bumpCmd.Flags().String("mode", "all", "Parse mode: semver, conventional, or all")
+
+	// Add level commands to bump
+	bumpCmd.AddCommand(makeLevelCmd(version.MajorLevel, "major"))
+	bumpCmd.AddCommand(makeLevelCmd(version.MinorLevel, "minor"))
+	bumpCmd.AddCommand(makeLevelCmd(version.PatchLevel, "patch"))
 }
 
 func runBump(cmd *cobra.Command, args []string) error {

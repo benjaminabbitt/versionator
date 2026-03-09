@@ -8,6 +8,15 @@
    - Versionator extensions
 
    Notation: ISO/IEC 14977 EBNF
+
+   License:
+   - SemVer 2.0.0 specification by Tom Preston-Werner is licensed under
+     Creative Commons Attribution 3.0 (CC BY 3.0).
+     https://creativecommons.org/licenses/by/3.0/
+   - This EBNF formalization and extensions are licensed under BSD 3-Clause.
+   - IMPORTANT: The BSD 3-Clause license does NOT remove CC BY 3.0
+     attribution requirements. You must credit Tom Preston-Werner and
+     the SemVer project when using SemVer-derived portions of this grammar.
    ======================================================================= *)
 
 (* -----------------------------------------------------------------------

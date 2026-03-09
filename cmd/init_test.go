@@ -30,7 +30,7 @@ func (suite *InitTestSuite) SetupTest() {
 func (suite *InitTestSuite) TearDownTest() {
 	// Restore original directory
 	if suite.origDir != "" {
-		os.Chdir(suite.origDir)
+		_ = os.Chdir(suite.origDir)
 	}
 
 	// Reset command state

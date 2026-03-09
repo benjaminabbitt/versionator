@@ -219,18 +219,18 @@ func TestLogger_ThreadSafety(t *testing.T) {
 // Benchmark tests to ensure logging performance is reasonable
 func BenchmarkInitLogger_Console(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		InitLogger("console")
+		_ = InitLogger("console")
 	}
 }
 
 func BenchmarkInitLogger_JSON(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		InitLogger("json")
+		_ = InitLogger("json")
 	}
 }
 
 func BenchmarkGetSugaredLogger(b *testing.B) {
-	InitLogger("console")
+	_ = InitLogger("console")
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
