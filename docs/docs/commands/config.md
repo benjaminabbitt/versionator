@@ -69,11 +69,13 @@ Manage build metadata
 Commands to enable or disable appending build metadata to version numbers.
 
 Build metadata follows SemVer 2.0.0 specification:
-- Appended with a plus sign (+) - this is added automatically
-- Use DOTS (.) to separate identifiers in your template
-- Must contain only alphanumerics and hyphens [0-9A-Za-z-]
+- Appended with a plus sign (+) - added automatically
+- Multiple identifiers separated by DOTS (.)
+- Each identifier: alphanumerics and hyphens only [0-9A-Za-z-]
 
-Example output: 1.2.3+20241211103045.abc1234def5
+Example: 1.2.3+20241211103045.abc1234
+         └─────────────────┘ └──────┘
+          identifier 1       identifier 2
 
 ```bash
 versionator config metadata

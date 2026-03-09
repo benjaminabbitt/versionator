@@ -49,8 +49,20 @@ func makeLevelCmd(level version.VersionLevel, name string) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   name,
-		Short: fmt.Sprintf("Manage %s version", name),
-		Long:  fmt.Sprintf("Commands to increment or decrement the %s version component", name),
+		Short: fmt.Sprintf("Increment %s version (default), or use subcommands", name),
+		Long:  fmt.Sprintf("Increment the %s version. Use 'decrement' subcommand to decrement instead.", name),
+		RunE: func(c *cobra.Command, args []string) error {
+			// Default to increment when no subcommand is given
+			if err := version.Increment(level); err != nil {
+				return err
+			}
+			ver, err := version.GetCurrentVersion()
+			if err != nil {
+				return fmt.Errorf("error reading updated version: %w", err)
+			}
+			fmt.Printf("%s version incremented to: %s\n", titleName, ver)
+			return nil
+		},
 	}
 
 	cmd.AddCommand(&cobra.Command{

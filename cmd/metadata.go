@@ -17,11 +17,13 @@ var metadataCmd = &cobra.Command{
 	Long: `Commands to enable or disable appending build metadata to version numbers.
 
 Build metadata follows SemVer 2.0.0 specification:
-- Appended with a plus sign (+) - this is added automatically
-- Use DOTS (.) to separate identifiers in your template
-- Must contain only alphanumerics and hyphens [0-9A-Za-z-]
+- Appended with a plus sign (+) - added automatically
+- Multiple identifiers separated by DOTS (.)
+- Each identifier: alphanumerics and hyphens only [0-9A-Za-z-]
 
-Example output: 1.2.3+20241211103045.abc1234def5`,
+Example: 1.2.3+20241211103045.abc1234
+         └─────────────────┘ └──────┘
+          identifier 1       identifier 2`,
 }
 
 var metadataEnableCmd = &cobra.Command{
@@ -243,7 +245,8 @@ var metadataTemplateCmd = &cobra.Command{
 When setting a template, it is saved to .versionator.yaml config AND rendered
 immediately to set the metadata value in VERSION file.
 
-IMPORTANT: Use DOTS (.) to separate metadata identifiers per SemVer 2.0.0.
+IMPORTANT: Separate identifiers with DOTS (.) per SemVer 2.0.0.
+Each identifier can only contain alphanumerics and hyphens [0-9A-Za-z-].
 The leading plus (+) is added automatically - do NOT include it in your template.
 
 The template uses Mustache syntax. Available variables:

@@ -47,15 +47,15 @@ versionator bump [command] [flags]
 
 | Command | Description |
 |---------|-------------|
-| `major` | Manage major version |
-| `minor` | Manage minor version |
-| `patch` | Manage patch version |
+| `major` | Increment major version (default), or use subcommands |
+| `minor` | Increment minor version (default), or use subcommands |
+| `patch` | Increment patch version (default), or use subcommands |
 
 ### major
 
-Manage major version
+Increment major version (default), or use subcommands
 
-Commands to increment or decrement the major version component
+Increment the major version. Use 'decrement' subcommand to decrement instead.
 
 ```bash
 versionator bump major
@@ -63,9 +63,9 @@ versionator bump major
 
 ### minor
 
-Manage minor version
+Increment minor version (default), or use subcommands
 
-Commands to increment or decrement the minor version component
+Increment the minor version. Use 'decrement' subcommand to decrement instead.
 
 ```bash
 versionator bump minor
@@ -73,9 +73,9 @@ versionator bump minor
 
 ### patch
 
-Manage patch version
+Increment patch version (default), or use subcommands
 
-Commands to increment or decrement the patch version component
+Increment the patch version. Use 'decrement' subcommand to decrement instead.
 
 ```bash
 versionator bump patch
