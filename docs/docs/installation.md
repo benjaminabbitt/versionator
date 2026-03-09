@@ -59,6 +59,44 @@ tar xzf versionator-freebsd-amd64.tar.gz
 sudo mv versionator-freebsd-amd64 /usr/local/bin/versionator
 ```
 
+## Container (Docker/Podman)
+
+Multi-arch container images are available for linux/amd64 and linux/arm64:
+
+```bash
+# Docker
+docker pull ghcr.io/benjaminabbitt/versionator:latest
+docker run --rm -v $(pwd):/workspace ghcr.io/benjaminabbitt/versionator version
+
+# Podman
+podman pull ghcr.io/benjaminabbitt/versionator:latest
+podman run --rm -v $(pwd):/workspace:Z ghcr.io/benjaminabbitt/versionator version
+```
+
+### Available Tags
+
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest release |
+| `vX.Y.Z` | Specific version (e.g., `v0.0.21`) |
+| `X.Y.Z` | Version without prefix (e.g., `0.0.21`) |
+
+### CI/CD Usage
+
+```yaml
+# GitHub Actions
+- name: Get version
+  run: |
+    docker run --rm -v ${{ github.workspace }}:/workspace \
+      ghcr.io/benjaminabbitt/versionator version
+
+# GitLab CI
+get_version:
+  image: ghcr.io/benjaminabbitt/versionator:latest
+  script:
+    - versionator version
+```
+
 ## Available Archives
 
 | Platform | Architecture | Archive |

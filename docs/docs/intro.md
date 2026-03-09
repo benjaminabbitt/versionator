@@ -26,7 +26,7 @@ See [Competitors](./competitors) for detailed comparisons with GitVersion, seman
 Versionator takes a different approach: **explicit version management**.
 
 - The `VERSION` file is the **single source of truth**
-- Version changes are deliberate actions (`versionator patch increment`)
+- Version changes are deliberate actions (`versionator patch +`)
 - Versions are predictable and reproducible
 - Works seamlessly in monorepos with independent package versions
 
@@ -64,13 +64,13 @@ When you're debugging at 2 AM, you'll know exactly what's running. See [Binary E
 # Initialize version (creates VERSION file with 0.0.1)
 versionator init
 
-# Increment versions
-versionator major increment   # 0.0.1 -> 1.0.0
-versionator minor increment   # 1.0.0 -> 1.1.0
-versionator patch increment   # 1.1.0 -> 1.1.1
+# Increment versions (aliases: increment, inc, +)
+versionator major +    # 0.0.1 -> 1.0.0
+versionator minor +    # 1.0.0 -> 1.1.0
+versionator patch +    # 1.1.0 -> 1.1.1
 
 # Create git tag and release branch
-versionator release           # Creates tag v1.1.1 and branch release/v1.1.1
+versionator release    # Creates tag v1.1.1 and branch release/v1.1.1
 
 # Generate version file for Python
 versionator emit python --output mypackage/_version.py

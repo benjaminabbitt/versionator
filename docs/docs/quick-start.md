@@ -35,25 +35,31 @@ Use the `major`, `minor`, and `patch` commands to increment versions following S
 
 ```bash
 # Bump to first release
-versionator major increment
+versionator major +      # aliases: increment, inc, +
 # VERSION: 1.0.0
 
 # Add a feature
-versionator minor increment
+versionator minor +
 # VERSION: 1.1.0
 
 # Fix a bug
-versionator patch increment
+versionator patch +
 # VERSION: 1.1.1
 ```
 
-### Shorthand Aliases
+### Command Aliases
 
-You can use `inc` and `dec` as shortcuts:
+All increment/decrement commands have shorthand aliases:
+
+| Command | Aliases |
+|---------|---------|
+| `increment` | `inc`, `+` |
+| `decrement` | `dec`, `-` |
 
 ```bash
-versionator patch inc    # Same as patch increment
-versionator minor dec    # Same as minor decrement
+versionator patch +      # increment patch
+versionator minor inc    # increment minor
+versionator major -      # decrement major
 ```
 
 ## Add a Prefix
@@ -74,7 +80,7 @@ Create git tags and release branches:
 
 ```bash
 # Bump version and release
-versionator patch increment
+versionator patch +
 versionator release
 
 # The release command will:
@@ -151,7 +157,7 @@ git checkout main
 git merge feature/new-feature
 
 # Bump version and release
-versionator minor increment
+versionator minor +
 versionator release
 git push --tags
 ```
@@ -164,7 +170,7 @@ git add .
 git commit -m "Fix critical bug"
 
 # Bump version and release
-versionator patch increment
+versionator patch +
 versionator release
 git push --tags
 ```
