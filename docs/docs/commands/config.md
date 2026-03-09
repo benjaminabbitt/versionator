@@ -8,14 +8,13 @@ description: Manage versionator configuration
 Manage versionator configuration
 
 Manage versionator configuration including version prefix, pre-release,
-metadata, custom variables, and versioning mode.
+metadata, and custom variables.
 
 Use subcommands to configure specific aspects:
   config prefix      - Manage version prefix (v, V)
-  config prerelease  - Manage pre-release identifiers
-  config metadata    - Manage build metadata
+  config prerelease  - Manage pre-release identifiers and stability
+  config metadata    - Manage build metadata and stability
   config custom      - Manage custom key-value pairs
-  config mode        - Switch between release and continuous-delivery modes
   config vars        - Show all available template variables
 
 ## Usage
@@ -29,10 +28,9 @@ versionator config [command]
 | Command | Description |
 |---------|-------------|
 | `custom` | Manage custom key-value pairs in config |
-| `metadata` | Manage build metadata |
-| `mode` | Manage versioning mode (release or continuous-delivery) |
+| `metadata` | Manage build metadata and stability |
 | `prefix` | Manage version prefix |
-| `prerelease` | Manage pre-release identifier |
+| `prerelease` | Manage pre-release identifier and stability |
 | `vars` | Show all template variables and their current values |
 
 ### custom
@@ -64,9 +62,9 @@ versionator config custom
 
 ### metadata
 
-Manage build metadata
+Manage build metadata and stability
 
-Commands to enable or disable appending build metadata to version numbers.
+Commands to manage build metadata configuration including stability settings.
 
 Build metadata follows SemVer 2.0.0 specification:
 - Appended with a plus sign (+) - added automatically
@@ -77,48 +75,29 @@ Example: 1.2.3+20241211103045.abc1234
          └─────────────────┘ └──────┘
           identifier 1       identifier 2
 
-```bash
-versionator config metadata
-```
+**Stability**: Controls whether metadata is stored in VERSION file or generated from template.
 
-### mode
-
-Manage versioning mode (release or continuous-delivery)
-
-Manage versioning mode configuration.
-
-Versioning modes control how pre-release and metadata are generated:
-
-  release (default):
-    - Pre-release and metadata come from VERSION file
-    - Used for standard release workflows
-    - Developer controls version components
-
-  continuous-delivery:
-    - Pre-release and metadata are auto-generated from templates
-    - Every build gets a unique version (e.g., 1.2.3-build-42+abc1234)
-    - Templates use Mustache syntax with VCS variables
+| Stability | Default | Behavior |
+|-----------|---------|----------|
+| `false` | Yes | Generated from template at output time |
+| `true` | No | Stored directly in VERSION file |
 
 **Examples:**
 
 ```bash
-versionator mode                           # Show current mode
-versionator mode release                   # Set to release mode
-versionator mode cd                        # Set to continuous-delivery mode
-versionator mode cd --prerelease "build-{{CommitsSinceTag}}"
-versionator mode cd --metadata "{{ShortHash}}"
+versionator config metadata                    # Show current status
+versionator config metadata template           # Get current template
+versionator config metadata template "{{ShortHash}}"  # Set template
+versionator config metadata stable             # Get stability setting
+versionator config metadata stable true        # Enable stable mode
+versionator config metadata stable false       # Disable stable mode (use template)
+versionator config metadata set "build123"     # Set literal (requires stable:true)
+versionator config metadata set "build123" --force  # Force set template
 ```
 
 ```bash
-versionator config mode [flags]
+versionator config metadata
 ```
-
-**Flags:**
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--metadata` | string | - | Metadata template for CD mode (Mustache) |
-| `--prerelease` | string | - | Pre-release template for CD mode (Mustache) |
 
 ### prefix
 
@@ -134,9 +113,9 @@ versionator config prefix
 
 ### prerelease
 
-Manage pre-release identifier
+Manage pre-release identifier and stability
 
-Commands to enable or disable pre-release identifiers.
+Commands to manage pre-release configuration including stability settings.
 
 Pre-release follows SemVer 2.0.0 specification:
 - Appended with a dash (-) - this is added automatically
@@ -144,6 +123,26 @@ Pre-release follows SemVer 2.0.0 specification:
 - Must contain only alphanumerics and hyphens [0-9A-Za-z-]
 
 Example output: 1.2.3-alpha-5
+
+**Stability**: Controls whether pre-release is stored in VERSION file or generated from template.
+
+| Stability | Default | Behavior |
+|-----------|---------|----------|
+| `false` | Yes | Generated from template at output time |
+| `true` | No | Stored directly in VERSION file |
+
+**Examples:**
+
+```bash
+versionator config prerelease                    # Show current status
+versionator config prerelease template           # Get current template
+versionator config prerelease template "build-{{CommitsSinceTag}}"  # Set template
+versionator config prerelease stable             # Get stability setting
+versionator config prerelease stable true        # Enable stable mode
+versionator config prerelease stable false       # Disable stable mode (use template)
+versionator config prerelease set "alpha"        # Set literal (requires stable:true)
+versionator config prerelease set "alpha" --force  # Force set template
+```
 
 ```bash
 versionator config prerelease

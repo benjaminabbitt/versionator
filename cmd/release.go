@@ -43,10 +43,12 @@ Use --no-branch to skip branch creation for a single invocation.
 
 The command will fail if there are uncommitted changes (other than VERSION)
 or if the tag already exists.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		_, err := runRelease(cmd)
-		return err
-	},
+	RunE: runReleaseCmd,
+}
+
+func runReleaseCmd(cmd *cobra.Command, args []string) error {
+	_, err := runRelease(cmd)
+	return err
 }
 
 var releasePushCmd = &cobra.Command{
@@ -62,30 +64,32 @@ This combines the release command with git push operations:
 Example:
   versionator release push           # Release and push to remote
   versionator release push --no-branch  # Release and push tag only`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		result, err := runRelease(cmd)
-		if err != nil {
-			return err
-		}
+	RunE: runReleasePush,
+}
 
-		// Push the tag
-		cmd.Printf("Pushing tag '%s' to remote...\n", result.tagName)
-		if err := result.vcsImpl.PushTag(result.tagName); err != nil {
-			return fmt.Errorf("failed to push tag: %w", err)
-		}
-		cmd.Printf("Successfully pushed tag '%s'\n", result.tagName)
+func runReleasePush(cmd *cobra.Command, args []string) error {
+	result, err := runRelease(cmd)
+	if err != nil {
+		return err
+	}
 
-		// Push the branch if it was created
-		if result.branchName != "" {
-			cmd.Printf("Pushing branch '%s' to remote...\n", result.branchName)
-			if err := result.vcsImpl.PushBranch(result.branchName); err != nil {
-				return fmt.Errorf("failed to push branch: %w", err)
-			}
-			cmd.Printf("Successfully pushed branch '%s'\n", result.branchName)
-		}
+	// Push the tag
+	cmd.Printf("Pushing tag '%s' to remote...\n", result.tagName)
+	if err := result.vcsImpl.PushTag(result.tagName); err != nil {
+		return fmt.Errorf("failed to push tag: %w", err)
+	}
+	cmd.Printf("Successfully pushed tag '%s'\n", result.tagName)
 
-		return nil
-	},
+	// Push the branch if it was created
+	if result.branchName != "" {
+		cmd.Printf("Pushing branch '%s' to remote...\n", result.branchName)
+		if err := result.vcsImpl.PushBranch(result.branchName); err != nil {
+			return fmt.Errorf("failed to push branch: %w", err)
+		}
+		cmd.Printf("Successfully pushed branch '%s'\n", result.branchName)
+	}
+
+	return nil
 }
 
 func runRelease(cmd *cobra.Command) (*releaseResult, error) {

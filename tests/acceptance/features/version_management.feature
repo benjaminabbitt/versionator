@@ -67,38 +67,80 @@ Feature: Version Management
     Then the VERSION should have prefix ""
 
   Scenario: Set prerelease
+    Given a config file with:
+      """
+      prerelease:
+        stable: true
+      """
     When I run "versionator config prerelease set alpha"
     Then the VERSION should have prerelease "alpha"
 
   Scenario: Set prerelease with identifier
+    Given a config file with:
+      """
+      prerelease:
+        stable: true
+      """
     When I run "versionator config prerelease set beta.1"
     Then the VERSION should have prerelease "beta.1"
 
   Scenario: Clear prerelease
     Given a VERSION file with prefix "v", version "1.0.0" and prerelease "alpha"
+    And a config file with:
+      """
+      prerelease:
+        stable: true
+      """
     When I run "versionator config prerelease clear"
     Then the VERSION should have prerelease ""
 
   Scenario: Set metadata
+    Given a config file with:
+      """
+      metadata:
+        stable: true
+      """
     When I run "versionator config metadata set build.123"
     Then the VERSION should have metadata "build.123"
 
   Scenario: Clear metadata
     Given a VERSION file with prefix "v", version "1.0.0" and metadata "build.456"
+    And a config file with:
+      """
+      metadata:
+        stable: true
+      """
     When I run "versionator config metadata clear"
     Then the VERSION should have metadata ""
 
   Scenario: Version with prerelease
+    Given a config file with:
+      """
+      prerelease:
+        stable: true
+      """
     When I run "versionator config prerelease set rc.1"
     And I run "versionator output version"
     Then the output should be "1.0.0-rc.1"
 
   Scenario: Version with metadata
+    Given a config file with:
+      """
+      metadata:
+        stable: true
+      """
     When I run "versionator config metadata set 20241212"
     And I run "versionator output version"
     Then the output should be "1.0.0+20241212"
 
   Scenario: Version with prerelease and metadata
+    Given a config file with:
+      """
+      prerelease:
+        stable: true
+      metadata:
+        stable: true
+      """
     When I run "versionator config prerelease set alpha"
     And I run "versionator config metadata set build.1"
     And I run "versionator output version"

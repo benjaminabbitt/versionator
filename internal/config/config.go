@@ -12,32 +12,13 @@ const configFile = ".versionator.yaml"
 
 // Config holds configuration for version metadata behavior
 type Config struct {
-	Prefix           string                  `yaml:"prefix"`
-	PreRelease       PreReleaseConfig        `yaml:"prerelease"`
-	Metadata         MetadataConfig          `yaml:"metadata"`
-	Release          ReleaseConfig           `yaml:"release"`
-	BranchVersioning BranchVersioningConfig  `yaml:"branchVersioning"`
-	Mode             ModeConfig              `yaml:"mode"`
-	Logging          LoggingConfig           `yaml:"logging"`
-	Custom           map[string]string       `yaml:"custom,omitempty"`
-}
-
-// ModeConfig holds versioning mode configuration
-type ModeConfig struct {
-	// Type is the versioning mode: "release" (default) or "continuous-delivery"
-	Type string `yaml:"type"`
-	// ContinuousDelivery holds CD mode specific settings
-	ContinuousDelivery CDModeConfig `yaml:"continuousDelivery"`
-}
-
-// CDModeConfig holds continuous delivery mode configuration
-type CDModeConfig struct {
-	// PrereleaseTemplate is a Mustache template for auto-generated pre-release
-	// Default: "build-{{CommitsSinceTag}}"
-	PrereleaseTemplate string `yaml:"prereleaseTemplate"`
-	// MetadataTemplate is a Mustache template for auto-generated metadata
-	// Default: "{{ShortHash}}"
-	MetadataTemplate string `yaml:"metadataTemplate"`
+	Prefix           string                 `yaml:"prefix"`
+	PreRelease       PreReleaseConfig       `yaml:"prerelease"`
+	Metadata         MetadataConfig         `yaml:"metadata"`
+	Release          ReleaseConfig          `yaml:"release"`
+	BranchVersioning BranchVersioningConfig `yaml:"branchVersioning"`
+	Logging          LoggingConfig          `yaml:"logging"`
+	Custom           map[string]string      `yaml:"custom,omitempty"`
 }
 
 // BranchVersioningConfig holds branch-aware versioning configuration
@@ -78,10 +59,12 @@ type ReleaseConfig struct {
 // The leading dash (-) is automatically prepended when using {{PreReleaseWithDash}}
 // Do NOT include the leading dash in your template.
 //
-// The VERSION file is the source of truth for current pre-release value.
-// This template is stored for use with 'prerelease enable' and '--prerelease' flag.
+// Stability controls where the pre-release value lives:
+//   - Stable=true: Value is written to VERSION file (traditional release workflow)
+//   - Stable=false: Value is generated from template at output time (default, CD workflow)
 type PreReleaseConfig struct {
 	Template string `yaml:"template"` // Mustache template with DASHES as separators: "alpha-{{CommitsSinceTag}}" → "alpha-5"
+	Stable   bool   `yaml:"stable"`   // If true, value is written to VERSION file; if false, generated at output time
 }
 
 // MetadataConfig holds build metadata configuration
@@ -94,10 +77,12 @@ type PreReleaseConfig struct {
 // The leading plus (+) is automatically prepended when using {{MetadataWithPlus}}
 // Do NOT include the leading plus in your template.
 //
-// The VERSION file is the source of truth for current metadata value.
-// This template is stored for use with 'metadata enable' and '--metadata' flag.
+// Stability controls where the metadata value lives:
+//   - Stable=true: Value is written to VERSION file
+//   - Stable=false: Value is generated from template at output time (default)
 type MetadataConfig struct {
 	Template string    `yaml:"template"` // Mustache template with DOTS as separators: "{{BuildDateTimeCompact}}.{{ShortHash}}" → "20241211.abc1234"
+	Stable   bool      `yaml:"stable"`   // If true, value is written to VERSION file; if false, generated at output time
 	Git      GitConfig `yaml:"git"`
 }
 
@@ -116,10 +101,12 @@ func ReadConfig() (*Config, error) {
 	config := &Config{
 		Prefix: "v", // default prefix
 		PreRelease: PreReleaseConfig{
-			Template: "", // empty by default, user must configure
+			Template: "", // default empty - templates must be explicitly configured
+			Stable:   false,                       // default: generated at output time (CD workflow)
 		},
 		Metadata: MetadataConfig{
-			Template: "", // empty by default, user must configure
+			Template: "", // default empty - templates must be explicitly configured
+			Stable:   false,           // default: generated at output time
 			Git: GitConfig{
 				HashLength: 12, // default hash length for MediumHash
 			},
@@ -301,32 +288,37 @@ prefix: "v"
 
 # Pre-release configuration
 # Pre-release follows SemVer 2.0.0: appended with dash (-)
-# Example output: 1.2.3-alpha-5
+# Example output: 1.2.3-build-5
 prerelease:
-  # Set to true to enable pre-release in version output
-  enabled: false
-
   # Mustache template string for pre-release identifier
   # IMPORTANT: Use DASHES (-) to separate identifiers per SemVer 2.0.0
-  # Example: "alpha-{{CommitsSinceTag}}" → "alpha-5"
+  # Example: "build-{{CommitsSinceTag}}" → "build-5"
   # The leading dash is added automatically - do NOT include it here
-  template: "alpha-{{CommitsSinceTag}}"
+  # Default is empty - set a template to enable dynamic pre-release
+  template: ""
+
+  # Stability controls where the pre-release value lives:
+  #   stable: true  - Value is written to VERSION file (traditional release workflow)
+  #   stable: false - Value is generated from template at output time (default, CD workflow)
+  # When stable is false, templates are re-evaluated on every output command.
+  stable: false
 
 # Build metadata configuration
 # Metadata follows SemVer 2.0.0: appended with plus (+)
-# Example output: 1.2.3+20241211103045.abc1234def5
+# Example output: 1.2.3+abc1234
 metadata:
-  # Set to true to enable metadata in version output
-  enabled: false
-
-  # Metadata type (currently only "git" supported)
-  type: "git"
-
   # Mustache template string for build metadata
   # IMPORTANT: Use DOTS (.) to separate identifiers per SemVer 2.0.0
   # Example: "{{BuildDateTimeCompact}}.{{MediumHash}}" → "20241211103045.abc1234def5"
   # The leading plus is added automatically - do NOT include it here
-  template: "{{BuildDateTimeCompact}}.{{MediumHash}}"
+  # Default is empty - set a template to enable dynamic metadata
+  template: ""
+
+  # Stability controls where the metadata value lives:
+  #   stable: true  - Value is written to VERSION file
+  #   stable: false - Value is generated from template at output time (default)
+  # Metadata is almost always dynamic (commit hash, build time), so default is false.
+  stable: false
 
   # Git-specific configuration
   git:
@@ -357,13 +349,13 @@ logging:
 #   {{MajorMinor}}                   - Major.Minor (1.2)
 #   {{Prefix}}                       - Version prefix (v)
 #
-# Pre-release (from VERSION file):
+# Pre-release (rendered from template or VERSION file depending on stable flag):
 #   {{PreRelease}}                   - Full pre-release string
 #   {{PreReleaseWithDash}}           - With dash prefix (-alpha.5)
 #   {{PreReleaseLabel}}              - Label only (alpha from alpha.5)
 #   {{PreReleaseNumber}}             - Number only (5 from alpha.5)
 #
-# Metadata (from VERSION file):
+# Metadata (rendered from template or VERSION file depending on stable flag):
 #   {{Metadata}}                     - Full metadata string
 #   {{MetadataWithPlus}}             - With plus prefix (+build.123)
 #
