@@ -8,14 +8,13 @@ var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage versionator configuration",
 	Long: `Manage versionator configuration including version prefix, pre-release,
-metadata, custom variables, and versioning mode.
+metadata, and custom variables.
 
 Use subcommands to configure specific aspects:
   config prefix      - Manage version prefix (v, V)
-  config prerelease  - Manage pre-release identifiers
-  config metadata    - Manage build metadata
+  config prerelease  - Manage pre-release identifiers (includes stability setting)
+  config metadata    - Manage build metadata (includes stability setting)
   config custom      - Manage custom key-value pairs
-  config mode        - Switch between release and continuous-delivery modes
   config vars        - Show all available template variables`,
 }
 

@@ -8,13 +8,43 @@ sidebar_position: 3
 
 Build metadata provides additional information about a build without affecting version precedence. Per SemVer, versions differing only in metadata are considered equal for sorting.
 
-## Static vs Dynamic Metadata
+## Stability Model
 
-### Static (Stored in VERSION file)
+Metadata supports two modes controlled by the `stable` setting:
 
-Set a fixed metadata value:
+### Dynamic (Default: stable: false)
+
+When `stable: false` (the default), metadata is **generated from template at output time**:
+
+```yaml
+# .versionator.yaml
+metadata:
+  template: "{{ShortHash}}"
+  stable: false  # Default
+```
+
+Every time you run `emit`, `ci`, or `output` commands, the template is evaluated:
 
 ```bash
+versionator output version
+# Output: 1.0.0+abc1234
+
+# After more commits:
+versionator output version
+# Output: 1.0.0+def5678
+```
+
+This is ideal for **continuous delivery** workflows where every build should include current commit information.
+
+### Static (stable: true)
+
+When `stable: true`, metadata is **stored in the VERSION file**:
+
+```bash
+# Enable stable mode
+versionator config metadata stable true
+
+# Now set a fixed value
 versionator config metadata set build.123
 # VERSION: 1.0.0+build.123
 
@@ -29,18 +59,12 @@ versionator config metadata clear
 # VERSION: 1.0.0
 ```
 
-### Dynamic (Template-based)
-
-Use templates for values computed at build time:
+### Checking Current Mode
 
 ```bash
-versionator output version \
-  -t "{{MajorMinorPatch}}{{MetadataWithPlus}}" \
-  --metadata="{{BuildDateTimeCompact}}.{{ShortHash}}"
-# Output: 1.0.0+20241211103045.abc1234
+versionator config metadata stable
+# Output: false (or true)
 ```
-
-Dynamic values are computed at runtime and don't modify the VERSION file.
 
 ## Template Configuration
 
@@ -126,55 +150,67 @@ metadata:
 
 Result: `1.0.0+abc1234def01`
 
-## Enable/Disable Commands
+## Commands
 
 ### metadata set
 
-Sets a static value in the VERSION file:
+Sets a metadata value. Behavior depends on stability:
 
+**When stable: true:**
 ```bash
 versionator config metadata set build.123
 # VERSION: 1.0.0+build.123
 ```
 
+**When stable: false (default):**
+```bash
+versionator config metadata set build.123
+# Error: cannot set literal metadata when stable is false
+# Use --force to set as template, or set stable to true first
+
+# Force it (sets as template):
+versionator config metadata set build.123 --force
+# Config: template = "build.123"
+```
+
 ### metadata template
 
-Sets a template in config and renders it to VERSION:
+Sets a template in config:
 
 ```bash
-versionator config metadata template "{{BuildDateTimeCompact}}.{{ShortHash}}"
-# Config: template = "{{BuildDateTimeCompact}}.{{ShortHash}}"
-# VERSION: 1.0.0+20241211103045.abc1234
+versionator config metadata template "{{ShortHash}}"
+# Config: template = "{{ShortHash}}"
 ```
 
-### metadata enable
+When `stable: false`, this template is rendered at output time.
+When `stable: true`, the template is rendered and stored in VERSION immediately.
 
-Renders the config template to VERSION:
+### metadata stable
 
-```bash
-versionator config metadata enable
-# Reads template from config
-# VERSION: 1.0.0+20241211103045.abc1234
-```
-
-### metadata disable
-
-Clears metadata from VERSION (preserves config template):
+Get or set the stability mode:
 
 ```bash
-versionator config metadata disable
-# VERSION: 1.0.0
-# Config template still saved
+# Get current setting
+versionator config metadata stable
+# Output: false
+
+# Enable stable mode (store in VERSION)
+versionator config metadata stable true
+
+# Disable stable mode (generate from template)
+versionator config metadata stable false
 ```
 
 ### metadata clear
 
-Clears metadata from VERSION:
+Clears metadata from VERSION file:
 
 ```bash
 versionator config metadata clear
 # VERSION: 1.0.0
 ```
+
+Only works when `stable: true`. When `stable: false`, use an empty template instead.
 
 ### metadata status
 
@@ -182,8 +218,9 @@ Shows current state:
 
 ```bash
 versionator config metadata status
-# Metadata: ENABLED
-# Value: 20241211103045.abc1234
+# Stable: false
+# Template: {{ShortHash}}
+# Rendered: abc1234
 ```
 
 ## Variables for Metadata

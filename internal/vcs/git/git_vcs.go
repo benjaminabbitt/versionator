@@ -27,9 +27,10 @@ const DefaultMaxCommitDepth = 10000
 // GitVersionControlSystem implements VersionControlSystem for Git
 type GitVersionControlSystem struct {
 	repoRoot   string
-	repo       *git.Repository // cached repository
-	tagInfo    *TagInfo        // cached tag information
-	tagInfoErr error           // cached error from tag info fetch
+	repo       Repository       // cached repository (interface)
+	repoOpener RepositoryOpener // injected repository opener
+	tagInfo    *TagInfo         // cached tag information
+	tagInfoErr error            // cached error from tag info fetch
 }
 
 // TagInfo holds pre-computed tag-related information from a single walk
@@ -39,9 +40,17 @@ type TagInfo struct {
 	LastTagCommitHash string // empty if no tags
 }
 
-// NewGitVCS creates a new GitVersionControlSystem
-func NewGitVCS() *GitVersionControlSystem {
-	return &GitVersionControlSystem{}
+// NewGitVCS creates a new GitVersionControlSystem with a custom repository opener.
+// Use this constructor for testing with mock repositories.
+func NewGitVCS(opener RepositoryOpener) *GitVersionControlSystem {
+	return &GitVersionControlSystem{
+		repoOpener: opener,
+	}
+}
+
+// NewGitVCSDefault creates a new GitVersionControlSystem with the default go-git opener.
+func NewGitVCSDefault() *GitVersionControlSystem {
+	return NewGitVCS(DefaultRepositoryOpener)
 }
 
 // Name returns "git"
@@ -231,7 +240,7 @@ func (g *GitVersionControlSystem) CreateBranch(branchName string) error {
 	refName := plumbing.NewBranchReferenceName(branchName)
 	ref := plumbing.NewHashReference(refName, head.Hash())
 
-	err = repo.Storer.SetReference(ref)
+	err = repo.SetReference(ref)
 	if err != nil {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
@@ -593,7 +602,7 @@ func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 	return ""
 }
 
-func (g *GitVersionControlSystem) openRepository() (*git.Repository, error) {
+func (g *GitVersionControlSystem) openRepository() (Repository, error) {
 	// Return cached repo if available
 	if g.repo != nil {
 		return g.repo, nil
@@ -604,7 +613,7 @@ func (g *GitVersionControlSystem) openRepository() (*git.Repository, error) {
 		return nil, err
 	}
 
-	repo, err := git.PlainOpen(root)
+	repo, err := g.repoOpener(root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open git repository: %w", err)
 	}
@@ -824,7 +833,7 @@ func (g *GitVersionControlSystem) PushBranch(branchName string) error {
 
 // Auto-registration as both VCS and plugin
 func init() {
-	gitVCS := NewGitVCS()
+	gitVCS := NewGitVCSDefault()
 	vcs.RegisterVCS(gitVCS)
 	plugin.RegisterTemplateProvider(gitVCS)
 }

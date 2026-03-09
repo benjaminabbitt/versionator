@@ -48,56 +48,58 @@ Examples:
   versionator init --prefix v             # Create VERSION with v0.0.1
   versionator init --config               # Also create .versionator.yaml
   versionator init --force                # Overwrite existing files`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		versionPath := "VERSION"
-		configPath := ".versionator.yaml"
+	RunE: runInit,
+}
 
-		// Validate prefix early with clear error message
-		if initPrefix != "" && initPrefix != "v" && initPrefix != "V" {
-			return fmt.Errorf("invalid prefix %q: only 'v' or 'V' allowed per SemVer convention", initPrefix)
+func runInit(cmd *cobra.Command, args []string) error {
+	versionPath := "VERSION"
+	configPath := ".versionator.yaml"
+
+	// Validate prefix early with clear error message
+	if initPrefix != "" && initPrefix != "v" && initPrefix != "V" {
+		return fmt.Errorf("invalid prefix %q: only 'v' or 'V' allowed per SemVer convention", initPrefix)
+	}
+
+	// Check if VERSION exists
+	if _, err := os.Stat(versionPath); err == nil && !initForce {
+		return fmt.Errorf("VERSION file already exists (use --force to overwrite)")
+	}
+
+	// Check if config exists when --config is specified
+	if initWithConfig {
+		if _, err := os.Stat(configPath); err == nil && !initForce {
+			return fmt.Errorf(".versionator.yaml already exists (use --force to overwrite)")
 		}
+	}
 
-		// Check if VERSION exists
-		if _, err := os.Stat(versionPath); err == nil && !initForce {
-			return fmt.Errorf("VERSION file already exists (use --force to overwrite)")
+	// Parse the initial version
+	v := version.Parse(initVersion)
+	if initPrefix != "" {
+		v.Prefix = initPrefix
+	}
+
+	// Validate version
+	if err := v.Validate(); err != nil {
+		return fmt.Errorf("invalid version: %w", err)
+	}
+
+	// Write VERSION file
+	content := v.FullString() + "\n"
+	if err := os.WriteFile(versionPath, []byte(content), FilePermission); err != nil {
+		return fmt.Errorf("error writing VERSION file: %w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Created VERSION: %s\n", v.FullString())
+
+	// Write config if requested
+	if initWithConfig {
+		defaultConfig := config.DefaultConfigYAML()
+		if err := os.WriteFile(configPath, []byte(defaultConfig), FilePermission); err != nil {
+			return fmt.Errorf("error writing .versionator.yaml: %w", err)
 		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Created .versionator.yaml\n")
+	}
 
-		// Check if config exists when --config is specified
-		if initWithConfig {
-			if _, err := os.Stat(configPath); err == nil && !initForce {
-				return fmt.Errorf(".versionator.yaml already exists (use --force to overwrite)")
-			}
-		}
-
-		// Parse the initial version
-		v := version.Parse(initVersion)
-		if initPrefix != "" {
-			v.Prefix = initPrefix
-		}
-
-		// Validate version
-		if err := v.Validate(); err != nil {
-			return fmt.Errorf("invalid version: %w", err)
-		}
-
-		// Write VERSION file
-		content := v.FullString() + "\n"
-		if err := os.WriteFile(versionPath, []byte(content), FilePermission); err != nil {
-			return fmt.Errorf("error writing VERSION file: %w", err)
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Created VERSION: %s\n", v.FullString())
-
-		// Write config if requested
-		if initWithConfig {
-			defaultConfig := config.DefaultConfigYAML()
-			if err := os.WriteFile(configPath, []byte(defaultConfig), FilePermission); err != nil {
-				return fmt.Errorf("error writing .versionator.yaml: %w", err)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Created .versionator.yaml\n")
-		}
-
-		return nil
-	},
+	return nil
 }
 
 var initHookCmd = &cobra.Command{
@@ -116,64 +118,66 @@ The hook only triggers when the commit message contains:
 Examples:
   versionator init hook              # Install the post-commit hook
   versionator init hook --uninstall  # Remove the post-commit hook`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get active VCS
-		activeVCS := vcs.GetActiveVCS()
-		if activeVCS == nil {
-			return fmt.Errorf("not in a git repository")
-		}
+	RunE: runInitHook,
+}
 
-		hooksPath, err := activeVCS.GetHooksPath()
-		if err != nil {
-			return fmt.Errorf("failed to get hooks path: %w", err)
-		}
+func runInitHook(cmd *cobra.Command, args []string) error {
+	// Get active VCS
+	activeVCS := vcs.GetActiveVCS()
+	if activeVCS == nil {
+		return fmt.Errorf("not in a git repository")
+	}
 
-		hookPath := filepath.Join(hooksPath, "post-commit")
+	hooksPath, err := activeVCS.GetHooksPath()
+	if err != nil {
+		return fmt.Errorf("failed to get hooks path: %w", err)
+	}
 
-		if hookUninstall {
-			// Check if hook exists
-			if _, err := os.Stat(hookPath); os.IsNotExist(err) {
-				cmd.Println("No post-commit hook installed")
-				return nil
-			}
+	hookPath := filepath.Join(hooksPath, "post-commit")
 
-			// Read existing hook to check if it's ours
-			content, err := os.ReadFile(hookPath)
-			if err != nil {
-				return fmt.Errorf("failed to read hook: %w", err)
-			}
-
-			if string(content) != postCommitHookScript {
-				return fmt.Errorf("post-commit hook exists but was not installed by versionator (use --force to remove anyway)")
-			}
-
-			if err := os.Remove(hookPath); err != nil {
-				return fmt.Errorf("failed to remove hook: %w", err)
-			}
-			cmd.Println("Removed post-commit hook")
+	if hookUninstall {
+		// Check if hook exists
+		if _, err := os.Stat(hookPath); os.IsNotExist(err) {
+			cmd.Println("No post-commit hook installed")
 			return nil
 		}
 
-		// Install hook
-		// Check if hook already exists
-		if _, err := os.Stat(hookPath); err == nil && !initForce {
-			return fmt.Errorf("post-commit hook already exists (use --force to overwrite)")
+		// Read existing hook to check if it's ours
+		content, err := os.ReadFile(hookPath)
+		if err != nil {
+			return fmt.Errorf("failed to read hook: %w", err)
 		}
 
-		// Ensure hooks directory exists
-		if err := os.MkdirAll(hooksPath, 0755); err != nil {
-			return fmt.Errorf("failed to create hooks directory: %w", err)
+		if string(content) != postCommitHookScript {
+			return fmt.Errorf("post-commit hook exists but was not installed by versionator (use --force to remove anyway)")
 		}
 
-		// Write hook script
-		if err := os.WriteFile(hookPath, []byte(postCommitHookScript), 0755); err != nil {
-			return fmt.Errorf("failed to write hook: %w", err)
+		if err := os.Remove(hookPath); err != nil {
+			return fmt.Errorf("failed to remove hook: %w", err)
 		}
-
-		cmd.Println("Installed post-commit hook")
-		cmd.Println("Commits with +semver:major/minor/patch will automatically bump VERSION")
+		cmd.Println("Removed post-commit hook")
 		return nil
-	},
+	}
+
+	// Install hook
+	// Check if hook already exists
+	if _, err := os.Stat(hookPath); err == nil && !initForce {
+		return fmt.Errorf("post-commit hook already exists (use --force to overwrite)")
+	}
+
+	// Ensure hooks directory exists
+	if err := os.MkdirAll(hooksPath, 0755); err != nil {
+		return fmt.Errorf("failed to create hooks directory: %w", err)
+	}
+
+	// Write hook script
+	if err := os.WriteFile(hookPath, []byte(postCommitHookScript), 0755); err != nil {
+		return fmt.Errorf("failed to write hook: %w", err)
+	}
+
+	cmd.Println("Installed post-commit hook")
+	cmd.Println("Commits with +semver:major/minor/patch will automatically bump VERSION")
+	return nil
 }
 
 func init() {

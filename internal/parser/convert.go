@@ -77,6 +77,7 @@ func parseIdentifiers(s string) []*Identifier {
 	parts := strings.Split(s, ".")
 	result := make([]*Identifier, len(parts))
 	for i, part := range parts {
+		part := part // Capture loop variable to avoid pointer aliasing
 		id := &Identifier{}
 		// Check if it's purely numeric
 		if _, err := strconv.Atoi(part); err == nil {

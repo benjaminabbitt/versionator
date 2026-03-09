@@ -39,90 +39,98 @@ Examples:
   versionator custom set Environment production
   versionator custom set Copyright "2024 Acme Inc"`,
 	Args: cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		key := args[0]
-		value := args[1]
+	RunE: runCustomSet,
+}
 
-		if err := config.SetCustom(key, value); err != nil {
-			return fmt.Errorf("error setting custom value: %w", err)
-		}
+func runCustomSet(cmd *cobra.Command, args []string) error {
+	key := args[0]
+	value := args[1]
 
-		fmt.Printf("Custom value set: %s = %s\n", key, value)
-		return nil
-	},
+	if err := config.SetCustom(key, value); err != nil {
+		return fmt.Errorf("error setting custom value: %w", err)
+	}
+
+	cmd.Printf("Custom value set: %s = %s\n", key, value)
+	return nil
 }
 
 var customGetCmd = &cobra.Command{
 	Use:   "get <key>",
 	Short: "Get a custom value by key",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		key := args[0]
+	RunE:  runCustomGet,
+}
 
-		value, ok, err := config.GetCustom(key)
-		if err != nil {
-			return fmt.Errorf("error loading config: %w", err)
-		}
+func runCustomGet(cmd *cobra.Command, args []string) error {
+	key := args[0]
 
-		if !ok {
-			return fmt.Errorf("%s: %s", ErrCustomKeyNotFound, key)
-		}
+	value, ok, err := config.GetCustom(key)
+	if err != nil {
+		return fmt.Errorf("error loading config: %w", err)
+	}
 
-		fmt.Println(value)
-		return nil
-	},
+	if !ok {
+		return fmt.Errorf("%s: %s", ErrCustomKeyNotFound, key)
+	}
+
+	cmd.Println(value)
+	return nil
 }
 
 var customListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all custom key-value pairs",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		custom, err := config.GetAllCustom()
-		if err != nil {
-			return fmt.Errorf("error loading custom values: %w", err)
-		}
+	RunE:  runCustomList,
+}
 
-		if len(custom) == 0 {
-			fmt.Println("No custom values defined")
-			return nil
-		}
+func runCustomList(cmd *cobra.Command, args []string) error {
+	custom, err := config.GetAllCustom()
+	if err != nil {
+		return fmt.Errorf("error loading custom values: %w", err)
+	}
 
-		// Sort keys for consistent output
-		keys := make([]string, 0, len(custom))
-		for k := range custom {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		// Find max key length for alignment
-		maxLen := 0
-		for _, k := range keys {
-			if len(k) > maxLen {
-				maxLen = len(k)
-			}
-		}
-
-		for _, k := range keys {
-			fmt.Printf("{{%s}}%s = %s\n", k, strings.Repeat(" ", maxLen-len(k)), custom[k])
-		}
+	if len(custom) == 0 {
+		cmd.Println("No custom values defined")
 		return nil
-	},
+	}
+
+	// Sort keys for consistent output
+	keys := make([]string, 0, len(custom))
+	for k := range custom {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Find max key length for alignment
+	maxLen := 0
+	for _, k := range keys {
+		if len(k) > maxLen {
+			maxLen = len(k)
+		}
+	}
+
+	for _, k := range keys {
+		cmd.Printf("{{%s}}%s = %s\n", k, strings.Repeat(" ", maxLen-len(k)), custom[k])
+	}
+	return nil
 }
 
 var customDeleteCmd = &cobra.Command{
 	Use:   "delete <key>",
 	Short: "Delete a custom key-value pair",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		key := args[0]
+	RunE:  runCustomDelete,
+}
 
-		if err := config.DeleteCustom(key); err != nil {
-			return fmt.Errorf("error deleting custom value: %w", err)
-		}
+func runCustomDelete(cmd *cobra.Command, args []string) error {
+	key := args[0]
 
-		fmt.Printf("Custom value deleted: %s\n", key)
-		return nil
-	},
+	if err := config.DeleteCustom(key); err != nil {
+		return fmt.Errorf("error deleting custom value: %w", err)
+	}
+
+	cmd.Printf("Custom value deleted: %s\n", key)
+	return nil
 }
 
 func init() {

@@ -77,25 +77,27 @@ This schema is designed for:
 - CI/CD tooling integration
 
 The schema is generated from the actual command tree, ensuring accuracy.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		schema := buildSchema(cmd.Root())
+	RunE: runSchema,
+}
 
-		output, err := json.MarshalIndent(schema, "", "  ")
-		if err != nil {
-			return fmt.Errorf("error generating schema: %w", err)
+func runSchema(cmd *cobra.Command, args []string) error {
+	schema := buildSchema(cmd.Root())
+
+	output, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error generating schema: %w", err)
+	}
+
+	if schemaOutput != "" {
+		if err := os.WriteFile(schemaOutput, output, FilePermission); err != nil {
+			return fmt.Errorf("error writing schema to %s: %w", schemaOutput, err)
 		}
-
-		if schemaOutput != "" {
-			if err := os.WriteFile(schemaOutput, output, FilePermission); err != nil {
-				return fmt.Errorf("error writing schema to %s: %w", schemaOutput, err)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Schema written to %s\n", schemaOutput)
-			return nil
-		}
-
-		fmt.Fprintln(cmd.OutOrStdout(), string(output))
+		fmt.Fprintf(cmd.OutOrStdout(), "Schema written to %s\n", schemaOutput)
 		return nil
-	},
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), string(output))
+	return nil
 }
 
 func init() {

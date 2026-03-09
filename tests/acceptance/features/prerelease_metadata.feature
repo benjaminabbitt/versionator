@@ -7,80 +7,140 @@ Feature: Pre-release and Metadata Management
     Given a clean git repository
     And a VERSION file with version "1.0.0"
 
-  # Pre-release enable/disable/status
-  Scenario: Enable prerelease from config template
+  # Pre-release with stable: true
+  Scenario: Set prerelease when stable is true
     Given a config file with:
       """
       prerelease:
-        template: "beta"
+        stable: true
       """
-    When I run "versionator config prerelease enable"
-    Then the VERSION should have prerelease "beta"
+    When I run "versionator config prerelease set alpha"
+    Then the VERSION should have prerelease "alpha"
 
-  Scenario: Disable prerelease preserves config
+  Scenario: Clear prerelease when stable is true
     Given a VERSION file with prefix "v", version "1.0.0" and prerelease "alpha"
-    When I run "versionator config prerelease disable"
+    And a config file with:
+      """
+      prerelease:
+        stable: true
+      """
+    When I run "versionator config prerelease clear"
     Then the VERSION should have prerelease ""
     And the exit code should be 0
 
-  Scenario: Prerelease status when enabled
+  Scenario: Prerelease status shows stable mode
     Given a VERSION file with prefix "v", version "1.0.0" and prerelease "rc.1"
+    And a config file with:
+      """
+      prerelease:
+        stable: true
+      """
     When I run "versionator config prerelease status"
-    Then the output should contain "ENABLED"
+    Then the output should contain "Stable: true"
     And the output should contain "rc.1"
 
-  Scenario: Prerelease status when disabled
+  Scenario: Prerelease status shows dynamic mode
+    Given a config file with:
+      """
+      prerelease:
+        template: "build-{{CommitsSinceTag}}"
+        stable: false
+      """
     When I run "versionator config prerelease status"
-    Then the output should contain "DISABLED"
+    Then the output should contain "Stable: false"
+    And the output should contain "Template:"
 
-  Scenario: Set prerelease template in config
+  Scenario: Set prerelease template
+    Given a config file with:
+      """
+      prerelease:
+        stable: true
+      """
     When I run "versionator config prerelease template alpha"
-    And I run "versionator config prerelease enable"
     Then the VERSION should have prerelease "alpha"
 
-  # Metadata enable/disable/status
-  Scenario: Enable metadata from config template
+  # Metadata with stable: true
+  Scenario: Set metadata when stable is true
     Given a config file with:
       """
       metadata:
-        template: "build42"
+        stable: true
       """
-    When I run "versionator config metadata enable"
+    When I run "versionator config metadata set build42"
     Then the exit code should be 0
 
-  Scenario: Disable metadata preserves config
+  Scenario: Clear metadata when stable is true
     Given a VERSION file with prefix "v", version "1.0.0" and metadata "build.123"
-    When I run "versionator config metadata disable"
+    And a config file with:
+      """
+      metadata:
+        stable: true
+      """
+    When I run "versionator config metadata clear"
     Then the VERSION should have metadata ""
     And the exit code should be 0
 
-  Scenario: Metadata status when enabled
+  Scenario: Metadata status shows stable mode
     Given a VERSION file with prefix "v", version "1.0.0" and metadata "20241212"
+    And a config file with:
+      """
+      metadata:
+        stable: true
+      """
     When I run "versionator config metadata status"
-    Then the output should contain "ENABLED"
+    Then the output should contain "Stable: true"
     And the output should contain "20241212"
 
-  Scenario: Metadata status when disabled
+  Scenario: Metadata status shows dynamic mode
+    Given a config file with:
+      """
+      metadata:
+        template: "{{ShortHash}}"
+        stable: false
+      """
     When I run "versionator config metadata status"
-    Then the output should contain "DISABLED"
+    Then the output should contain "Stable: false"
+    And the output should contain "Template:"
 
-  Scenario: Set metadata template in config
+  Scenario: Set metadata template when stable is true
+    Given a config file with:
+      """
+      metadata:
+        stable: true
+      """
     When I run "versionator config metadata template build123"
     Then the exit code should be 0
 
-  # Combined scenarios
+  # Combined scenarios with stable: true
   Scenario: Full SemVer with prerelease and metadata
+    Given a config file with:
+      """
+      prerelease:
+        stable: true
+      metadata:
+        stable: true
+      """
     When I run "versionator config prerelease set alpha.1"
     And I run "versionator config metadata set build.42"
     And I run "versionator output version"
     Then the output should be "1.0.0-alpha.1+build.42"
 
   Scenario: Prerelease with dots separator
+    Given a config file with:
+      """
+      prerelease:
+        stable: true
+      """
     When I run "versionator config prerelease set alpha.1.test"
     And I run "versionator output version"
     Then the output should be "1.0.0-alpha.1.test"
 
   Scenario: Metadata with dots separator
+    Given a config file with:
+      """
+      metadata:
+        stable: true
+      """
     When I run "versionator config metadata set 2024.12.25.abc1234"
     And I run "versionator output version"
     Then the output should be "1.0.0+2024.12.25.abc1234"

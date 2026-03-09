@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/benjaminabbitt/versionator/internal/config"
 	"github.com/benjaminabbitt/versionator/internal/emit"
 	"github.com/benjaminabbitt/versionator/internal/version"
 	"github.com/benjaminabbitt/versionator/internal/versionator"
@@ -115,140 +116,171 @@ EXAMPLES:
   # Dump a template for customization
   versionator emit dump python --output _version.tmpl.py`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load version data
-		vd, err := version.Load()
-		if err != nil {
-			return fmt.Errorf("error getting version: %w", err)
-		}
+	RunE: runEmit,
+}
 
-		// Handle prefix override
-		var prefix string
-		if cmd.Flags().Changed("prefix") {
-			if emitPrefixOverride == useDefaultMarker {
-				// Flag provided without value - use default "v"
-				prefix = "v"
-			} else {
-				prefix = emitPrefixOverride
-			}
+func runEmit(cmd *cobra.Command, args []string) error {
+	// Load version data
+	vd, err := version.Load()
+	if err != nil {
+		return fmt.Errorf("error getting version: %w", err)
+	}
+
+	// Handle prefix override
+	var prefix string
+	if cmd.Flags().Changed("prefix") {
+		if emitPrefixOverride == useDefaultMarker {
+			// Flag provided without value - use default "v"
+			prefix = "v"
 		} else {
-			// Use prefix from VERSION file
-			prefix = vd.Prefix
+			prefix = emitPrefixOverride
 		}
+	} else {
+		// Use prefix from VERSION file
+		prefix = vd.Prefix
+	}
 
-		// Handle prerelease template
-		var prereleaseResult string
-		if cmd.Flags().Changed("prerelease") {
-			baseData := emit.BuildTemplateDataFromVersion(vd)
-			if emitPrereleaseTemplate == useDefaultMarker {
-				// Flag provided without value - use defaults from config
-				template, _ := versionator.GetPreReleaseTemplate()
-				if template != "" {
-					prereleaseResult, err = emit.RenderTemplateWithData(template, baseData)
-					if err != nil {
-						return fmt.Errorf("error rendering prerelease template: %w", err)
-					}
-					prereleaseResult = strings.TrimSpace(prereleaseResult)
-				}
-			} else {
-				// Render the provided template
-				prereleaseResult, err = emit.RenderTemplateWithData(emitPrereleaseTemplate, baseData)
+	// Read config for stability settings
+	cfg, _ := config.ReadConfig()
+
+	// Handle prerelease
+	// Priority: 1) --prerelease flag, 2) non-stable template, 3) VERSION file value
+	var prereleaseResult string
+	if cmd.Flags().Changed("prerelease") {
+		// Flag explicitly provided - use it
+		baseData := emit.BuildTemplateDataFromVersion(vd)
+		if emitPrereleaseTemplate == useDefaultMarker {
+			// Flag provided without value - use defaults from config
+			template, _ := versionator.GetPreReleaseTemplate()
+			if template != "" {
+				prereleaseResult, err = emit.RenderTemplateWithData(template, baseData)
 				if err != nil {
 					return fmt.Errorf("error rendering prerelease template: %w", err)
 				}
 				prereleaseResult = strings.TrimSpace(prereleaseResult)
 			}
+		} else {
+			// Render the provided template
+			prereleaseResult, err = emit.RenderTemplateWithData(emitPrereleaseTemplate, baseData)
+			if err != nil {
+				return fmt.Errorf("error rendering prerelease template: %w", err)
+			}
+			prereleaseResult = strings.TrimSpace(prereleaseResult)
 		}
+	} else if cfg != nil && !cfg.PreRelease.Stable && cfg.PreRelease.Template != "" {
+		// Non-stable: automatically render template
+		baseData := emit.BuildTemplateDataFromVersion(vd)
+		prereleaseResult, err = emit.RenderTemplateWithData(cfg.PreRelease.Template, baseData)
+		if err != nil {
+			return fmt.Errorf("error rendering prerelease template: %w", err)
+		}
+		prereleaseResult = strings.TrimSpace(prereleaseResult)
+	} else {
+		// Stable: use VERSION file value
+		prereleaseResult = vd.PreRelease
+	}
 
-		// Handle metadata template
-		var metadataResult string
-		if cmd.Flags().Changed("metadata") {
-			baseData := emit.BuildTemplateDataFromVersion(vd)
-			if emitMetadataTemplate == useDefaultMarker {
-				// Flag provided without value - use defaults from config
-				template, _ := versionator.GetMetadataTemplate()
-				if template != "" {
-					metadataResult, err = emit.RenderTemplateWithData(template, baseData)
-					if err != nil {
-						return fmt.Errorf("error rendering metadata template: %w", err)
-					}
-					metadataResult = strings.TrimSpace(metadataResult)
-				}
-			} else {
-				// Render the provided template
-				metadataResult, err = emit.RenderTemplateWithData(emitMetadataTemplate, baseData)
+	// Handle metadata
+	// Priority: 1) --metadata flag, 2) non-stable template, 3) VERSION file value
+	var metadataResult string
+	if cmd.Flags().Changed("metadata") {
+		// Flag explicitly provided - use it
+		baseData := emit.BuildTemplateDataFromVersion(vd)
+		if emitMetadataTemplate == useDefaultMarker {
+			// Flag provided without value - use defaults from config
+			template, _ := versionator.GetMetadataTemplate()
+			if template != "" {
+				metadataResult, err = emit.RenderTemplateWithData(template, baseData)
 				if err != nil {
 					return fmt.Errorf("error rendering metadata template: %w", err)
 				}
 				metadataResult = strings.TrimSpace(metadataResult)
 			}
-		}
-
-		// Build template data with rendered prerelease and metadata
-		templateData := emit.BuildTemplateDataFromVersion(vd)
-		templateData.Prefix = prefix
-		templateData.PreRelease = prereleaseResult
-		if prereleaseResult != "" {
-			templateData.PreReleaseWithDash = "-" + prereleaseResult
-		}
-		templateData.Metadata = metadataResult
-		if metadataResult != "" {
-			templateData.MetadataWithPlus = "+" + metadataResult
-		}
-
-		var content string
-		var templateStr string
-
-		// Check if using template file
-		if emitTemplateFile != "" {
-			data, err := os.ReadFile(emitTemplateFile)
-			if err != nil {
-				return fmt.Errorf("error reading template file: %w", err)
-			}
-			templateStr = string(data)
-		} else if emitTemplate != "" {
-			templateStr = emitTemplate
-		}
-
-		// Render content
-		if templateStr != "" {
-			content, err = emit.RenderTemplateWithData(templateStr, templateData)
-			if err != nil {
-				return fmt.Errorf("error rendering template: %w", err)
-			}
 		} else {
-			// Require format argument if no template
-			if len(args) == 0 {
-				return fmt.Errorf("format argument required (or use --template/--template-file)\nSupported formats: %s", strings.Join(emit.SupportedFormats(), ", "))
-			}
-
-			format := emit.Format(args[0])
-			if !emit.IsValidFormat(string(format)) {
-				return fmt.Errorf("unsupported format '%s'\nSupported formats: %s", format, strings.Join(emit.SupportedFormats(), ", "))
-			}
-
-			// For built-in formats, use RenderTemplateWithData for consistency
-			tmplStr, err := emit.GetEmbeddedTemplate(format)
+			// Render the provided template
+			metadataResult, err = emit.RenderTemplateWithData(emitMetadataTemplate, baseData)
 			if err != nil {
-				return fmt.Errorf("error getting template: %w", err)
+				return fmt.Errorf("error rendering metadata template: %w", err)
 			}
-			content, err = emit.RenderTemplateWithData(tmplStr, templateData)
-			if err != nil {
-				return fmt.Errorf("error rendering format: %w", err)
-			}
+			metadataResult = strings.TrimSpace(metadataResult)
+		}
+	} else if cfg != nil && !cfg.Metadata.Stable && cfg.Metadata.Template != "" {
+		// Non-stable: automatically render template
+		baseData := emit.BuildTemplateDataFromVersion(vd)
+		metadataResult, err = emit.RenderTemplateWithData(cfg.Metadata.Template, baseData)
+		if err != nil {
+			return fmt.Errorf("error rendering metadata template: %w", err)
+		}
+		metadataResult = strings.TrimSpace(metadataResult)
+	} else {
+		// Stable: use VERSION file value
+		metadataResult = vd.BuildMetadata
+	}
+
+	// Build template data with rendered prerelease and metadata
+	templateData := emit.BuildTemplateDataFromVersion(vd)
+	templateData.Prefix = prefix
+	templateData.PreRelease = prereleaseResult
+	if prereleaseResult != "" {
+		templateData.PreReleaseWithDash = "-" + prereleaseResult
+	}
+	templateData.Metadata = metadataResult
+	if metadataResult != "" {
+		templateData.MetadataWithPlus = "+" + metadataResult
+	}
+
+	var content string
+	var templateStr string
+
+	// Check if using template file
+	if emitTemplateFile != "" {
+		data, err := os.ReadFile(emitTemplateFile)
+		if err != nil {
+			return fmt.Errorf("error reading template file: %w", err)
+		}
+		templateStr = string(data)
+	} else if emitTemplate != "" {
+		templateStr = emitTemplate
+	}
+
+	// Render content
+	if templateStr != "" {
+		content, err = emit.RenderTemplateWithData(templateStr, templateData)
+		if err != nil {
+			return fmt.Errorf("error rendering template: %w", err)
+		}
+	} else {
+		// Require format argument if no template
+		if len(args) == 0 {
+			return fmt.Errorf("format argument required (or use --template/--template-file)\nSupported formats: %s", strings.Join(emit.SupportedFormats(), ", "))
 		}
 
-		// Output to file or stdout
-		if emitOutput != "" {
-			if err := emit.WriteToFile(content, emitOutput); err != nil {
-				return fmt.Errorf("error writing to file: %w", err)
-			}
-			fmt.Printf("Version %s written to %s\n", vd.CoreVersion(), emitOutput)
-		} else {
-			fmt.Print(content)
+		format := emit.Format(args[0])
+		if !emit.IsValidFormat(string(format)) {
+			return fmt.Errorf("unsupported format '%s'\nSupported formats: %s", format, strings.Join(emit.SupportedFormats(), ", "))
 		}
-		return nil
-	},
+
+		// For built-in formats, use RenderTemplateWithData for consistency
+		tmplStr, err := emit.GetEmbeddedTemplate(format)
+		if err != nil {
+			return fmt.Errorf("error getting template: %w", err)
+		}
+		content, err = emit.RenderTemplateWithData(tmplStr, templateData)
+		if err != nil {
+			return fmt.Errorf("error rendering format: %w", err)
+		}
+	}
+
+	// Output to file or stdout
+	if emitOutput != "" {
+		if err := emit.WriteToFile(content, emitOutput); err != nil {
+			return fmt.Errorf("error writing to file: %w", err)
+		}
+		fmt.Printf("Version %s written to %s\n", vd.CoreVersion(), emitOutput)
+	} else {
+		fmt.Print(content)
+	}
+	return nil
 }
 
 var emitDumpCmd = &cobra.Command{
@@ -272,28 +304,30 @@ Examples:
   # Then use your customized template
   versionator emit --template-file _version.tmpl.py --output _version.py`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		format := emit.Format(args[0])
-		if !emit.IsValidFormat(string(format)) {
-			return fmt.Errorf("unsupported format '%s'\nSupported formats: %s", format, strings.Join(emit.SupportedFormats(), ", "))
-		}
+	RunE: runEmitDump,
+}
 
-		template, err := emit.GetEmbeddedTemplate(format)
-		if err != nil {
-			return fmt.Errorf("error getting template: %w", err)
-		}
+func runEmitDump(cmd *cobra.Command, args []string) error {
+	format := emit.Format(args[0])
+	if !emit.IsValidFormat(string(format)) {
+		return fmt.Errorf("unsupported format '%s'\nSupported formats: %s", format, strings.Join(emit.SupportedFormats(), ", "))
+	}
 
-		// Output to file or stdout
-		if dumpOutput != "" {
-			if err := emit.WriteToFile(template, dumpOutput); err != nil {
-				return fmt.Errorf("error writing to file: %w", err)
-			}
-			fmt.Printf("Template for '%s' written to %s\n", format, dumpOutput)
-		} else {
-			fmt.Print(template)
+	template, err := emit.GetEmbeddedTemplate(format)
+	if err != nil {
+		return fmt.Errorf("error getting template: %w", err)
+	}
+
+	// Output to file or stdout
+	if dumpOutput != "" {
+		if err := emit.WriteToFile(template, dumpOutput); err != nil {
+			return fmt.Errorf("error writing to file: %w", err)
 		}
-		return nil
-	},
+		fmt.Printf("Template for '%s' written to %s\n", format, dumpOutput)
+	} else {
+		fmt.Print(template)
+	}
+	return nil
 }
 
 func init() {

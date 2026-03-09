@@ -30,11 +30,13 @@ prefix: "v"
 
 # Pre-release template configuration
 prerelease:
-  template: "alpha-{{CommitsSinceTag}}"
+  template: "build-{{CommitsSinceTag}}"  # Template for generating pre-release
+  stable: false                           # false = generate from template at output
 
 # Build metadata template configuration
 metadata:
-  template: "{{BuildDateTimeCompact}}.{{ShortHash}}"
+  template: "{{ShortHash}}"               # Template for generating metadata
+  stable: false                           # false = generate from template at output
   git:
     hashLength: 12    # Length for {{MediumHash}}
 
@@ -74,10 +76,17 @@ Pre-release template configuration.
 ```yaml
 prerelease:
   # Template string (Mustache syntax)
-  template: "alpha-{{CommitsSinceTag}}"
+  template: "build-{{CommitsSinceTag}}"
+
+  # Stability setting (default: false)
+  # false = generate from template at output time (CD workflow)
+  # true = store in VERSION file (release workflow)
+  stable: false
 ```
 
-The template is rendered when using `--prerelease` flag or `versionator config prerelease enable`.
+**Stability**: When `stable: false` (default), the pre-release is generated from the template each time you run `emit`, `ci`, or `output` commands. This is ideal for continuous delivery workflows where you want dynamic values like commit counts.
+
+When `stable: true`, you must explicitly set the pre-release value and it will be stored in the VERSION file.
 
 **Separator Convention**: Use dashes (`-`) between pre-release components:
 
@@ -94,12 +103,21 @@ Build metadata template configuration.
 ```yaml
 metadata:
   # Template string (Mustache syntax)
-  template: "{{BuildDateTimeCompact}}.{{ShortHash}}"
+  template: "{{ShortHash}}"
+
+  # Stability setting (default: false)
+  # false = generate from template at output time (CD workflow)
+  # true = store in VERSION file (release workflow)
+  stable: false
 
   # Git-specific settings
   git:
     hashLength: 12    # Length for {{MediumHash}}
 ```
+
+**Stability**: When `stable: false` (default), the metadata is generated from the template each time you run `emit`, `ci`, or `output` commands. This is ideal for continuous delivery workflows where you want dynamic values like commit hashes.
+
+When `stable: true`, you must explicitly set the metadata value and it will be stored in the VERSION file.
 
 **Separator Convention**: Use dots (`.`) between metadata components:
 
@@ -184,15 +202,38 @@ Some settings can be overridden via environment variables:
 ## Relationship with VERSION File
 
 :::important
-The VERSION file is always the source of truth for the actual version.
+The VERSION file stores stable version components. Non-stable components are generated at output time.
 :::
 
+The VERSION file stores:
+- **Major, minor, patch** - always stored in VERSION
+- **Prefix** - always stored in VERSION
+- **Pre-release** - stored in VERSION only when `stable: true`
+- **Metadata** - stored in VERSION only when `stable: true`
+
 The config file stores:
-- **Templates** for pre-release and metadata
+- **Templates** for pre-release and metadata (used when `stable: false`)
+- **Stability settings** for pre-release and metadata
 - **Custom variables** for templating
 
-The VERSION file stores:
-- **Actual current version** including prefix, pre-release, metadata
+### Stability Model
+
+| Component | Default | Behavior |
+|-----------|---------|----------|
+| Major/Minor/Patch | Always stable | Always stored in VERSION |
+| Prefix | Always stable | Always stored in VERSION |
+| Pre-release | `stable: false` | Generated from template at output |
+| Metadata | `stable: false` | Generated from template at output |
+
+When `stable: false` (default for pre-release and metadata):
+- Values are generated from templates each time you output the version
+- `set` commands will error (use `--force` to override and set template instead)
+- Ideal for continuous delivery workflows
+
+When `stable: true`:
+- Values are stored directly in the VERSION file
+- `set` commands modify the VERSION file
+- Ideal for traditional release workflows
 
 ## See Also
 

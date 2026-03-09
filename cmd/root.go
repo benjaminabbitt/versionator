@@ -29,20 +29,22 @@ var rootCmd = &cobra.Command{
 	Long: `Versionator is a CLI tool for managing semantic versions.
 It allows you to increment and decrement major, minor, and patch versions
 stored in a VERSION file in the current directory.`,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// If log format wasn't explicitly set via flag, use config default
-		if !cmd.PersistentFlags().Changed("log-format") {
-			if cfg, err := config.ReadConfig(); err == nil {
-				logOutput = cfg.Logging.Output
-			}
-		}
+	PersistentPreRunE: runRootPersistentPreRun,
+}
 
-		// Initialize logger with the specified output format
-		if err := logging.InitLogger(logOutput); err != nil {
-			return fmt.Errorf("failed to initialize logger: %w", err)
+func runRootPersistentPreRun(cmd *cobra.Command, args []string) error {
+	// If log format wasn't explicitly set via flag, use config default
+	if !cmd.PersistentFlags().Changed("log-format") {
+		if cfg, err := config.ReadConfig(); err == nil {
+			logOutput = cfg.Logging.Output
 		}
-		return nil
-	},
+	}
+
+	// Initialize logger with the specified output format
+	if err := logging.InitLogger(logOutput); err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -132,113 +134,115 @@ EXAMPLES:
 
   # With custom variables
   versionator version -t "{{AppName}} v{{MajorMinorPatch}}" --set AppName="My App"`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		vd, err := version.Load()
-		if err != nil {
-			return fmt.Errorf("error reading version: %w", err)
-		}
+	RunE: runVersion,
+}
 
-		// Parse --set flags into a map
-		extraVars := parseSetFlags(setVars)
+func runVersion(cmd *cobra.Command, args []string) error {
+	vd, err := version.Load()
+	if err != nil {
+		return fmt.Errorf("error reading version: %w", err)
+	}
 
-		// If no template specified, output full SemVer (including prerelease and metadata from VERSION file)
-		if versionTemplate == "" {
-			fmt.Fprintln(cmd.OutOrStdout(), vd.String())
-			return nil
-		}
+	// Parse --set flags into a map
+	extraVars := parseSetFlags(setVars)
 
-		// Handle prefix override
-		var prefix string
-		if cmd.Flags().Changed("prefix") {
-			if prefixOverride == useDefaultMarker {
-				// Flag provided without value - use default "v"
-				prefix = "v"
-			} else {
-				prefix = prefixOverride
-			}
+	// If no template specified, output full SemVer (including prerelease and metadata from VERSION file)
+	if versionTemplate == "" {
+		fmt.Fprintln(cmd.OutOrStdout(), vd.String())
+		return nil
+	}
+
+	// Handle prefix override
+	var prefix string
+	if cmd.Flags().Changed("prefix") {
+		if prefixOverride == useDefaultMarker {
+			// Flag provided without value - use default "v"
+			prefix = "v"
 		} else {
-			// Use prefix from VERSION file
-			prefix = vd.Prefix
+			prefix = prefixOverride
 		}
+	} else {
+		// Use prefix from VERSION file
+		prefix = vd.Prefix
+	}
 
-		// Handle prerelease template
-		var prereleaseResult string
-		if cmd.Flags().Changed("prerelease") {
-			templateData := emit.BuildTemplateDataFromVersion(vd)
-			if prereleaseTemplate == useDefaultMarker {
-				// Flag provided without value - use defaults from config
-				template, _ := versionator.GetPreReleaseTemplate()
-				if template != "" {
-					prereleaseResult, err = emit.RenderTemplateWithData(template, templateData)
-					if err != nil {
-						return fmt.Errorf("error rendering prerelease template: %w", err)
-					}
-					prereleaseResult = strings.TrimSpace(prereleaseResult)
-				}
-			} else {
-				// Render the provided template
-				prereleaseResult, err = emit.RenderTemplateWithData(prereleaseTemplate, templateData)
+	// Handle prerelease template
+	var prereleaseResult string
+	if cmd.Flags().Changed("prerelease") {
+		templateData := emit.BuildTemplateDataFromVersion(vd)
+		if prereleaseTemplate == useDefaultMarker {
+			// Flag provided without value - use defaults from config
+			template, _ := versionator.GetPreReleaseTemplate()
+			if template != "" {
+				prereleaseResult, err = emit.RenderTemplateWithData(template, templateData)
 				if err != nil {
 					return fmt.Errorf("error rendering prerelease template: %w", err)
 				}
 				prereleaseResult = strings.TrimSpace(prereleaseResult)
 			}
+		} else {
+			// Render the provided template
+			prereleaseResult, err = emit.RenderTemplateWithData(prereleaseTemplate, templateData)
+			if err != nil {
+				return fmt.Errorf("error rendering prerelease template: %w", err)
+			}
+			prereleaseResult = strings.TrimSpace(prereleaseResult)
 		}
+	}
 
-		// Handle metadata template
-		var metadataResult string
-		if cmd.Flags().Changed("metadata") {
-			templateData := emit.BuildTemplateDataFromVersion(vd)
-			if metadataTemplate == useDefaultMarker {
-				// Flag provided without value - use defaults from config
-				template, _ := versionator.GetMetadataTemplate()
-				if template != "" {
-					metadataResult, err = emit.RenderTemplateWithData(template, templateData)
-					if err != nil {
-						return fmt.Errorf("error rendering metadata template: %w", err)
-					}
-					metadataResult = strings.TrimSpace(metadataResult)
-				}
-			} else {
-				// Render the provided template
-				metadataResult, err = emit.RenderTemplateWithData(metadataTemplate, templateData)
+	// Handle metadata template
+	var metadataResult string
+	if cmd.Flags().Changed("metadata") {
+		templateData := emit.BuildTemplateDataFromVersion(vd)
+		if metadataTemplate == useDefaultMarker {
+			// Flag provided without value - use defaults from config
+			template, _ := versionator.GetMetadataTemplate()
+			if template != "" {
+				metadataResult, err = emit.RenderTemplateWithData(template, templateData)
 				if err != nil {
 					return fmt.Errorf("error rendering metadata template: %w", err)
 				}
 				metadataResult = strings.TrimSpace(metadataResult)
 			}
+		} else {
+			// Render the provided template
+			metadataResult, err = emit.RenderTemplateWithData(metadataTemplate, templateData)
+			if err != nil {
+				return fmt.Errorf("error rendering metadata template: %w", err)
+			}
+			metadataResult = strings.TrimSpace(metadataResult)
 		}
+	}
 
-		// Build template data with rendered prerelease and metadata
-		templateData := emit.BuildTemplateDataFromVersion(vd)
-		templateData.Prefix = prefix
-		templateData.PreRelease = prereleaseResult
-		if prereleaseResult != "" {
-			templateData.PreReleaseWithDash = "-" + prereleaseResult
-		}
-		templateData.Metadata = metadataResult
-		if metadataResult != "" {
-			templateData.MetadataWithPlus = "+" + metadataResult
-		}
+	// Build template data with rendered prerelease and metadata
+	templateData := emit.BuildTemplateDataFromVersion(vd)
+	templateData.Prefix = prefix
+	templateData.PreRelease = prereleaseResult
+	if prereleaseResult != "" {
+		templateData.PreReleaseWithDash = "-" + prereleaseResult
+	}
+	templateData.Metadata = metadataResult
+	if metadataResult != "" {
+		templateData.MetadataWithPlus = "+" + metadataResult
+	}
 
-		// Load custom vars from config
-		configCustomVars, err := config.GetAllCustom()
-		if err == nil && len(configCustomVars) > 0 {
-			emit.MergeCustomVars(&templateData, configCustomVars)
-		}
+	// Load custom vars from config
+	configCustomVars, err := config.GetAllCustom()
+	if err == nil && len(configCustomVars) > 0 {
+		emit.MergeCustomVars(&templateData, configCustomVars)
+	}
 
-		// Merge command-line custom vars (override config custom vars)
-		emit.MergeCustomVars(&templateData, extraVars)
+	// Merge command-line custom vars (override config custom vars)
+	emit.MergeCustomVars(&templateData, extraVars)
 
-		result, err := emit.RenderTemplateWithData(versionTemplate, templateData)
-		if err != nil {
-			return fmt.Errorf("error rendering template: %w", err)
-		}
+	result, err := emit.RenderTemplateWithData(versionTemplate, templateData)
+	if err != nil {
+		return fmt.Errorf("error rendering template: %w", err)
+	}
 
-		// Trim any trailing newlines that might be added by template rendering
-		fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(result))
-		return nil
-	},
+	// Trim any trailing newlines that might be added by template rendering
+	fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(result))
+	return nil
 }
 
 func init() {

@@ -8,22 +8,51 @@ sidebar_position: 2
 
 Pre-release identifiers mark versions as unstable or in-progress (e.g., `1.0.0-alpha.1`, `2.0.0-rc.1`).
 
-## Static vs Dynamic Pre-release
+## Stability Model
 
-### Static (Stored in VERSION file)
+Pre-release supports two modes controlled by the `stable` setting:
 
-Set a fixed pre-release value:
+### Dynamic (Default: stable: false)
+
+When `stable: false` (the default), pre-release is **generated from template at output time**:
+
+```yaml
+# .versionator.yaml
+prerelease:
+  template: "build-{{CommitsSinceTag}}"
+  stable: false  # Default
+```
+
+Every time you run `emit`, `ci`, or `output` commands, the template is evaluated:
 
 ```bash
+versionator output version
+# Output: 1.0.0-build-42
+
+# After more commits:
+versionator output version
+# Output: 1.0.0-build-45
+```
+
+This is ideal for **continuous delivery** workflows where every build should have a unique version.
+
+### Static (stable: true)
+
+When `stable: true`, pre-release is **stored in the VERSION file**:
+
+```bash
+# Enable stable mode
+versionator config prerelease stable true
+
+# Now set a fixed value
 versionator config prerelease set alpha
 # VERSION: 1.0.0-alpha
 
 versionator config prerelease set beta.1
 # VERSION: 1.0.0-beta.1
-
-versionator config prerelease set rc.2
-# VERSION: 1.0.0-rc.2
 ```
+
+This is ideal for **traditional release** workflows (alpha → beta → rc → release).
 
 Clear when ready to release:
 
@@ -32,18 +61,12 @@ versionator config prerelease clear
 # VERSION: 1.0.0
 ```
 
-### Dynamic (Template-based)
-
-Use templates for values that change (like commit count):
+### Checking Current Mode
 
 ```bash
-versionator output version \
-  -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}" \
-  --prerelease="alpha-{{CommitsSinceTag}}"
-# Output: 1.0.0-alpha-5
+versionator config prerelease stable
+# Output: false (or true)
 ```
-
-Dynamic values are computed at runtime and don't modify the VERSION file.
 
 ## Template Configuration
 
@@ -128,55 +151,67 @@ versionator config prerelease set rc.2
 versionator config prerelease clear
 ```
 
-## Enable/Disable Commands
+## Commands
 
 ### prerelease set
 
-Sets a static value in the VERSION file:
+Sets a pre-release value. Behavior depends on stability:
 
+**When stable: true:**
 ```bash
 versionator config prerelease set alpha
 # VERSION: 1.0.0-alpha
 ```
 
+**When stable: false (default):**
+```bash
+versionator config prerelease set alpha
+# Error: cannot set literal pre-release when stable is false
+# Use --force to set as template, or set stable to true first
+
+# Force it (sets as template):
+versionator config prerelease set alpha --force
+# Config: template = "alpha"
+```
+
 ### prerelease template
 
-Sets a template in config and renders it to VERSION:
+Sets a template in config:
 
 ```bash
-versionator config prerelease template "alpha-{{CommitsSinceTag}}"
-# Config: template = "alpha-{{CommitsSinceTag}}"
-# VERSION: 1.0.0-alpha-5
+versionator config prerelease template "build-{{CommitsSinceTag}}"
+# Config: template = "build-{{CommitsSinceTag}}"
 ```
 
-### prerelease enable
+When `stable: false`, this template is rendered at output time.
+When `stable: true`, the template is rendered and stored in VERSION immediately.
 
-Renders the config template to VERSION:
+### prerelease stable
 
-```bash
-versionator config prerelease enable
-# Reads template from config
-# VERSION: 1.0.0-alpha-5
-```
-
-### prerelease disable
-
-Clears pre-release from VERSION (preserves config template):
+Get or set the stability mode:
 
 ```bash
-versionator config prerelease disable
-# VERSION: 1.0.0
-# Config template still saved
+# Get current setting
+versionator config prerelease stable
+# Output: false
+
+# Enable stable mode (store in VERSION)
+versionator config prerelease stable true
+
+# Disable stable mode (generate from template)
+versionator config prerelease stable false
 ```
 
 ### prerelease clear
 
-Clears pre-release from VERSION:
+Clears pre-release from VERSION file:
 
 ```bash
 versionator config prerelease clear
 # VERSION: 1.0.0
 ```
+
+Only works when `stable: true`. When `stable: false`, use an empty template instead.
 
 ### prerelease status
 
@@ -184,8 +219,9 @@ Shows current state:
 
 ```bash
 versionator config prerelease status
-# Pre-release: ENABLED
-# Value: alpha-5
+# Stable: false
+# Template: build-{{CommitsSinceTag}}
+# Rendered: build-42
 ```
 
 ## Variables for Pre-release

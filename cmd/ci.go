@@ -9,7 +9,6 @@ import (
 	"github.com/benjaminabbitt/versionator/internal/ci"
 	"github.com/benjaminabbitt/versionator/internal/config"
 	"github.com/benjaminabbitt/versionator/internal/emit"
-	"github.com/benjaminabbitt/versionator/internal/mode"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/version"
 
@@ -113,29 +112,31 @@ func runCI(cmd *cobra.Command, args []string) error {
 }
 
 func buildCIVariables(v *version.Version) *ci.Variables {
-	// Load config to check for CD mode
+	// Load config to check stability settings
 	cfg, _ := config.ReadConfig()
-	activeMode := mode.GetMode(cfg)
 
-	// Build template data for mode rendering
+	// Build template data for rendering
 	templateData := emit.BuildTemplateDataFromVersion(v)
-	templateDataMap := emit.TemplateDataToStringMap(templateData)
 
-	// Determine pre-release and metadata based on mode
+	// Determine pre-release based on stability
 	preRelease := v.PreRelease
-	metadata := v.BuildMetadata
-
-	if !activeMode.IsReleaseMode() {
-		// CD mode: generate from templates
-		if pr, err := activeMode.GetPreRelease(v, templateDataMap); err == nil && pr != "" {
-			preRelease = pr
-		}
-		if md, err := activeMode.GetMetadata(v, templateDataMap); err == nil && md != "" {
-			metadata = md
+	if cfg != nil && !cfg.PreRelease.Stable && cfg.PreRelease.Template != "" {
+		// Non-stable: render from template
+		if rendered, err := emit.RenderTemplateWithData(cfg.PreRelease.Template, templateData); err == nil {
+			preRelease = strings.TrimSpace(rendered)
 		}
 	}
 
-	// Build version strings with potentially mode-generated pre-release/metadata
+	// Determine metadata based on stability
+	metadata := v.BuildMetadata
+	if cfg != nil && !cfg.Metadata.Stable && cfg.Metadata.Template != "" {
+		// Non-stable: render from template
+		if rendered, err := emit.RenderTemplateWithData(cfg.Metadata.Template, templateData); err == nil {
+			metadata = strings.TrimSpace(rendered)
+		}
+	}
+
+	// Build version strings with potentially rendered pre-release/metadata
 	versionFull := v.CoreVersion()
 	if preRelease != "" {
 		versionFull += "-" + preRelease
