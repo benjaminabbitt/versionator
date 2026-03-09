@@ -48,8 +48,8 @@ curl -LO https://github.com/benjaminabbitt/versionator/releases/latest/download/
 tar xzf versionator-linux-amd64.tar.gz
 sudo mv versionator-linux-amd64 /usr/local/bin/versionator
 
-# Verify
-versionator version
+# Or use container (Docker/Podman)
+docker run --rm -v $(pwd):/workspace ghcr.io/benjaminabbitt/versionator version
 ```
 
 See [Installation](https://benjaminabbitt.github.io/versionator/installation) for all platforms.
@@ -57,9 +57,9 @@ See [Installation](https://benjaminabbitt.github.io/versionator/installation) fo
 ## Quick Start
 
 ```bash
-versionator init                  # Create VERSION file (0.0.1)
-versionator patch increment       # 0.0.1 -> 0.0.2
-versionator release               # Create tag v0.0.2
+versionator init        # Create VERSION file (0.0.1)
+versionator patch +     # 0.0.1 -> 0.0.2  (aliases: increment, inc, +)
+versionator release     # Create tag v0.0.2
 ```
 
 ## License
