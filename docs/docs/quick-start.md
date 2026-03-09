@@ -140,6 +140,28 @@ versionator config vars
 
 ## Common Workflows
 
+### Auto-bump with Release Push (Recommended)
+
+The fastest workflow uses `+semver:` markers in commit messages for automatic version detection:
+
+```bash
+# Stage and commit with semver marker
+git add -A
+git commit -m "Add new feature +semver:minor"
+
+# Auto-detect bump level from commit, then release and push
+versionator bump
+versionator release push
+```
+
+The `+semver:` marker tells versionator what type of change this is:
+- `+semver:major` - Breaking changes (1.0.0 → 2.0.0)
+- `+semver:minor` - New features (1.0.0 → 1.1.0)
+- `+semver:patch` - Bug fixes (1.0.0 → 1.0.1)
+- `+semver:skip` - No version bump needed
+
+The `release push` command creates the tag and release branch, then pushes both to the remote in one step.
+
 ### Feature Development
 
 ```bash
@@ -156,8 +178,7 @@ git merge feature/new-feature
 
 # Bump version and release
 versionator bump minor increment
-versionator release
-git push --tags
+versionator release push
 ```
 
 ### Bug Fix
@@ -169,8 +190,7 @@ git commit -m "Fix critical bug"
 
 # Bump version and release
 versionator bump patch increment
-versionator release
-git push --tags
+versionator release push
 ```
 
 ### Pre-release
