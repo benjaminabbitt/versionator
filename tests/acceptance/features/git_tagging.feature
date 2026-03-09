@@ -15,7 +15,7 @@ Feature: Git Release Creation
     And the exit code should be 0
 
   Scenario: Create release after version increment with auto-commit
-    When I run "versionator minor increment"
+    When I run "versionator bump minor increment"
     And I run "versionator release"
     Then a git tag "v1.1.0" should exist
     And a git branch "release/v1.1.0" should exist
@@ -48,7 +48,7 @@ Feature: Git Release Creation
 
   Scenario: Multiple releases
     When I run "versionator release"
-    And I run "versionator patch increment"
+    And I run "versionator bump patch increment"
     And I run "versionator release"
     Then a git tag "v1.0.0" should exist
     And a git tag "v1.0.1" should exist

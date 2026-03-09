@@ -45,7 +45,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(ciCmd)
+	outputCmd.AddCommand(ciCmd)
 
 	ciCmd.Flags().StringP("format", "f", "", "Output format (github, gitlab, azure, circleci, jenkins, shell)")
 	ciCmd.Flags().StringP("output", "o", "", "Output file (default: stdout or CI-specific location)")

@@ -13,29 +13,29 @@ Feature: Error Handling
 
   Scenario: Invalid emit format
     Given a VERSION file with version "1.0.0"
-    When I run "versionator emit invalid-format"
+    When I run "versionator output emit invalid-format"
     Then the exit code should not be 0
     And the output should contain "unsupported"
 
   Scenario: Missing required argument for custom get
     Given a VERSION file with version "1.0.0"
-    When I run "versionator custom get"
+    When I run "versionator config custom get"
     Then the exit code should not be 0
 
   # Version boundary errors
   Scenario: Decrement major below zero
     Given a VERSION file with version "0.5.0"
-    When I run "versionator major decrement"
+    When I run "versionator bump major decrement"
     Then the exit code should not be 0
 
   Scenario: Decrement minor below zero
     Given a VERSION file with version "1.0.5"
-    When I run "versionator minor decrement"
+    When I run "versionator bump minor decrement"
     Then the exit code should not be 0
 
   Scenario: Decrement patch below zero
     Given a VERSION file with version "1.5.0"
-    When I run "versionator patch decrement"
+    When I run "versionator bump patch decrement"
     Then the exit code should not be 0
 
   # Git/VCS errors
@@ -57,31 +57,31 @@ Feature: Error Handling
   # Custom variable errors
   Scenario: Get nonexistent custom variable
     Given a VERSION file with version "1.0.0"
-    When I run "versionator custom get NonExistent"
+    When I run "versionator config custom get NonExistent"
     Then the exit code should not be 0
     And the output should contain "not found"
 
   Scenario: Delete custom variable is idempotent
     Given a VERSION file with version "1.0.0"
-    When I run "versionator custom delete NonExistent"
+    When I run "versionator config custom delete NonExistent"
     Then the exit code should be 0
 
   # Template errors
   Scenario: Invalid template syntax
     Given a VERSION file with version "1.0.0"
-    When I run "versionator version -t '{{InvalidUnclosed'"
+    When I run "versionator output version -t '{{InvalidUnclosed'"
     Then the exit code should not be 0
 
   Scenario: Template file not found
     Given a VERSION file with version "1.0.0"
-    When I run "versionator emit --template-file nonexistent.tmpl"
+    When I run "versionator output emit --template-file nonexistent.tmpl"
     Then the exit code should not be 0
 
   # Completion errors
   Scenario: Invalid completion shell
-    When I run "versionator completion invalid"
+    When I run "versionator support completion invalid"
     Then the exit code should not be 0
 
   Scenario: Missing completion argument
-    When I run "versionator completion"
+    When I run "versionator support completion"
     Then the exit code should not be 0

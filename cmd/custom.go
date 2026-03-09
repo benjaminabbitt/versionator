@@ -130,5 +130,5 @@ func init() {
 	customCmd.AddCommand(customGetCmd)
 	customCmd.AddCommand(customListCmd)
 	customCmd.AddCommand(customDeleteCmd)
-	rootCmd.AddCommand(customCmd)
+	configCmd.AddCommand(customCmd)
 }

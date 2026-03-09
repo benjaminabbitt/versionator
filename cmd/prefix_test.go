@@ -63,7 +63,7 @@ func TestPrefixEnableCommand(t *testing.T) {
 			originalDir, err := os.Getwd()
 			require.NoError(t, err)
 			defer func() {
-				os.Chdir(originalDir)
+				_ = os.Chdir(originalDir)
 			}()
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestPrefixEnableCommand(t *testing.T) {
 			// Capture output
 			var stdout bytes.Buffer
 			rootCmd.SetOut(&stdout)
-			rootCmd.SetArgs([]string{"prefix", "enable"})
+			rootCmd.SetArgs([]string{"config", "prefix", "enable"})
 
 			// Execute command
 			err = rootCmd.Execute()
@@ -149,7 +149,7 @@ func TestPrefixDisableCommand(t *testing.T) {
 			originalDir, err := os.Getwd()
 			require.NoError(t, err)
 			defer func() {
-				os.Chdir(originalDir)
+				_ = os.Chdir(originalDir)
 			}()
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)
@@ -167,7 +167,7 @@ func TestPrefixDisableCommand(t *testing.T) {
 			// Capture output
 			var stdout bytes.Buffer
 			rootCmd.SetOut(&stdout)
-			rootCmd.SetArgs([]string{"prefix", "disable"})
+			rootCmd.SetArgs([]string{"config", "prefix", "disable"})
 
 			// Execute command
 			err = rootCmd.Execute()
@@ -207,7 +207,7 @@ func TestPrefixSetCommand(t *testing.T) {
 	}{
 		{
 			name: "set v prefix",
-			args: []string{"prefix", "set", "v"},
+			args: []string{"config", "prefix", "set", "v"},
 			initialConfig: &config.Config{
 				Prefix: "",
 				Metadata: config.MetadataConfig{
@@ -221,7 +221,7 @@ func TestPrefixSetCommand(t *testing.T) {
 		},
 		{
 			name: "set empty prefix",
-			args: []string{"prefix", "set", ""},
+			args: []string{"config", "prefix", "set", ""},
 			initialConfig: &config.Config{
 				Prefix: "v",
 				Metadata: config.MetadataConfig{
@@ -235,7 +235,7 @@ func TestPrefixSetCommand(t *testing.T) {
 		},
 		{
 			name: "set uppercase V prefix",
-			args: []string{"prefix", "set", "V"},
+			args: []string{"config", "prefix", "set", "V"},
 			initialConfig: &config.Config{
 				Prefix: "",
 				Metadata: config.MetadataConfig{
@@ -249,7 +249,7 @@ func TestPrefixSetCommand(t *testing.T) {
 		},
 		{
 			name: "set prefix without argument",
-			args: []string{"prefix", "set"},
+			args: []string{"config", "prefix", "set"},
 			initialConfig: &config.Config{
 				Prefix: "",
 				Metadata: config.MetadataConfig{
@@ -264,7 +264,7 @@ func TestPrefixSetCommand(t *testing.T) {
 		},
 		{
 			name: "set invalid prefix rejected",
-			args: []string{"prefix", "set", "release-"},
+			args: []string{"config", "prefix", "set", "release-"},
 			initialConfig: &config.Config{
 				Prefix: "",
 				Metadata: config.MetadataConfig{
@@ -286,7 +286,7 @@ func TestPrefixSetCommand(t *testing.T) {
 			originalDir, err := os.Getwd()
 			require.NoError(t, err)
 			defer func() {
-				os.Chdir(originalDir)
+				_ = os.Chdir(originalDir)
 			}()
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)
@@ -392,7 +392,7 @@ func TestPrefixStatusCommand(t *testing.T) {
 			originalDir, err := os.Getwd()
 			require.NoError(t, err)
 			defer func() {
-				os.Chdir(originalDir)
+				_ = os.Chdir(originalDir)
 			}()
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)
@@ -410,7 +410,7 @@ func TestPrefixStatusCommand(t *testing.T) {
 			// Capture output
 			var stdout bytes.Buffer
 			rootCmd.SetOut(&stdout)
-			rootCmd.SetArgs([]string{"prefix", "status"})
+			rootCmd.SetArgs([]string{"config", "prefix", "status"})
 
 			// Execute command
 			err = rootCmd.Execute()
@@ -446,23 +446,23 @@ func TestPrefixCommandHelp(t *testing.T) {
 	}{
 		{
 			name: "prefix help",
-			args: []string{"prefix", "--help"},
+			args: []string{"config", "prefix", "--help"},
 		},
 		{
 			name: "prefix enable help",
-			args: []string{"prefix", "enable", "--help"},
+			args: []string{"config", "prefix", "enable", "--help"},
 		},
 		{
 			name: "prefix disable help",
-			args: []string{"prefix", "disable", "--help"},
+			args: []string{"config", "prefix", "disable", "--help"},
 		},
 		{
 			name: "prefix set help",
-			args: []string{"prefix", "set", "--help"},
+			args: []string{"config", "prefix", "set", "--help"},
 		},
 		{
 			name: "prefix status help",
-			args: []string{"prefix", "status", "--help"},
+			args: []string{"config", "prefix", "status", "--help"},
 		},
 	}
 
@@ -494,7 +494,7 @@ func TestPrefixCommandConfigErrors(t *testing.T) {
 	}{
 		{
 			name: "missing config file",
-			args: []string{"prefix", "enable"},
+			args: []string{"config", "prefix", "enable"},
 			setupFunc: func(tempDir string) error {
 				// Create VERSION file but no config file
 				return os.WriteFile("VERSION", []byte(createPrefixVersionString("1.0.0")+"\n"), 0644)
@@ -512,7 +512,7 @@ func TestPrefixCommandConfigErrors(t *testing.T) {
 			originalDir, err := os.Getwd()
 			require.NoError(t, err)
 			defer func() {
-				os.Chdir(originalDir)
+				_ = os.Chdir(originalDir)
 			}()
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)

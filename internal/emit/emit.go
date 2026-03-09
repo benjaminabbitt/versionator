@@ -2,6 +2,7 @@ package emit
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -184,14 +185,6 @@ func dirtyFlag(uncommittedChanges int) string {
 		return "dirty"
 	}
 	return ""
-}
-
-// formatCommitDateTime formats a commit datetime as ISO 8601, or empty string if zero
-func formatCommitDateTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.Format(time.RFC3339)
 }
 
 // formatPreReleaseNumber formats the pre-release number as string, empty if -1
@@ -445,7 +438,7 @@ func RenderTemplate(tmplStr string, versionStr string) (string, error) {
 // - The parent directory doesn't exist and can't be determined
 func ValidateOutputPath(filepath string) error {
 	if filepath == "" {
-		return fmt.Errorf(ErrOutputPathEmpty)
+		return errors.New(ErrOutputPathEmpty)
 	}
 
 	// Check if path points to an existing directory

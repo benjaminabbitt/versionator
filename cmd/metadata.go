@@ -326,7 +326,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(metadataCmd)
+	configCmd.AddCommand(metadataCmd)
 	metadataCmd.AddCommand(metadataEnableCmd)
 	metadataCmd.AddCommand(metadataDisableCmd)
 	metadataCmd.AddCommand(metadataStatusCmd)

@@ -65,5 +65,5 @@ PowerShell:
 func init() {
 	// Disable the default completion command from Cobra
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
-	rootCmd.AddCommand(completionCmd)
+	supportCmd.AddCommand(completionCmd)
 }

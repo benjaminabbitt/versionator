@@ -287,7 +287,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(prereleaseCmd)
+	configCmd.AddCommand(prereleaseCmd)
 	prereleaseCmd.AddCommand(prereleaseEnableCmd)
 	prereleaseCmd.AddCommand(prereleaseDisableCmd)
 	prereleaseCmd.AddCommand(prereleaseStatusCmd)

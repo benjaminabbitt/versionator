@@ -15,8 +15,8 @@ func TestGetCurrentVersion_NoVersionFile_NoVCS(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Test getting version when no VERSION file exists and no VCS
 	// The version package will fallback to current directory when no VCS is active
@@ -40,8 +40,8 @@ func TestGetCurrentVersion_NoVersionFile_WithVCS(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -77,8 +77,8 @@ func TestGetCurrentVersion_ExistingValidVersion(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a legacy VERSION file with valid content (will be migrated)
 	versionContent := "1.2.3"
@@ -102,8 +102,8 @@ func TestGetCurrentVersion_EmptyVersionFile(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create an empty legacy VERSION file (will be migrated as 0.0.0)
 	err := os.WriteFile(versionFile, []byte(""), 0644)
@@ -126,8 +126,8 @@ func TestGetCurrentVersion_WhitespaceVersionFile(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a legacy VERSION file with whitespace (will be migrated as 0.0.0)
 	err := os.WriteFile(versionFile, []byte("  \n\t  \n"), 0644)
@@ -150,8 +150,8 @@ func TestGetCurrentVersion_UnparseableVersion(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a VERSION file with content that doesn't parse as a valid semver
 	// The parser is lenient - unparseable strings result in 0.0.0
@@ -176,8 +176,8 @@ func TestGetCurrentVersion_VCSError(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -213,8 +213,8 @@ func TestIncrement_Major(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -243,8 +243,8 @@ func TestIncrement_Minor(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -273,8 +273,8 @@ func TestIncrement_Patch(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -303,8 +303,8 @@ func TestIncrement_InvalidLevel(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -327,8 +327,8 @@ func TestDecrement_Major(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("2.3.4"), 0644)
@@ -357,8 +357,8 @@ func TestDecrement_Minor(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.3.4"), 0644)
@@ -387,8 +387,8 @@ func TestDecrement_Patch(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.4"), 0644)
@@ -417,8 +417,8 @@ func TestDecrement_MajorAtZero(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version at 0.x.x
 	err := os.WriteFile(versionFile, []byte("0.2.3"), 0644)
@@ -441,8 +441,8 @@ func TestDecrement_MinorAtZero(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version with minor at 0
 	err := os.WriteFile(versionFile, []byte("1.0.3"), 0644)
@@ -465,8 +465,8 @@ func TestDecrement_PatchAtZero(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version with patch at 0
 	err := os.WriteFile(versionFile, []byte("1.2.0"), 0644)
@@ -489,8 +489,8 @@ func TestDecrement_InvalidLevel(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -527,8 +527,8 @@ func TestGetVersionPath_WalksUpToFindVersionFile(t *testing.T) {
 
 	// Change to subdir
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(subDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(subDir)
 
 	// Unregister any VCS to test pure walk-up behavior
 	vcs.UnregisterVCS("git")
@@ -554,8 +554,8 @@ func TestGetVersionPath_ReturnsCurrentDirWhenNotFound(t *testing.T) {
 
 	// Change to temp dir
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Unregister any VCS
 	vcs.UnregisterVCS("git")
@@ -598,8 +598,8 @@ func TestGetVersionPath_PrefersCloserVersionFile(t *testing.T) {
 
 	// Change to subdir
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(subDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(subDir)
 
 	// Unregister any VCS
 	vcs.UnregisterVCS("git")
@@ -722,8 +722,8 @@ func TestValidate_ValidIdentifiers(t *testing.T) {
 func TestSetPrefix_Success(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -750,8 +750,8 @@ func TestSetPrefix_Success(t *testing.T) {
 func TestGetPrefix_Success(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create version with prefix
 	err := os.WriteFile(versionFile, []byte("v1.2.3"), 0644)
@@ -771,8 +771,8 @@ func TestGetPrefix_Success(t *testing.T) {
 func TestSetPreRelease_Success(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -799,8 +799,8 @@ func TestSetPreRelease_Success(t *testing.T) {
 func TestSetMetadata_Success(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create initial version
 	err := os.WriteFile(versionFile, []byte("1.2.3"), 0644)
@@ -827,8 +827,8 @@ func TestSetMetadata_Success(t *testing.T) {
 func TestSetPrefix_ErrorWhenNoVersionFile(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Don't create VERSION file - SetPrefix creates one if needed
 	err := SetPrefix("v")
@@ -840,8 +840,8 @@ func TestSetPrefix_ErrorWhenNoVersionFile(t *testing.T) {
 func TestGetPrefix_CreatesVersionFileIfNeeded(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Don't create VERSION file - GetPrefix creates one if needed
 	prefix, err := GetPrefix()
@@ -857,8 +857,8 @@ func TestGetPrefix_CreatesVersionFileIfNeeded(t *testing.T) {
 func TestSetPreRelease_ErrorWhenNoVersionFile(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Don't create VERSION file - SetPreRelease creates one if needed
 	err := SetPreRelease("alpha")
@@ -870,8 +870,8 @@ func TestSetPreRelease_ErrorWhenNoVersionFile(t *testing.T) {
 func TestSetMetadata_ErrorWhenNoVersionFile(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Don't create VERSION file - SetMetadata creates one if needed
 	err := SetMetadata("build123")

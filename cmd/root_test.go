@@ -11,8 +11,8 @@ func TestExecute_Success(t *testing.T) {
 	// Use a temp dir to avoid affecting real files
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Test Execute function doesn't panic and shows help
 	err := Execute()
@@ -26,8 +26,8 @@ func TestVersionCommand(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a VERSION file
 	err := os.WriteFile("VERSION", []byte(`{"major": 2, "minor": 1, "patch": 0}`), 0644)
@@ -53,7 +53,7 @@ logging:
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"version"})
+	rootCmd.SetArgs([]string{"output", "version"})
 
 	// Execute the version command
 	err = rootCmd.Execute()
@@ -77,8 +77,8 @@ func TestVersionCommand_WithPrefix(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a VERSION file with prefix
 	err := os.WriteFile("VERSION", []byte(`{"prefix": "v", "major": 3, "minor": 0, "patch": 0}`), 0644)
@@ -104,7 +104,7 @@ logging:
 	// Capture stdout
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"version"})
+	rootCmd.SetArgs([]string{"output", "version"})
 
 	// Execute the version command
 	err = rootCmd.Execute()
@@ -127,8 +127,8 @@ func TestVersionCommand_NoVersionFile(t *testing.T) {
 	// Create a temporary directory for testing (no VERSION file)
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a minimal config file
 	configContent := `prefix: ""
@@ -148,7 +148,7 @@ logging:
 	// Capture stderr
 	var buf bytes.Buffer
 	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs([]string{"version"})
+	rootCmd.SetArgs([]string{"output", "version"})
 
 	// Execute the version command - should succeed and create default VERSION
 	err = rootCmd.Execute()
@@ -170,8 +170,8 @@ func TestLogFormatFlag(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	os.Chdir(tempDir)
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
 
 	// Create a VERSION file
 	err := os.WriteFile("VERSION", []byte(`{"major": 1, "minor": 0, "patch": 0}`), 0644)
@@ -195,7 +195,7 @@ logging:
 	}
 
 	// Test with log-format flag
-	rootCmd.SetArgs([]string{"--log-format", "development", "version"})
+	rootCmd.SetArgs([]string{"--log-format", "development", "output", "version"})
 
 	// Execute should not fail
 	err = rootCmd.Execute()

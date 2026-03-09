@@ -31,35 +31,33 @@ cat VERSION
 
 ## Increment Versions
 
-Use the `major`, `minor`, and `patch` commands to increment versions following SemVer:
+Use `bump` with `major`, `minor`, or `patch` subcommands to increment versions following SemVer:
 
 ```bash
 # Bump to first release
-versionator major +      # aliases: increment, inc, +
+versionator bump major increment
 # VERSION: 1.0.0
 
 # Add a feature
-versionator minor +
+versionator bump minor increment
 # VERSION: 1.1.0
 
 # Fix a bug
-versionator patch +
+versionator bump patch increment
 # VERSION: 1.1.1
 ```
 
-### Command Aliases
+### Auto-bump from Commit Messages
 
-All increment/decrement commands have shorthand aliases:
-
-| Command | Aliases |
-|---------|---------|
-| `increment` | `inc`, `+` |
-| `decrement` | `dec`, `-` |
+Use `versionator bump` without arguments to automatically detect version changes from commit messages:
 
 ```bash
-versionator patch +      # increment patch
-versionator minor inc    # increment minor
-versionator major -      # decrement major
+# Commit with +semver: marker
+git commit -m "Add new feature +semver:minor"
+
+# Auto-bump based on commit message
+versionator bump
+# VERSION: 1.2.0
 ```
 
 ## Add a Prefix
@@ -68,7 +66,7 @@ Many projects use `v` prefix for versions (e.g., `v1.0.0`):
 
 ```bash
 # Enable prefix
-versionator prefix set v
+versionator config prefix set v
 
 cat VERSION
 # Output: v1.1.1
@@ -80,7 +78,7 @@ Create git tags and release branches:
 
 ```bash
 # Bump version and release
-versionator patch +
+versionator bump patch increment
 versionator release
 
 # The release command will:
@@ -99,15 +97,15 @@ Output version in custom formats using Mustache templates:
 
 ```bash
 # Simple version
-versionator version
+versionator output version
 # Output: 1.1.1
 
 # With prefix
-versionator version -t "{{Prefix}}{{MajorMinorPatch}}" --prefix
+versionator output version -t "{{Prefix}}{{MajorMinorPatch}}" --prefix
 # Output: v1.1.1
 
 # Full SemVer with pre-release and metadata
-versionator version \
+versionator output version \
   -t "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}" \
   --prefix \
   --prerelease="alpha-{{CommitsSinceTag}}" \
@@ -121,13 +119,13 @@ Generate version information in your preferred programming language:
 
 ```bash
 # Python
-versionator emit python --output mypackage/_version.py
+versionator output emit python --output mypackage/_version.py
 
 # JSON
-versionator emit json --output version.json
+versionator output emit json --output version.json
 
 # Go (compile-time injection recommended instead)
-versionator emit go
+versionator output emit go
 ```
 
 See [Binary Embedding](./integration/binary-embedding) for language-specific examples and best practices.
@@ -137,7 +135,7 @@ See [Binary Embedding](./integration/binary-embedding) for language-specific exa
 See all available template variables and their current values:
 
 ```bash
-versionator vars
+versionator config vars
 ```
 
 ## Common Workflows
@@ -157,7 +155,7 @@ git checkout main
 git merge feature/new-feature
 
 # Bump version and release
-versionator minor +
+versionator bump minor increment
 versionator release
 git push --tags
 ```
@@ -170,7 +168,7 @@ git add .
 git commit -m "Fix critical bug"
 
 # Bump version and release
-versionator patch +
+versionator bump patch increment
 versionator release
 git push --tags
 ```
@@ -179,16 +177,16 @@ git push --tags
 
 ```bash
 # Set up pre-release
-versionator prerelease set alpha
+versionator config prerelease set alpha
 
 cat VERSION
 # Output: v1.2.0-alpha
 
 # Increment pre-release number
-versionator prerelease set alpha.2
+versionator config prerelease set alpha.2
 
 # When ready to release
-versionator prerelease clear
+versionator config prerelease clear
 ```
 
 ## Next Steps

@@ -358,3 +358,31 @@ func (mr *MockVersionControlSystemMockRecorder) GetHooksPath() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHooksPath", reflect.TypeOf((*MockVersionControlSystem)(nil).GetHooksPath))
 }
 
+// PushTag mock base method.
+func (m *MockVersionControlSystem) PushTag(tagName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PushTag", tagName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PushTag indicates an expected call of PushTag.
+func (mr *MockVersionControlSystemMockRecorder) PushTag(tagName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PushTag", reflect.TypeOf((*MockVersionControlSystem)(nil).PushTag), tagName)
+}
+
+// PushBranch mock base method.
+func (m *MockVersionControlSystem) PushBranch(branchName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PushBranch", branchName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PushBranch indicates an expected call of PushBranch.
+func (mr *MockVersionControlSystemMockRecorder) PushBranch(branchName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PushBranch", reflect.TypeOf((*MockVersionControlSystem)(nil).PushBranch), branchName)
+}
+

@@ -73,4 +73,10 @@ type VersionControlSystem interface {
 
 	// GetHooksPath returns the path to the hooks directory
 	GetHooksPath() (string, error)
+
+	// PushTag pushes a tag to the remote repository
+	PushTag(tagName string) error
+
+	// PushBranch pushes a branch to the remote repository
+	PushBranch(branchName string) error
 }

@@ -52,7 +52,7 @@ func (suite *ReleaseTestSuite) SetupTest() {
 func (suite *ReleaseTestSuite) TearDownTest() {
 	// Restore original directory
 	if suite.origDir != "" {
-		os.Chdir(suite.origDir)
+		_ = os.Chdir(suite.origDir)
 	}
 
 	// Finish gomock controller
@@ -78,11 +78,11 @@ func (suite *ReleaseTestSuite) resetReleaseCommand() {
 	rootCmd.SetArgs(nil)
 
 	// Reset release command flags to their default values
-	releaseCmd.Flags().Set("message", "")
-	releaseCmd.Flags().Set("prefix", "v")
-	releaseCmd.Flags().Set("force", "false")
-	releaseCmd.Flags().Set("verbose", "false")
-	releaseCmd.Flags().Set("no-branch", "false")
+	_ = releaseCmd.Flags().Set("message", "")
+	_ = releaseCmd.Flags().Set("prefix", "v")
+	_ = releaseCmd.Flags().Set("force", "false")
+	_ = releaseCmd.Flags().Set("verbose", "false")
+	_ = releaseCmd.Flags().Set("no-branch", "false")
 }
 
 // createTestFiles creates the standard test files needed for most tests

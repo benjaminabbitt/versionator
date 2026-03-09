@@ -297,7 +297,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(emitCmd)
+	outputCmd.AddCommand(emitCmd)
 	emitCmd.AddCommand(emitDumpCmd)
 
 	emitCmd.Flags().StringVarP(&emitOutput, "output", "o", "", "Output file path (default: stdout)")
