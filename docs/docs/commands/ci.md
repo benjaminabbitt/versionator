@@ -30,6 +30,22 @@ Examples:
   versionator ci --output=vars.env  # Write to file
   versionator ci --prefix=MYAPP_    # Variable prefix (MYAPP_VERSION, etc.)
 
+## Installation in CI
+
+The `ci` command renders dynamic content (git hashes, timestamps, commit counts) at runtime. This requires versionator to be installed in your CI environment.
+
+Versionator is a **static binary** with no dependencies:
+
+```bash
+# Add to your CI pipeline
+curl -sSL https://github.com/benjaminabbitt/versionator/releases/latest/download/versionator-linux-amd64 -o /usr/local/bin/versionator
+chmod +x /usr/local/bin/versionator
+```
+
+:::tip
+If you're not using dynamic pre-release or metadata templates, you can simply read the VERSION file directly without installing versionator. See [VERSION File - Static vs Dynamic Content](../concepts/version-file#static-vs-dynamic-content).
+:::
+
 ## Usage
 
 ```bash

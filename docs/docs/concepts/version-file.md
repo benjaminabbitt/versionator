@@ -23,7 +23,6 @@ The VERSION file contains a SemVer 2.0.0 version string:
 1.2.3
 v1.0.0
 v2.5.3-alpha.1
-release-1.0.0-beta.1
 v3.0.0+20241212.abc1234
 v1.2.3-rc.1+build.456
 ```
@@ -32,7 +31,7 @@ v1.2.3-rc.1+build.456
 
 | Component | Description | Example |
 |-----------|-------------|---------|
-| Prefix | Optional version prefix | `v`, `release-` |
+| Prefix | Optional version prefix (`v` or `V` only) | `v` |
 | Major | Major version number | `1` |
 | Minor | Minor version number | `2` |
 | Patch | Patch version number | `3` |
@@ -49,6 +48,52 @@ The VERSION file is always the source of truth. Its content takes priority over 
 - Config settings only apply as defaults when creating a new VERSION file
 - Pre-release and metadata in the VERSION file are static values
 
+## Static vs Dynamic Content
+
+The VERSION file contains **static** values only. Dynamic content like git hashes, timestamps, or commit counts are rendered at **emit time** by versionator.
+
+### When You Need Versionator
+
+If your workflow uses **templates** or **dynamic content** in pre-release or metadata:
+
+```yaml
+# .versionator.yaml
+prerelease:
+  template: "alpha-{{CommitsSinceTag}}"
+metadata:
+  template: "{{BuildDateTimeCompact}}.{{ShortHash}}"
+```
+
+You'll need versionator installed in your CI container to:
+- Generate code embeddings (`versionator emit`)
+- Set CI/CD environment variables (`versionator ci`)
+- Render templates with current git/build context
+
+Versionator is a **static binary** with no dependencies, making installation straightforward:
+
+```bash
+# Download and install (single binary, no dependencies)
+curl -sSL https://github.com/benjaminabbitt/versionator/releases/latest/download/versionator-linux-amd64 -o /usr/local/bin/versionator
+chmod +x /usr/local/bin/versionator
+```
+
+### When You Can Just Read VERSION
+
+If you're **not** using dynamic pre-release or metadata content, the VERSION file is plain text that any tool can read:
+
+```bash
+# Shell
+VERSION=$(cat VERSION)
+
+# Make
+VERSION := $(shell cat VERSION)
+
+# Python
+version = open('VERSION').read().strip()
+```
+
+No versionator installation required for these simple use cases.
+
 ## File Discovery
 
 Versionator walks up the directory tree from the current working directory looking for a VERSION file. This enables nested projects with independent versions.
@@ -58,7 +103,7 @@ Versionator walks up the directory tree from the current working directory looki
 1. Check current directory for `VERSION`
 2. Walk up to parent directory
 3. Repeat until found or filesystem root is reached
-4. If not found, create `VERSION` in current directory with `0.0.0`
+4. If not found, create `VERSION` in current directory with `0.0.1`
 
 ### Example Directory Structure
 
@@ -87,7 +132,7 @@ versionator version          # 3.0.0
 versionator version          # 3.0.0 (walks up to packages/core/)
 
 # From myproject/apps/web/
-versionator version          # Creates VERSION with 0.0.0
+versionator version          # Creates VERSION with 0.0.1
 ```
 
 ## Creating the VERSION File
@@ -97,11 +142,11 @@ The VERSION file is created automatically on first use:
 ```bash
 # In a directory without VERSION
 versionator version
-# Creates VERSION with: 0.0.0
+# Creates VERSION with: 0.0.1
 
 # With prefix enabled in config
 versionator version
-# Creates VERSION with: v0.0.0
+# Creates VERSION with: v0.0.1
 ```
 
 You can also create it manually:

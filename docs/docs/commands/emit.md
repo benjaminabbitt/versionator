@@ -14,7 +14,7 @@ Supported formats: python, json, yaml, go, c, c-header, cpp, cpp-header, js, ts,
 
 FLAGS WITH OPTIONAL VALUES (use = syntax for values, e.g., --prefix=value):
   --prefix, -p            Enable prefix (default "v" if no value given)
-  --prefix="release-"     Use custom prefix value
+  --prefix="V"            Use uppercase V prefix (only "v" or "V" allowed)
   --prerelease            Enable pre-release with config defaults
   --prerelease="..."      Use custom template (YOU provide dash separators)
   --metadata              Enable metadata with config defaults
@@ -99,6 +99,22 @@ EXAMPLES:
   # Dump a template for customization
   versionator emit dump python --output _version.tmpl.py
 ```
+
+## Installation in CI/Build Systems
+
+The `emit` command renders dynamic content (git hashes, timestamps, commit counts) at **build time**. This requires versionator to be installed where you generate code embeddings.
+
+Versionator is a **static binary** with no dependencies:
+
+```bash
+# Add to your CI pipeline or build container
+curl -sSL https://github.com/benjaminabbitt/versionator/releases/latest/download/versionator-linux-amd64 -o /usr/local/bin/versionator
+chmod +x /usr/local/bin/versionator
+```
+
+:::tip
+If you're not using dynamic pre-release or metadata templates, you can simply read the VERSION file directly without installing versionator. See [VERSION File - Static vs Dynamic Content](../concepts/version-file#static-vs-dynamic-content).
+:::
 
 ## Usage
 
