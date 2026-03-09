@@ -187,6 +187,8 @@ versionator version \
 
 ## See Also
 
+- [Version Grammar](./version-grammar) - Understanding version string format (beginner-friendly)
 - [Pre-release Templates](../templates/prerelease) - Dynamic pre-release identifiers
 - [Metadata Templates](../templates/metadata) - Build metadata configuration
 - [SemVer.org](https://semver.org/) - Official specification
+- [VERSION Grammar (EBNF)](https://github.com/benjaminabbitt/versionator/blob/master/docs/grammar/version.ebnf) - Formal grammar specification

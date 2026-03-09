@@ -35,8 +35,9 @@ Conflict resolution:
   - +semver:skip takes precedence and prevents any bump
 
 Examples:
-  versionator bump                   # Auto-bump based on commits
+  versionator bump                   # Auto-bump and amend last commit
   versionator bump --dry-run         # Show what would happen
+  versionator bump --no-amend        # Bump without amending the commit
   versionator bump --mode=semver     # Only use +semver: markers
   versionator bump --mode=conventional  # Only use conventional commits`,
 	RunE: runBump,
@@ -46,6 +47,7 @@ func init() {
 	rootCmd.AddCommand(bumpCmd)
 
 	bumpCmd.Flags().Bool("dry-run", false, "Show what would happen without making changes")
+	bumpCmd.Flags().Bool("no-amend", false, "Update VERSION file but do not amend the last commit")
 	bumpCmd.Flags().String("mode", "all", "Parse mode: semver, conventional, or all")
 }
 
@@ -122,6 +124,15 @@ func runBump(cmd *cobra.Command, args []string) error {
 	cmd.Printf("Version bumped from %s to %s (%s)\n",
 		oldVersion, newVersion, analysis.BumpLevel.String())
 	cmd.Printf("Triggering commit: %s\n", truncateCommit(analysis.TriggeringCommit))
+
+	// Amend the last commit by default (unless --no-amend is specified)
+	noAmend, _ := cmd.Flags().GetBool("no-amend")
+	if !noAmend {
+		if err := activeVCS.AmendCommit([]string{"VERSION"}); err != nil {
+			return fmt.Errorf("failed to amend commit: %w", err)
+		}
+		cmd.Println("Amended last commit to include VERSION change")
+	}
 
 	return nil
 }

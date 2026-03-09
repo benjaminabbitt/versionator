@@ -67,4 +67,10 @@ type VersionControlSystem interface {
 
 	// CommitFiles stages and commits the specified files with the given message
 	CommitFiles(files []string, message string) error
+
+	// AmendCommit stages the specified files and amends the last commit
+	AmendCommit(files []string) error
+
+	// GetHooksPath returns the path to the hooks directory
+	GetHooksPath() (string, error)
 }

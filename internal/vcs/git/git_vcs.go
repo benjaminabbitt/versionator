@@ -516,6 +516,62 @@ func (g *GitVersionControlSystem) CommitFiles(files []string, message string) er
 	return nil
 }
 
+// AmendCommit stages the specified files and amends the last commit
+func (g *GitVersionControlSystem) AmendCommit(files []string) error {
+	repo, err := g.openRepository()
+	if err != nil {
+		return err
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get working tree: %w", err)
+	}
+
+	// Stage each file
+	for _, file := range files {
+		_, err := worktree.Add(file)
+		if err != nil {
+			return fmt.Errorf("failed to stage file %s: %w", file, err)
+		}
+	}
+
+	// Get the last commit to preserve its message and author
+	head, err := repo.Head()
+	if err != nil {
+		return fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	lastCommit, err := repo.CommitObject(head.Hash())
+	if err != nil {
+		return fmt.Errorf("failed to get commit object: %w", err)
+	}
+
+	// Amend the commit (reuse message, update author timestamp)
+	_, err = worktree.Commit(lastCommit.Message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  lastCommit.Author.Name,
+			Email: lastCommit.Author.Email,
+			When:  time.Now(),
+		},
+		Amend: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to amend commit: %w", err)
+	}
+
+	return nil
+}
+
+// GetHooksPath returns the path to the git hooks directory
+func (g *GitVersionControlSystem) GetHooksPath() (string, error) {
+	root, err := g.GetRepositoryRoot()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, ".git", "hooks"), nil
+}
+
 // Helper methods
 func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 	currentPath := startPath

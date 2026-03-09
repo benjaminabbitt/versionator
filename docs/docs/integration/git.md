@@ -48,7 +48,7 @@ The tag name follows your version format:
 |--------------|-------------|
 | `1.0.0` | `1.0.0` |
 | `v1.0.0` | `v1.0.0` |
-| `release-1.0.0` | `release-1.0.0` |
+| `V1.0.0` | `V1.0.0` |
 | `v1.0.0-beta.1` | `v1.0.0-beta.1` |
 
 ## Release Branches
