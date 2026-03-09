@@ -242,8 +242,8 @@ EXAMPLES:
 }
 
 func init() {
-	// Add persistent flag for log output format
-	rootCmd.PersistentFlags().StringVar(&logOutput, "log-format", "console", "Log output format (console, json, development)")
+	// Add persistent flag for log output format (default: quiet for CLI usage)
+	rootCmd.PersistentFlags().StringVar(&logOutput, "log-format", "quiet", "Log output format (quiet, console, json, development)")
 
 	// Add template flag to version command
 	versionCmd.Flags().StringVarP(&versionTemplate, "template", "t", "", "Template string for version output (Mustache syntax)")

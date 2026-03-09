@@ -27,7 +27,7 @@ jobs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GH_TOKEN }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Extract tag version
       id: tag_version
@@ -92,6 +92,9 @@ jobs:
     - name: Submit to VirusTotal
       id: virustotal
       run: |
+        # Debug: Check if secret is present (shows length, not value)
+        echo "VIRUSTOTAL_API_KEY length: ${#VIRUSTOTAL_API_KEY}"
+
         if [ -z "$VIRUSTOTAL_API_KEY" ]; then
           echo "VIRUSTOTAL_API_KEY not set, skipping VirusTotal submission"
           echo "VT_RESULTS=_VirusTotal scanning not configured for this release._" >> $GITHUB_OUTPUT

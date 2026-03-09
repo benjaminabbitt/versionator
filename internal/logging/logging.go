@@ -14,6 +14,12 @@ var (
 
 // InitLogger initializes the global logger with the specified output format
 // This function is thread-safe and can be called multiple times
+//
+// Supported formats:
+//   - "quiet" (default): No logging output - suitable for CLI usage
+//   - "console": Human-readable colored output
+//   - "json": Structured JSON output for log aggregation
+//   - "development": Verbose development output with stack traces
 func InitLogger(outputFormat string) error {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
@@ -21,18 +27,24 @@ func InitLogger(outputFormat string) error {
 	var config zap.Config
 
 	switch outputFormat {
+	case "quiet", "none", "":
+		// No-op logger for CLI - discards all output
+		logger = zap.NewNop()
+		return nil
 	case "json":
 		config = zap.NewProductionConfig()
 	case "development":
 		config = zap.NewDevelopmentConfig()
 	case "console":
-		fallthrough
-	default:
 		config = zap.NewProductionConfig()
 		config.Encoding = "console"
 		config.EncoderConfig.TimeKey = "timestamp"
 		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	default:
+		// Unknown format, default to quiet
+		logger = zap.NewNop()
+		return nil
 	}
 
 	var err error
@@ -70,7 +82,7 @@ func GetLogger() *zap.Logger {
 		return logger
 	}
 
-	// Initialize default production logger
-	logger, _ = zap.NewProduction()
+	// Initialize default no-op logger (quiet mode for CLI)
+	logger = zap.NewNop()
 	return logger
 }

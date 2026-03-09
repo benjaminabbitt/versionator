@@ -23,4 +23,4 @@ mode:
         prereleaseTemplate: build-{{CommitsSinceTag}}
         metadataTemplate: '{{ShortHash}}'
 logging:
-    output: console
+    output: quiet
