@@ -21,7 +21,7 @@ const versionFile = "VERSION"
 // Version represents a semantic version with all components
 // This is the unified struct replacing both SemVer and VersionData
 type Version struct {
-	Prefix        string // Optional prefix (e.g., "v", "release-")
+	Prefix        string // Optional prefix ("v" or "V" only, per SemVer convention)
 	Major         int    // Major version
 	Minor         int    // Minor version
 	Patch         int    // Patch version
