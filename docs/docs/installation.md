@@ -6,49 +6,9 @@ sidebar_position: 2
 
 # Installation
 
-Versionator is distributed as a single static binary with no dependencies. Choose the installation method that works best for your system.
+Versionator is distributed as a single static binary with no dependencies.
 
-## Package Managers
-
-### Homebrew (macOS/Linux)
-
-```bash
-brew tap benjaminabbitt/tap
-brew install versionator
-```
-
-### Chocolatey (Windows)
-
-```powershell
-choco install versionator
-```
-
-### Go Install
-
-If you have Go installed:
-
-```bash
-go install github.com/benjaminabbitt/versionator@latest
-```
-
-## Manual Installation
-
-### Debian/Ubuntu (.deb)
-
-```bash
-# Download the latest .deb package
-VERSION="1.0.0"  # Replace with desired version
-
-# For amd64
-wget https://github.com/benjaminabbitt/versionator/releases/download/v${VERSION}/versionator_${VERSION}_amd64.deb
-sudo dpkg -i versionator_${VERSION}_amd64.deb
-
-# For arm64
-wget https://github.com/benjaminabbitt/versionator/releases/download/v${VERSION}/versionator_${VERSION}_arm64.deb
-sudo dpkg -i versionator_${VERSION}_arm64.deb
-```
-
-### Linux/macOS Binary
+## Linux/macOS
 
 ```bash
 # Download (example for Linux amd64)
@@ -64,7 +24,7 @@ sudo mv versionator-linux-amd64 /usr/local/bin/versionator
 versionator version
 ```
 
-### Windows
+## Windows
 
 1. Download `versionator-windows-amd64.exe` from [Releases](https://github.com/benjaminabbitt/versionator/releases)
 2. Rename to `versionator.exe`
@@ -93,7 +53,7 @@ After installation, verify versionator is working:
 versionator version
 ```
 
-This should output `0.0.0` (or create a VERSION file if one doesn't exist).
+This should output `0.0.1` (or create a VERSION file if one doesn't exist).
 
 ## Shell Completion
 

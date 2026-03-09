@@ -60,10 +60,12 @@ custom:
 The version prefix string.
 
 ```yaml
-prefix: "v"           # Results in v1.0.0
-prefix: "release-"    # Results in release-1.0.0
+prefix: "v"           # Results in v1.0.0 (recommended)
+prefix: "V"           # Results in V1.0.0
 prefix: ""            # No prefix: 1.0.0
 ```
+
+Only `v` or `V` prefixes are allowed per SemVer convention.
 
 ### prerelease
 
@@ -187,7 +189,6 @@ The VERSION file is always the source of truth for the actual version.
 
 The config file stores:
 - **Templates** for pre-release and metadata
-- **Defaults** for new VERSION files
 - **Custom variables** for templating
 
 The VERSION file stores:
