@@ -188,6 +188,34 @@ The grammar approach pays off when:
 3. **Multiple formats supported** - Go pseudo-versions, assembly versions, partial versions
 4. **Good error messages matter** - CLI users need actionable feedback
 
+## Philosophy: The Joy of Excess
+
+Let's be honest: a regex would do.
+
+```go
+var semverRegex = regexp.MustCompile(
+    `^v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z-.]+)?(\+[0-9A-Za-z-.]+)?$`)
+```
+
+That's 80 characters. It would parse 99% of version strings correctly. Ship it.
+
+Instead, versionator has a 370-line formal EBNF grammar covering SemVer, Go pseudo-versions, .NET assembly versions, NuGet, npm, CalVer, and template variables. Complete with ISO/IEC 14977 notation, proper CC BY 3.0 licensing attribution for the SemVer spec, and railroad diagram generation.
+
+This is, by any reasonable measure, excessive.
+
+**And that's exactly the point.**
+
+Versionator is a hobby project solving a real problem. The problem could be solved with less. But hobby projects aren't about *less*. They're about:
+
+- **Doing it right** - Not "right enough," but *right*. The SemVer spec is prose; a formal grammar removes ambiguity.
+- **Learning by building** - Writing an EBNF grammar teaches you things a regex never will.
+- **Joy in craft** - There's satisfaction in a grammar that could serve as a community reference, even if it only serves one CLI tool.
+- **Permissible digressions** - In professional work, you ship the regex. In passion projects, you write the grammar, generate the railroad diagrams, and document the precedence rules.
+
+The grammar exists because it was *fun* to write, *correct* to use, and *excessive* in exactly the right way for a project where the journey matters as much as the destination.
+
+If you're evaluating versionator for production use: the grammar works, it's well-tested, and it handles edge cases gracefully. If you're evaluating versionator as a codebase to learn from: welcome, fellow enthusiast.
+
 ## Grammar Reference
 
 The complete grammar is in [`docs/grammar/version.ebnf`](https://github.com/benjaminabbitt/versionator/blob/master/docs/grammar/version.ebnf).
