@@ -30,7 +30,7 @@ Supported formats: ` + strings.Join(emit.SupportedFormats(), ", ") + `
 
 FLAGS WITH OPTIONAL VALUES (use = syntax for values, e.g., --prefix=value):
   --prefix, -p            Enable prefix (default "v" if no value given)
-  --prefix="release-"     Use custom prefix value
+  --prefix="V"            Use uppercase V prefix (only 'v' or 'V' allowed)
   --prerelease            Enable pre-release with config defaults
   --prerelease="..."      Use custom template (YOU provide dash separators)
   --metadata              Enable metadata with config defaults

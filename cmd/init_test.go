@@ -81,13 +81,20 @@ func (suite *InitTestSuite) TestInitCommand_WithPrefix() {
 }
 
 func (suite *InitTestSuite) TestInitCommand_WithVersionAndPrefix() {
-	rootCmd.SetArgs([]string{"init", "--version", "2.0.0", "--prefix", "release-"})
+	rootCmd.SetArgs([]string{"init", "--version", "2.0.0", "--prefix", "V"})
 	err := rootCmd.Execute()
 	suite.Require().NoError(err, "init command should succeed")
 
 	content, err := os.ReadFile("VERSION")
 	suite.Require().NoError(err, "Should be able to read VERSION file")
-	suite.Equal("release-2.0.0", strings.TrimSpace(string(content)), "VERSION should contain 'release-2.0.0'")
+	suite.Equal("V2.0.0", strings.TrimSpace(string(content)), "VERSION should contain 'V2.0.0'")
+}
+
+func (suite *InitTestSuite) TestInitCommand_InvalidPrefixRejected() {
+	rootCmd.SetArgs([]string{"init", "--prefix", "release-"})
+	err := rootCmd.Execute()
+	suite.Error(err, "init command should reject invalid prefix")
+	suite.Contains(err.Error(), "only 'v' or 'V' allowed", "error should mention valid prefixes")
 }
 
 func (suite *InitTestSuite) TestInitCommand_WithConfig() {

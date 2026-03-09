@@ -277,7 +277,20 @@ acceptance-test-compose-slow:
     docker compose -f tests/acceptance/docker-compose.yml run --build acceptance-tests-slow
     docker compose -f tests/acceptance/docker-compose.yml down
 
-# ==================== Documentation ====================
+# ==================== Grammar & Documentation ====================
+
+# Generate railroad diagram HTML from parser grammar
+grammar-railroad:
+    #!/bin/zsh
+    set -e
+    echo "Generating railroad diagram..."
+    go run ./docs/grammar/railroad > docs/grammar/railroad.html
+    echo "Generated docs/grammar/railroad.html"
+
+# Output EBNF grammar to stdout
+grammar-ebnf:
+    #!/bin/zsh
+    go run ./docs/grammar/railroad 2>/dev/null | grep -A 1000 "<!-- EBNF Grammar -->" | grep -B 1000 "^-->" | head -n -1 | tail -n +3
 
 # Start documentation dev server
 docs-dev:

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/benjaminabbitt/versionator/internal/config"
 	"github.com/benjaminabbitt/versionator/internal/logging"
+	"github.com/benjaminabbitt/versionator/internal/parser"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 )
 
@@ -39,73 +39,60 @@ const (
 	PatchLevel
 )
 
-// semverRegex matches semantic versions with optional pre-release and build metadata
-// Based on SemVer 2.0.0 specification (see resources/semver-2.md)
-// Note: prefix is extracted separately before applying this regex
-var semverRegex = regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?(?:\+([0-9A-Za-z\-]+(?:\.[0-9A-Za-z\-]+)*))?$`)
-
-// Parse parses a version string into a Version struct
-// Extracts prefix as all characters (letters, dashes) before the first digit
-// Returns a Version with zero values for unparseable input
+// Parse parses a version string into a Version struct using the grammar-based parser.
+// Returns a Version with zero values for unparseable input (lenient parsing).
+// For strict parsing with error reporting, use ParseStrict.
 func Parse(version string) Version {
-	v := Version{Raw: version}
+	v, err := ParseStrict(version)
+	if err != nil {
+		// Return a minimal version with the raw input preserved
+		return Version{Raw: version}
+	}
+	return *v
+}
 
-	// Find first digit - everything before it is the prefix
-	firstDigit := -1
-	for i, c := range version {
-		if c >= '0' && c <= '9' {
-			firstDigit = i
-			break
-		}
+// ParseStrict parses a version string with full validation.
+// Returns an error if the version string is invalid according to the grammar.
+func ParseStrict(version string) (*Version, error) {
+	pv, err := parser.Parse(version)
+	if err != nil {
+		return nil, err
+	}
+	return fromParserVersion(pv), nil
+}
+
+// fromParserVersion converts a parser.Version to a version.Version
+func fromParserVersion(pv *parser.Version) *Version {
+	if pv == nil {
+		return &Version{}
+	}
+	return &Version{
+		Prefix:        pv.Prefix,
+		Major:         pv.Major(),
+		Minor:         pv.Minor(),
+		Patch:         pv.Patch(),
+		PreRelease:    pv.PreReleaseString(),
+		BuildMetadata: pv.BuildMetadataString(),
+		Raw:           pv.Raw,
+	}
+}
+
+// toBuilder converts a version.Version to a parser.Builder for mutation/validation
+func (v *Version) toBuilder() *parser.Builder {
+	b := parser.NewBuilder().
+		Prefix(v.Prefix).
+		Major(v.Major).
+		Minor(v.Minor).
+		Patch(v.Patch)
+
+	if v.PreRelease != "" {
+		b.PreRelease(v.PreRelease)
+	}
+	if v.BuildMetadata != "" {
+		b.BuildMetadata(v.BuildMetadata)
 	}
 
-	// No digit found - unparseable
-	if firstDigit == -1 {
-		return v
-	}
-
-	// Extract prefix (everything before first digit)
-	v.Prefix = version[:firstDigit]
-	semverPart := version[firstDigit:]
-
-	matches := semverRegex.FindStringSubmatch(semverPart)
-	if matches == nil {
-		return v
-	}
-
-	// Capture groups: [0]=full match, [1]=major, [2]=minor, [3]=patch, [4]=prerelease, [5]=metadata
-
-	// Major version (required)
-	if matches[1] != "" {
-		major, err := strconv.Atoi(matches[1])
-		if err != nil {
-			return Version{Raw: version}
-		}
-		v.Major = major
-	}
-
-	// Minor version (optional, defaults to 0)
-	if matches[2] != "" {
-		minor, err := strconv.Atoi(matches[2])
-		if err != nil {
-			return Version{Raw: version}
-		}
-		v.Minor = minor
-	}
-
-	// Patch version (optional, defaults to 0)
-	if matches[3] != "" {
-		patch, err := strconv.Atoi(matches[3])
-		if err != nil {
-			return Version{Raw: version}
-		}
-		v.Patch = patch
-	}
-
-	v.PreRelease = matches[4]
-	v.BuildMetadata = matches[5]
-
-	return v
+	return b
 }
 
 // findVersionFile walks up from startPath looking for a VERSION file
@@ -210,11 +197,14 @@ func Load() (*Version, error) {
 	return nil, fmt.Errorf("failed to read VERSION: %w", err)
 }
 
-// Save writes the version to the VERSION file
+// Save writes the version to the VERSION file.
+// Validates the version by round-tripping through the parser before writing.
 func Save(v *Version) error {
 	logger := logging.GetLogger()
 
-	if err := v.Validate(); err != nil {
+	// Validate by building through the parser (round-trip validation)
+	validated, err := v.toBuilder().Build()
+	if err != nil {
 		logger.Error(LogVersionParseError, zap.String("version", v.String()), zap.Error(err))
 		return fmt.Errorf("invalid version: %w", err)
 	}
@@ -224,8 +214,8 @@ func Save(v *Version) error {
 		return err
 	}
 
-	// Write full version string with newline
-	content := v.FullString() + "\n"
+	// Write the validated version string with newline
+	content := validated.FullString() + "\n"
 
 	if err := os.WriteFile(path, []byte(content), FilePermission); err != nil {
 		logger.Error(LogFileWriteError, zap.String("path", path), zap.Error(err))
@@ -234,7 +224,7 @@ func Save(v *Version) error {
 
 	logger.Debug(LogVersionSaved,
 		zap.String("path", path),
-		zap.String("version", v.String()))
+		zap.String("version", validated.String()))
 	return nil
 }
 
@@ -414,46 +404,11 @@ func (v *Version) OriginalFullSemVer() string {
 	return v.FullSemVer()
 }
 
-// Validate checks if the version is valid according to SemVer 2.0.0
+// Validate checks if the version is valid according to SemVer 2.0.0.
+// Uses the grammar-based parser for validation via round-trip.
 func (v *Version) Validate() error {
-	if v.Major < 0 {
-		return errors.New(ErrMajorVersionNegative)
-	}
-	if v.Minor < 0 {
-		return errors.New(ErrMinorVersionNegative)
-	}
-	if v.Patch < 0 {
-		return errors.New(ErrPatchVersionNegative)
-	}
-
-	if v.PreRelease != "" {
-		if err := validateIdentifier(v.PreRelease); err != nil {
-			return fmt.Errorf("%s: %w", ErrInvalidPreRelease, err)
-		}
-	}
-
-	if v.BuildMetadata != "" {
-		if err := validateIdentifier(v.BuildMetadata); err != nil {
-			return fmt.Errorf("%s: %w", ErrInvalidMetadata, err)
-		}
-	}
-
-	return nil
-}
-
-// validateIdentifier checks if an identifier is valid per SemVer 2.0.0
-func validateIdentifier(id string) error {
-	for _, part := range strings.Split(id, ".") {
-		if part == "" {
-			return errors.New(ErrEmptyIdentifierPart)
-		}
-		for _, c := range part {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-') {
-				return fmt.Errorf("%s: '%c'", ErrInvalidIdentifierChar, c)
-			}
-		}
-	}
-	return nil
+	_, err := v.toBuilder().Build()
+	return err
 }
 
 // IncrementMajor increments the major version, resets minor and patch

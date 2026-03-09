@@ -24,6 +24,8 @@ var initCmd = &cobra.Command{
 Creates a VERSION file with the specified initial version and prefix.
 Optionally creates a .versionator.yaml configuration file.
 
+Only 'v' or 'V' prefixes are allowed per SemVer convention.
+
 Examples:
   versionator init                        # Create VERSION with 0.0.0
   versionator init --version 1.0.0        # Create VERSION with 1.0.0
@@ -33,6 +35,11 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		versionPath := "VERSION"
 		configPath := ".versionator.yaml"
+
+		// Validate prefix early with clear error message
+		if initPrefix != "" && initPrefix != "v" && initPrefix != "V" {
+			return fmt.Errorf("invalid prefix %q: only 'v' or 'V' allowed per SemVer convention", initPrefix)
+		}
 
 		// Check if VERSION exists
 		if _, err := os.Stat(versionPath); err == nil && !initForce {
@@ -79,7 +86,7 @@ Examples:
 
 func init() {
 	initCmd.Flags().StringVarP(&initVersion, "version", "v", "0.0.0", "Initial version")
-	initCmd.Flags().StringVarP(&initPrefix, "prefix", "p", "", "Version prefix (e.g., 'v')")
+	initCmd.Flags().StringVarP(&initPrefix, "prefix", "p", "", "Version prefix ('v' or 'V' only)")
 	initCmd.Flags().BoolVar(&initWithConfig, "config", false, "Also create .versionator.yaml")
 	initCmd.Flags().BoolVarP(&initForce, "force", "f", false, "Overwrite existing files")
 	rootCmd.AddCommand(initCmd)
