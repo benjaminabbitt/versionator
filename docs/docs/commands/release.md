@@ -18,19 +18,13 @@ This command will:
 6. Create a release branch (e.g., 'release/v1.2.3') if enabled
 
 This is the recommended workflow after bumping a version:
-
-```bash
-versionator bump patch increment
-versionator release push
-```
+  versionator patch increment
+  versionator release
 
 Release branch creation is enabled by default. Configure in .versionator.yaml:
-
-```yaml
-release:
-  createBranch: true    # set to false to disable
-  branchPrefix: "release/"
-```
+  release:
+    createBranch: true    # set to false to disable
+    branchPrefix: "release/"
 
 Use --no-branch to skip branch creation for a single invocation.
 
@@ -40,39 +34,45 @@ or if the tag already exists.
 ## Usage
 
 ```bash
-versionator release [flags]
-versionator release push [flags]
+versionator release [command] [flags]
 ```
 
 ## Subcommands
 
+| Command | Description |
+|---------|-------------|
+| `push` | Create release and push tag and branch to remote |
+
 ### push
 
-Create a release and push both the tag and branch to the remote repository.
+Create release and push tag and branch to remote
 
-```bash
-versionator release push
-```
+Create a release (tag and branch) and push both to the remote repository.
 
 This combines the release command with git push operations:
 1. Perform the standard release (create tag and branch)
 2. Push the tag to origin
 3. Push the release branch to origin (if created)
 
-Example workflow:
-```bash
-# Commit with semver marker
-git add -A
-git commit -m "Fix bug +semver:patch"
+Example:
+  versionator release push           # Release and push to remote
+  versionator release push --no-branch  # Release and push tag only
 
-# Auto-bump, release, and push in two commands
-versionator bump
-versionator release push
+```bash
+versionator release push [flags]
 ```
 
-## Flags
+**Flags:**
 
-These flags apply to both `release` and `release push`:
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `-f, --force` | bool | false | Force creation even if tag exists |
+| `-m, --message` | string | - | Tag message (default: 'Release \<version\>') |
+| `--no-branch` | bool | false | Skip creating release branch |
+| `-p, --prefix` | string | v | Tag prefix (default: 'v') |
+| `-v, --verbose` | bool | false | Show additional information |
+
+## Flags
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
