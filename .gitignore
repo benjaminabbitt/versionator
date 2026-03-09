@@ -56,3 +56,9 @@ docs/node_modules/
 
 # Backup of old docs (can be removed after migration)
 .docs-backup/
+
+# SCM context files
+.scm/context/**/*
+
+# Claude settings
+.claude/**/*
