@@ -191,4 +191,6 @@ This provides a clear history of version changes in your repository.
 ## See Also
 
 - [SemVer 2.0.0](./semver) - Semantic Versioning specification
+- [Version Grammar](./version-grammar) - Understanding version string format
 - [Monorepo Support](./monorepo) - Managing versions in monorepos
+- [VERSION Grammar (EBNF)](https://github.com/benjaminabbitt/versionator/blob/master/docs/grammar/version.ebnf) - Formal grammar specification

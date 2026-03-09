@@ -28,8 +28,9 @@ Conflict resolution:
   - +semver:skip takes precedence and prevents any bump
 
 Examples:
-  versionator bump                   # Auto-bump based on commits
+  versionator bump                   # Auto-bump and amend last commit
   versionator bump --dry-run         # Show what would happen
+  versionator bump --no-amend        # Bump without amending the commit
   versionator bump --mode=semver     # Only use +semver: markers
   versionator bump --mode=conventional  # Only use conventional commits
 
@@ -45,4 +46,17 @@ versionator bump [flags]
 |------|------|---------|-------------|
 | `--dry-run` | bool | false | Show what would happen without making changes |
 | `--mode` | string | all | Parse mode: semver, conventional, or all |
+| `--no-amend` | bool | false | Update VERSION file but do not amend the last commit |
+
+## Automatic Bumping with Git Hook
+
+You can install a post-commit hook to automatically bump the VERSION file when commits contain `+semver:` tags:
+
+```bash
+versionator init hook
+```
+
+This installs a hook that runs `versionator bump` after each commit containing `+semver:major`, `+semver:minor`, or `+semver:patch`. The commit is automatically amended to include the VERSION change.
+
+See [init hook](./init#hook) for details.
 

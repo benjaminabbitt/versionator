@@ -38,10 +38,11 @@ func TestVCSRegistry_GetActiveVCS(t *testing.T) {
 	mockVCS1 := mock.NewMockVersionControlSystem(ctrl)
 	mockVCS2 := mock.NewMockVersionControlSystem(ctrl)
 
+	// Map iteration order is non-deterministic, so use AnyTimes()
 	// First VCS is not in a repository
-	mockVCS1.EXPECT().IsRepository().Return(false)
+	mockVCS1.EXPECT().IsRepository().Return(false).AnyTimes()
 	// Second VCS is in a repository
-	mockVCS2.EXPECT().IsRepository().Return(true)
+	mockVCS2.EXPECT().IsRepository().Return(true).AnyTimes()
 
 	registry := &VCSRegistry{
 		systems: make(map[string]VersionControlSystem),

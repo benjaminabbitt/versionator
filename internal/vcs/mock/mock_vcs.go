@@ -329,3 +329,32 @@ func (mr *MockVersionControlSystemMockRecorder) CommitFiles(files, message inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitFiles", reflect.TypeOf((*MockVersionControlSystem)(nil).CommitFiles), files, message)
 }
 
+// AmendCommit mock base method.
+func (m *MockVersionControlSystem) AmendCommit(files []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AmendCommit", files)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AmendCommit indicates an expected call of AmendCommit.
+func (mr *MockVersionControlSystemMockRecorder) AmendCommit(files interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AmendCommit", reflect.TypeOf((*MockVersionControlSystem)(nil).AmendCommit), files)
+}
+
+// GetHooksPath mock base method.
+func (m *MockVersionControlSystem) GetHooksPath() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHooksPath")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetHooksPath indicates an expected call of GetHooksPath.
+func (mr *MockVersionControlSystemMockRecorder) GetHooksPath() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHooksPath", reflect.TypeOf((*MockVersionControlSystem)(nil).GetHooksPath))
+}
+
