@@ -1,0 +1,220 @@
+// Command railroad generates railroad diagrams from the version parser grammar.
+//
+// Usage:
+//
+//	go run ./docs/grammar/railroad > docs/grammar/railroad.html
+//
+// The output is a self-contained HTML file with SVG railroad diagrams
+// for all grammar rules.
+package main
+
+import (
+	"fmt"
+
+	"github.com/benjaminabbitt/versionator/internal/parser"
+)
+
+func main() {
+	// Get EBNF from the parser
+	ebnf := parser.EBNF()
+
+	// Output EBNF grammar
+	fmt.Println("<!-- EBNF Grammar -->")
+	fmt.Println("<!--")
+	fmt.Println(ebnf)
+	fmt.Println("-->")
+	fmt.Println()
+
+	// Generate railroad diagram HTML
+	html := generateRailroadHTML(ebnf)
+	fmt.Println(html)
+}
+
+func generateRailroadHTML(ebnf string) string {
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Version Grammar - Railroad Diagrams</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        h2 { color: #555; margin-top: 2rem; }
+        .grammar {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .rule {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #fafafa;
+            border-left: 4px solid #007acc;
+        }
+        .rule-name {
+            font-weight: bold;
+            color: #007acc;
+            font-size: 1.1rem;
+        }
+        .rule-def {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .examples {
+            margin-top: 1rem;
+        }
+        .examples h3 {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .example {
+            display: inline-block;
+            background: #e8f4e8;
+            padding: 0.25rem 0.5rem;
+            margin: 0.25rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .invalid {
+            background: #f4e8e8;
+            text-decoration: line-through;
+        }
+        .token-table {
+            width: 100%%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        .token-table th, .token-table td {
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+            text-align: left;
+        }
+        .token-table th {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Version Grammar</h1>
+    <p>Railroad diagrams and EBNF grammar for version string parsing.</p>
+
+    <h2>Supported Formats</h2>
+    <div class="grammar">
+        <div class="rule">
+            <div class="rule-name">SemVer 2.0.0</div>
+            <div class="examples">
+                <span class="example">1.2.3</span>
+                <span class="example">1.0.0-alpha</span>
+                <span class="example">1.0.0-alpha.1</span>
+                <span class="example">1.0.0+build.123</span>
+                <span class="example">1.0.0-beta+exp.sha.5114f85</span>
+            </div>
+        </div>
+        <div class="rule">
+            <div class="rule-name">With Prefix</div>
+            <div class="examples">
+                <span class="example">v1.2.3</span>
+                <span class="example">V1.0.0-rc.1</span>
+            </div>
+        </div>
+        <div class="rule">
+            <div class="rule-name">Partial Versions</div>
+            <div class="examples">
+                <span class="example">1</span>
+                <span class="example">1.2</span>
+            </div>
+        </div>
+        <div class="rule">
+            <div class="rule-name">Go Pseudo-versions</div>
+            <div class="examples">
+                <span class="example">v0.0.0-20191109021931-daa7c04131f5</span>
+            </div>
+        </div>
+        <div class="rule">
+            <div class="rule-name">Assembly Versions</div>
+            <div class="examples">
+                <span class="example">1.0.0.0</span>
+                <span class="example">2.1.3.456</span>
+            </div>
+        </div>
+    </div>
+
+    <h2>EBNF Grammar</h2>
+    <pre>%s</pre>
+
+    <h2>Lexer Tokens</h2>
+    <table class="token-table">
+        <tr>
+            <th>Token</th>
+            <th>Pattern</th>
+            <th>Description</th>
+        </tr>
+        <tr><td>Prefix</td><td><code>[vV]</code></td><td>Version prefix (v or V)</td></tr>
+        <tr><td>Number</td><td><code>[0-9]+</code></td><td>Numeric component</td></tr>
+        <tr><td>Dot</td><td><code>.</code></td><td>Component separator</td></tr>
+        <tr><td>Dash</td><td><code>-</code></td><td>Pre-release prefix</td></tr>
+        <tr><td>Plus</td><td><code>+</code></td><td>Build metadata prefix</td></tr>
+        <tr><td>Ident</td><td><code>[a-zA-Z0-9-]+</code></td><td>Identifier (alphanumeric with dashes)</td></tr>
+    </table>
+
+    <h2>Precedence Rules</h2>
+    <div class="grammar">
+        <ol>
+            <li>Compare major, minor, patch numerically (left to right)</li>
+            <li>Pre-release has <strong>lower</strong> precedence than normal: <code>1.0.0-alpha &lt; 1.0.0</code></li>
+            <li>Pre-release identifiers compared left to right:
+                <ul>
+                    <li>Numeric identifiers compared as integers</li>
+                    <li>Alphanumeric compared as ASCII sort</li>
+                    <li>Numeric &lt; Alphanumeric</li>
+                    <li>Shorter set &lt; longer set</li>
+                </ul>
+            </li>
+            <li>Build metadata is ignored in precedence comparisons</li>
+        </ol>
+        <div class="examples">
+            <h3>Ascending order example:</h3>
+            <span class="example">1.0.0-alpha</span>
+            <span class="example">1.0.0-alpha.1</span>
+            <span class="example">1.0.0-alpha.beta</span>
+            <span class="example">1.0.0-beta</span>
+            <span class="example">1.0.0-beta.2</span>
+            <span class="example">1.0.0-beta.11</span>
+            <span class="example">1.0.0-rc.1</span>
+            <span class="example">1.0.0</span>
+        </div>
+    </div>
+
+    <h2>Invalid Examples</h2>
+    <div class="grammar">
+        <div class="examples">
+            <span class="example invalid">1.2.3.4.5</span>
+            <span class="example invalid">1.02.3</span>
+            <span class="example invalid">1.2.3-</span>
+            <span class="example invalid">1.2.3+</span>
+            <span class="example invalid">1.2.3-alpha..1</span>
+            <span class="example invalid">v-1.2.3</span>
+        </div>
+    </div>
+</body>
+</html>`, ebnf)
+}

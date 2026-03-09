@@ -18,12 +18,8 @@ const (
 	ErrCannotDecrementMajor  = "cannot decrement major version below 0"
 	ErrCannotDecrementMinor  = "cannot decrement minor version below 0"
 	ErrCannotDecrementPatch  = "cannot decrement patch version below 0"
-	ErrInvalidVersionLevel   = "invalid version level"
-	ErrInvalidPreRelease     = "invalid pre-release identifier"
-	ErrInvalidMetadata       = "invalid build metadata"
-	ErrEmptyIdentifierPart   = "identifier part cannot be empty"
-	ErrInvalidIdentifierChar = "invalid character in identifier"
-	ErrCustomKeyNotFound     = "custom key not found"
+	ErrInvalidVersionLevel = "invalid version level"
+	ErrCustomKeyNotFound   = "custom key not found"
 )
 
 // Log messages for structured logging

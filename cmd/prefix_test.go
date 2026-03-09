@@ -44,14 +44,14 @@ func TestPrefixEnableCommand(t *testing.T) {
 		{
 			name: "enable prefix uses config value when set",
 			initialConfig: &config.Config{
-				Prefix: "release-",
+				Prefix: "v",
 				Metadata: config.MetadataConfig{
 					Git: config.GitConfig{HashLength: 7},
 				},
 				Logging: config.LoggingConfig{Output: "console"},
 			},
 			initialVersion: "2.0.0",
-			expectedPrefix: "release-",
+			expectedPrefix: "v",
 			expectError:    false,
 		},
 	}
@@ -234,8 +234,8 @@ func TestPrefixSetCommand(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name: "set custom release prefix",
-			args: []string{"prefix", "set", "release-"},
+			name: "set uppercase V prefix",
+			args: []string{"prefix", "set", "V"},
 			initialConfig: &config.Config{
 				Prefix: "",
 				Metadata: config.MetadataConfig{
@@ -244,7 +244,7 @@ func TestPrefixSetCommand(t *testing.T) {
 				Logging: config.LoggingConfig{Output: "console"},
 			},
 			initialVersion: "1.0.0",
-			expectedPrefix: "release-",
+			expectedPrefix: "V",
 			expectError:    false,
 		},
 		{
@@ -261,6 +261,21 @@ func TestPrefixSetCommand(t *testing.T) {
 			expectedPrefix: "",
 			expectError:    true,
 			errorContains:  "accepts 1 arg(s), received 0",
+		},
+		{
+			name: "set invalid prefix rejected",
+			args: []string{"prefix", "set", "release-"},
+			initialConfig: &config.Config{
+				Prefix: "",
+				Metadata: config.MetadataConfig{
+					Git: config.GitConfig{HashLength: 7},
+				},
+				Logging: config.LoggingConfig{Output: "console"},
+			},
+			initialVersion: "1.0.0",
+			expectedPrefix: "",
+			expectError:    true,
+			errorContains:  "only 'v' or 'V' allowed",
 		},
 	}
 
@@ -357,9 +372,9 @@ func TestPrefixStatusCommand(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name: "status with custom release prefix",
+			name: "status with uppercase V prefix",
 			initialConfig: &config.Config{
-				Prefix: "release-",
+				Prefix: "V",
 				Metadata: config.MetadataConfig{
 					Git: config.GitConfig{HashLength: 7},
 				},
