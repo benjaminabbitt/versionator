@@ -9,6 +9,16 @@ slug: /
 
 Versionator is a CLI tool for managing semantic versions following [SemVer 2.0.0](https://semver.org/). It stores the current version in a plain text `VERSION` file, making version management explicit and deterministic.
 
+## SemVer with Practical Extensions
+
+Versionator implements SemVer 2.0.0 as the foundation, with practical extensions to handle real-world conventions:
+
+- **Version prefix**: Supports the `v` or `V` prefix commonly used in git tags and Go modules (e.g., `v1.2.3`)
+- **Flexible parsing**: Handles version formats from various ecosystems including npm, Go, and container registries
+- **Strict output**: Always produces valid SemVer-compliant version strings
+
+The formal grammar is documented in [Version Grammar](./concepts/version-grammar) with a beginner-friendly walkthrough.
+
 ## Why Versionator?
 
 ### The Problem with Auto-Versioning
