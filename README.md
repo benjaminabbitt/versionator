@@ -20,23 +20,23 @@ Generate version constants for your codebase (sorted by [TIOBE Index](https://ww
 
 | Language | Format | Documentation |
 |----------|--------|---------------|
-| [Python](https://benjaminabbitt.github.io/versionator/commands/emit#python) | `python` | `_version.py` |
-| [C](https://benjaminabbitt.github.io/versionator/commands/emit#c) | `c`, `c-header` | `version.c`, `version.h` |
-| [C++](https://benjaminabbitt.github.io/versionator/commands/emit#cpp) | `cpp`, `cpp-header` | `version.cpp`, `version.hpp` |
-| [Java](https://benjaminabbitt.github.io/versionator/commands/emit#java) | `java` | `Version.java` |
-| [C#](https://benjaminabbitt.github.io/versionator/commands/emit#csharp) | `csharp` | `Version.cs` |
-| [JavaScript](https://benjaminabbitt.github.io/versionator/commands/emit#javascript) | `js` | `version.js` |
-| [Go](https://benjaminabbitt.github.io/versionator/commands/emit#go) | `go` | `version.go` |
-| [TypeScript](https://benjaminabbitt.github.io/versionator/commands/emit#typescript) | `ts` | `version.ts` |
-| [PHP](https://benjaminabbitt.github.io/versionator/commands/emit#php) | `php` | `Version.php` |
-| [Swift](https://benjaminabbitt.github.io/versionator/commands/emit#swift) | `swift` | `Version.swift` |
-| [Kotlin](https://benjaminabbitt.github.io/versionator/commands/emit#kotlin) | `kotlin` | `Version.kt` |
-| [Rust](https://benjaminabbitt.github.io/versionator/commands/emit#rust) | `rust` | `version.rs` |
-| [Ruby](https://benjaminabbitt.github.io/versionator/commands/emit#ruby) | `ruby` | `version.rb` |
+| [Python](https://benjaminabbitt.github.io/versionator/integration/languages/python) | `python` | `_version.py` |
+| [C](https://benjaminabbitt.github.io/versionator/integration/languages/c) | `c`, `c-header` | `version.c`, `version.h` |
+| [C++](https://benjaminabbitt.github.io/versionator/integration/languages/cpp) | `cpp`, `cpp-header` | `version.cpp`, `version.hpp` |
+| [Java](https://benjaminabbitt.github.io/versionator/integration/languages/java) | `java` | `Version.java` |
+| [C#](https://benjaminabbitt.github.io/versionator/integration/languages/csharp) | `csharp` | `Version.cs` |
+| [JavaScript](https://benjaminabbitt.github.io/versionator/integration/languages/javascript) | `js` | `version.js` |
+| [Go](https://benjaminabbitt.github.io/versionator/integration/languages/go) | `go` | `version.go` |
+| [TypeScript](https://benjaminabbitt.github.io/versionator/integration/languages/typescript) | `ts` | `version.ts` |
+| [PHP](https://benjaminabbitt.github.io/versionator/integration/languages/php) | `php` | `Version.php` |
+| [Swift](https://benjaminabbitt.github.io/versionator/integration/languages/swift) | `swift` | `Version.swift` |
+| [Kotlin](https://benjaminabbitt.github.io/versionator/integration/languages/kotlin) | `kotlin` | `Version.kt` |
+| [Rust](https://benjaminabbitt.github.io/versionator/integration/languages/rust) | `rust` | `version.rs` |
+| [Ruby](https://benjaminabbitt.github.io/versionator/integration/languages/ruby) | `ruby` | `version.rb` |
 
-**Data formats:** [JSON](https://benjaminabbitt.github.io/versionator/commands/emit#json), [YAML](https://benjaminabbitt.github.io/versionator/commands/emit#yaml)
+**Data formats:** JSON (`json`), YAML (`yaml`) — see [emit command](https://benjaminabbitt.github.io/versionator/commands/output#emit)
 
-**Container files:** [Containerfile/Dockerfile](https://benjaminabbitt.github.io/versionator/commands/emit#containers), [compose.yml](https://benjaminabbitt.github.io/versionator/commands/emit#containers)
+**Container files:** [Docker](https://benjaminabbitt.github.io/versionator/integration/languages/docker) — Containerfile/Dockerfile with OCI labels
 
 ## Documentation
 
