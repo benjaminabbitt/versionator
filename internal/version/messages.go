@@ -12,14 +12,11 @@ const (
 
 // Error messages
 const (
-	ErrMajorVersionNegative  = "major version cannot be negative"
-	ErrMinorVersionNegative  = "minor version cannot be negative"
-	ErrPatchVersionNegative  = "patch version cannot be negative"
-	ErrCannotDecrementMajor  = "cannot decrement major version below 0"
-	ErrCannotDecrementMinor  = "cannot decrement minor version below 0"
-	ErrCannotDecrementPatch  = "cannot decrement patch version below 0"
-	ErrInvalidVersionLevel = "invalid version level"
-	ErrCustomKeyNotFound   = "custom key not found"
+	ErrCannotDecrementMajor = "cannot decrement major version below 0"
+	ErrCannotDecrementMinor = "cannot decrement minor version below 0"
+	ErrCannotDecrementPatch = "cannot decrement patch version below 0"
+	ErrInvalidVersionLevel  = "invalid version level"
+	ErrCustomKeyNotFound    = "custom key not found"
 )
 
 // Log messages for structured logging
