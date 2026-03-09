@@ -26,19 +26,19 @@ Generate source files at build time:
 | Language | Mechanism |
 |----------|-----------|
 | [Java](./java) | Template-generated source |
-| [Kotlin](./kotlin) | `versionator emit kotlin` |
+| [Kotlin](./kotlin) | `versionator output emit kotlin` |
 
 ## .NET Languages
 
 | Language | Mechanism |
 |----------|-----------|
-| [C#](./csharp) | `versionator emit csharp` |
+| [C#](./csharp) | `versionator output emit csharp` |
 
 ## Apple Platforms
 
 | Language | Mechanism |
 |----------|-----------|
-| [Swift](./swift) | `versionator emit swift` |
+| [Swift](./swift) | `versionator output emit swift` |
 
 ## Interpreted Languages
 
@@ -46,10 +46,10 @@ Generate version modules:
 
 | Language | Mechanism |
 |----------|-----------|
-| [Python](./python) | `versionator emit python` |
-| [JavaScript](./javascript) | `versionator emit js` |
-| [TypeScript](./typescript) | `versionator emit ts` |
-| [Ruby](./ruby) | `versionator emit ruby` |
+| [Python](./python) | `versionator output emit python` |
+| [JavaScript](./javascript) | `versionator output emit js` |
+| [TypeScript](./typescript) | `versionator output emit ts` |
+| [Ruby](./ruby) | `versionator output emit ruby` |
 
 ## Containers
 

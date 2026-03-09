@@ -29,7 +29,7 @@ version:
 
 ```makefile
 # With pre-release and metadata
-FULL_VERSION := $(shell versionator version \
+FULL_VERSION := $(shell versionator output version \
 	-t "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}" \
 	--prefix \
 	--metadata="{{ShortHash}}")
@@ -68,8 +68,8 @@ VERSION := $(shell versionator version)
 
 # Generate version files
 generate-version:
-	versionator emit python --output src/_version.py
-	versionator emit json --output version.json
+	versionator output emit python --output src/_version.py
+	versionator output emit json --output version.json
 
 # Build all
 build: generate-version
@@ -99,7 +99,7 @@ app: main.c
 
 ```just
 # Get version
-version := `versionator version`
+version := `versionator output version`
 
 # Build with version
 build:
@@ -126,15 +126,15 @@ build:
 # Bump and show new version
 bump-major:
     versionator major increment
-    @versionator version
+    @versionator output version
 
 bump-minor:
     versionator minor increment
-    @versionator version
+    @versionator output version
 
 bump-patch:
     versionator patch increment
-    @versionator version
+    @versionator output version
 ```
 
 ### Release Recipe
@@ -162,9 +162,9 @@ release bump="patch":
 ```just
 # Generate version files for all languages
 generate-version:
-    versionator emit python --output src/_version.py
-    versionator emit json --output version.json
-    versionator emit go --output internal/version/version.go
+    versionator output emit python --output src/_version.py
+    versionator output emit json --output version.json
+    versionator output emit go --output internal/version/version.go
 
 # Build (depends on generate)
 build: generate-version
@@ -177,7 +177,7 @@ build: generate-version
 # Build with dynamic metadata
 build-ci:
     #!/bin/bash
-    VERSION=$(versionator version \
+    VERSION=$(versionator output version \
         -t "{{MajorMinorPatch}}{{MetadataWithPlus}}" \
         --metadata="{{BuildDateTimeCompact}}.{{ShortHash}}")
     echo "Building $VERSION"

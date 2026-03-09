@@ -23,7 +23,7 @@ pipeline {
             steps {
                 script {
                     sh 'go install github.com/benjaminabbitt/versionator@latest'
-                    env.VERSION = sh(script: 'versionator version', returnStdout: true).trim()
+                    env.VERSION = sh(script: 'versionator output version', returnStdout: true).trim()
                 }
             }
         }
@@ -49,7 +49,7 @@ node {
 
     stage('Get Version') {
         sh 'go install github.com/benjaminabbitt/versionator@latest'
-        version = sh(script: 'versionator version', returnStdout: true).trim()
+        version = sh(script: 'versionator output version', returnStdout: true).trim()
         echo "Building version: ${version}"
     }
 
@@ -80,7 +80,7 @@ pipeline {
             steps {
                 sh 'go install github.com/benjaminabbitt/versionator@latest'
                 script {
-                    env.VERSION = sh(script: 'versionator version', returnStdout: true).trim()
+                    env.VERSION = sh(script: 'versionator output version', returnStdout: true).trim()
                 }
                 echo "Version: ${env.VERSION}"
             }

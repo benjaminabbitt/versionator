@@ -8,7 +8,7 @@ sidebar_position: 9
 
 **Location:** [`examples/python/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/python)
 
-Python uses `versionator emit` to generate a `_version.py` module:
+Python uses `versionator output emit` to generate a `_version.py` module:
 
 ```python title="examples/python/mypackage/main.py"
 """Sample application entry point."""
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
 ```makefile title="examples/python/Makefile (excerpt)"
 version-file:
-    versionator emit python --output mypackage/_version.py
+    versionator output emit python --output mypackage/_version.py
 
 run: version-file
     python -m mypackage.main

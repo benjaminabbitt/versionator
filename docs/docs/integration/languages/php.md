@@ -6,7 +6,7 @@ sidebar_position: 14
 
 # PHP
 
-PHP uses `versionator emit` to generate a `Version.php` file with constants:
+PHP uses `versionator output emit` to generate a `Version.php` file with constants:
 
 ```php title="Version.php (generated)"
 <?php
@@ -23,10 +23,10 @@ const GIT_HASH = 'abc1234';
 
 ```bash
 # Generate Version.php
-versionator emit php --output src/Version.php
+versionator output emit php --output src/Version.php
 
 # With pre-release and metadata
-versionator emit php --prerelease="beta" --metadata="{{ShortHash}}" --output src/Version.php
+versionator output emit php --prerelease="beta" --metadata="{{ShortHash}}" --output src/Version.php
 ```
 
 ## Usage in PHP
@@ -44,7 +44,7 @@ echo "Major: " . MAJOR . ", Minor: " . MINOR . ", Patch: " . PATCH . "\n";
 
 ```makefile
 version-file:
-	versionator emit php --output src/Version.php
+	versionator output emit php --output src/Version.php
 
 build: version-file
 	# Your build commands here

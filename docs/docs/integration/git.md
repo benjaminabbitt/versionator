@@ -148,19 +148,19 @@ For pre-release versions:
 
 ```bash
 # Set pre-release
-versionator prerelease set alpha.1
+versionator config prerelease set alpha.1
 versionator release
 
 # Iterate on alpha
-versionator prerelease set alpha.2
+versionator config prerelease set alpha.2
 versionator release
 
 # Move to beta
-versionator prerelease set beta.1
+versionator config prerelease set beta.1
 versionator release
 
 # Final release
-versionator prerelease clear
+versionator config prerelease clear
 versionator release
 git push --tags
 ```
@@ -335,7 +335,7 @@ Ensure VERSION file is valid:
 # .git/hooks/pre-commit
 
 # Validate VERSION file format
-if ! versionator version > /dev/null 2>&1; then
+if ! versionator output version > /dev/null 2>&1; then
     echo "ERROR: Invalid VERSION file"
     exit 1
 fi
@@ -350,7 +350,7 @@ Regenerate version files after merge:
 # .git/hooks/post-merge
 
 # Regenerate version file for interpreted languages
-versionator emit python --output src/_version.py
+versionator output emit python --output src/_version.py
 ```
 
 ## Lefthook Integration
@@ -362,13 +362,13 @@ With [Lefthook](https://github.com/evilmartians/lefthook):
 pre-commit:
   commands:
     version-check:
-      run: versionator version > /dev/null
+      run: versionator output version > /dev/null
       fail_text: "Invalid VERSION file"
 
 post-merge:
   commands:
     version-emit:
-      run: versionator emit python --output src/_version.py
+      run: versionator output emit python --output src/_version.py
 ```
 
 ## GitHub Actions Integration

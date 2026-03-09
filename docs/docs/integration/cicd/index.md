@@ -46,7 +46,7 @@ on:
       VERSION=$(versionator version)
     else
       # Development: add commit info
-      VERSION=$(versionator version \
+      VERSION=$(versionator output version \
         -t "{{MajorMinorPatch}}-{{EscapedBranchName}}.{{CommitsSinceTag}}")
     fi
     echo "VERSION=$VERSION" >> $GITHUB_ENV

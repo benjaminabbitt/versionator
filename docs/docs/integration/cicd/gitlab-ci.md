@@ -30,7 +30,7 @@ build:
 build:
   script:
     - |
-      VERSION=$(versionator version \
+      VERSION=$(versionator output version \
         -t "{{MajorMinorPatch}}{{MetadataWithPlus}}" \
         --metadata="${CI_COMMIT_SHORT_SHA}")
     - echo "Building $VERSION"

@@ -108,8 +108,8 @@ echo '. "$HOME\Documents\WindowsPowerShell\versionator.ps1"' >> $PROFILE
 Once installed, tab completion provides:
 
 - **Command completion**: `versionator <TAB>` shows available commands
-- **Subcommand completion**: `versionator prefix <TAB>` shows subcommands
-- **Flag completion**: `versionator version --<TAB>` shows available flags
+- **Subcommand completion**: `versionator config prefix <TAB>` shows subcommands
+- **Flag completion**: `versionator output version --<TAB>` shows available flags
 - **Flag value completion**: For flags with known values
 
 ### Examples
@@ -120,15 +120,15 @@ completion  config      custom      emit        help        major
 metadata    minor       patch       prefix      prerelease  schema
 tag         vars        version
 
-$ versionator prefix <TAB>
+$ versionator config prefix <TAB>
 disable  enable  set  status
 
-$ versionator emit <TAB>
+$ versionator output emit <TAB>
 c         c-header   cpp       cpp-header  csharp    dump
 go        java       js        json        kotlin    php
 python    ruby       rust      swift       ts        yaml
 
-$ versionator version --<TAB>
+$ versionator output version --<TAB>
 --help        --metadata    --prefix      --prerelease  --template
 ```
 

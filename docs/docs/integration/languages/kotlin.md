@@ -8,7 +8,7 @@ sidebar_position: 6
 
 **Location:** [`examples/kotlin/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/kotlin)
 
-Kotlin generates a `Version.kt` object at build time using `versionator emit`:
+Kotlin generates a `Version.kt` object at build time using `versionator output emit`:
 
 ```kotlin title="examples/kotlin/Main.kt"
 package app
@@ -23,7 +23,7 @@ fun main() {
 
 ```makefile title="examples/kotlin/Makefile (excerpt)"
 version-file:
-    versionator emit kotlin --output Version.kt
+    versionator output emit kotlin --output Version.kt
 
 build: version-file
     kotlinc Main.kt Version.kt -include-runtime -d sample-app.jar

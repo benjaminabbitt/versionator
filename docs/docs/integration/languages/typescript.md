@@ -8,7 +8,7 @@ sidebar_position: 11
 
 **Location:** [`examples/typescript/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript)
 
-TypeScript generates a typed `version.ts` module using `versionator emit`:
+TypeScript generates a typed `version.ts` module using `versionator output emit`:
 
 ```typescript title="examples/typescript/src/index.ts"
 import { VERSION } from './version.js';
@@ -23,7 +23,7 @@ main();
 
 ```makefile title="examples/typescript/Makefile (excerpt)"
 version-file:
-    versionator emit ts --output src/version.ts
+    versionator output emit ts --output src/version.ts
 
 build: version-file
     npx tsc

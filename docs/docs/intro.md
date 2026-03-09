@@ -83,7 +83,7 @@ versionator patch +    # 1.1.0 -> 1.1.1
 versionator release    # Creates tag v1.1.1 and branch release/v1.1.1
 
 # Generate version file for Python
-versionator emit python --output mypackage/_version.py
+versionator output emit python --output mypackage/_version.py
 ```
 
 ## When to Use Versionator
@@ -114,26 +114,26 @@ Complete working examples for each supported language and scenario:
 | Example | Description |
 |---------|-------------|
 | [Java](https://github.com/benjaminabbitt/versionator/tree/master/examples/java) | Generated source file |
-| [Kotlin](https://github.com/benjaminabbitt/versionator/tree/master/examples/kotlin) | `versionator emit kotlin` |
+| [Kotlin](https://github.com/benjaminabbitt/versionator/tree/master/examples/kotlin) | `versionator output emit kotlin` |
 
 ### .NET & Apple
 
 | Example | Description |
 |---------|-------------|
-| [C#](https://github.com/benjaminabbitt/versionator/tree/master/examples/csharp) | `versionator emit csharp` |
-| [Swift](https://github.com/benjaminabbitt/versionator/tree/master/examples/swift) | `versionator emit swift` |
+| [C#](https://github.com/benjaminabbitt/versionator/tree/master/examples/csharp) | `versionator output emit csharp` |
+| [Swift](https://github.com/benjaminabbitt/versionator/tree/master/examples/swift) | `versionator output emit swift` |
 
 ### Interpreted Languages
 
 | Example | Description |
 |---------|-------------|
-| [Python](https://github.com/benjaminabbitt/versionator/tree/master/examples/python) | `versionator emit python` |
+| [Python](https://github.com/benjaminabbitt/versionator/tree/master/examples/python) | `versionator output emit python` |
 | [Python (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/python-custom) | Custom template |
-| [JavaScript](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript) | `versionator emit js` |
+| [JavaScript](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript) | `versionator output emit js` |
 | [JavaScript (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/javascript-custom) | Custom template |
-| [TypeScript](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript) | `versionator emit ts` |
+| [TypeScript](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript) | `versionator output emit ts` |
 | [TypeScript (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/typescript-custom) | Custom template |
-| [Ruby](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby) | `versionator emit ruby` |
+| [Ruby](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby) | `versionator output emit ruby` |
 | [Ruby (Custom)](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby-custom) | Custom template |
 
 ### Containers

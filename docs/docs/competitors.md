@@ -22,7 +22,7 @@ That's it. Everything else—changelogs, release notes, package publishing, depl
 ```bash
 # Versionator plays well with others
 versionator bump patch increment
-versionator emit go --output internal/version/version.go
+versionator output emit go --output internal/version/version.go
 git-chglog > CHANGELOG.md
 goreleaser release
 ```

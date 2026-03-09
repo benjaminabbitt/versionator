@@ -14,15 +14,15 @@ Use `{{VariableName}}` syntax to insert template variables:
 
 ```bash
 # Simple template
-versionator version -t "{{MajorMinorPatch}}"
+versionator output version -t "{{MajorMinorPatch}}"
 # Output: 1.2.3
 
 # With prefix
-versionator version -t "{{Prefix}}{{MajorMinorPatch}}" --prefix
+versionator output version -t "{{Prefix}}{{MajorMinorPatch}}" --prefix
 # Output: v1.2.3
 
 # Custom format
-versionator version -t "Version: {{Major}}.{{Minor}}.{{Patch}}"
+versionator output version -t "Version: {{Major}}.{{Minor}}.{{Patch}}"
 # Output: Version: 1.2.3
 ```
 
@@ -45,7 +45,7 @@ See [Template Variables](./variables) for the complete list. Common variables in
 Pre-release and metadata are rendered from their own templates:
 
 ```bash
-versionator version \
+versionator output version \
   -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}" \
   --prerelease="alpha-{{CommitsSinceTag}}" \
   --metadata="{{BuildDateTimeCompact}}.{{ShortHash}}"
@@ -61,11 +61,11 @@ This makes it easy to build valid SemVer strings:
 
 ```bash
 # Pre-release only
-versionator version -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}" --prerelease="beta"
+versionator output version -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}" --prerelease="beta"
 # Output: 1.2.3-beta
 
 # No pre-release (variable is empty)
-versionator version -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+versionator output version -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
 # Output: 1.2.3
 ```
 
@@ -84,7 +84,7 @@ metadata:
 Then use without specifying the template:
 
 ```bash
-versionator version \
+versionator output version \
   -t "{{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}" \
   --prerelease \
   --metadata
@@ -103,14 +103,14 @@ custom:
 Use them in templates:
 
 ```bash
-versionator version -t "{{AppName}}-{{MajorMinorPatch}}"
+versionator output version -t "{{AppName}}-{{MajorMinorPatch}}"
 # Output: MyApp-1.2.3
 ```
 
 Or set inline:
 
 ```bash
-versionator version -t "{{AppName}}-{{MajorMinorPatch}}" --set AppName="MyApp"
+versionator output version -t "{{AppName}}-{{MajorMinorPatch}}" --set AppName="MyApp"
 ```
 
 ## Code Generation
@@ -119,13 +119,13 @@ Templates are also used by the `emit` command:
 
 ```bash
 # Use built-in Python template
-versionator emit python --output _version.py
+versionator output emit python --output _version.py
 
 # Dump template for customization
-versionator emit dump python > custom_python.tmpl
+versionator output emit dump python > custom_python.tmpl
 
 # Use custom template
-versionator emit --template-file custom_python.tmpl --output _version.py
+versionator output emit --template-file custom_python.tmpl --output _version.py
 ```
 
 ## View Current Values
@@ -133,7 +133,7 @@ versionator emit --template-file custom_python.tmpl --output _version.py
 See all variables with their current values:
 
 ```bash
-versionator vars
+versionator config vars
 ```
 
 ## Template Syntax Reference
@@ -151,7 +151,7 @@ Versionator uses Mustache syntax:
 
 ```bash
 # Include "dirty" suffix only if there are uncommitted changes
-versionator version -t "{{MajorMinorPatch}}{{#Dirty}}-dirty{{/Dirty}}"
+versionator output version -t "{{MajorMinorPatch}}{{#Dirty}}-dirty{{/Dirty}}"
 # Output with changes: 1.2.3-dirty
 # Output without: 1.2.3
 ```

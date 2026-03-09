@@ -8,7 +8,7 @@ sidebar_position: 12
 
 **Location:** [`examples/ruby/`](https://github.com/benjaminabbitt/versionator/tree/master/examples/ruby)
 
-Ruby generates a `version.rb` module using `versionator emit`:
+Ruby generates a `version.rb` module using `versionator output emit`:
 
 ```ruby title="examples/ruby/lib/mypackage.rb"
 require_relative "mypackage/version"
@@ -23,7 +23,7 @@ end
 
 ```makefile title="examples/ruby/Makefile (excerpt)"
 version-file:
-    versionator emit ruby --output lib/mypackage/version.rb
+    versionator output emit ruby --output lib/mypackage/version.rb
 
 run: version-file
     ruby -I lib -e "require 'mypackage'; Mypackage.hello"

@@ -19,7 +19,7 @@ tar xzf versionator-linux-amd64.tar.gz
 sudo mv versionator-linux-amd64 /usr/local/bin/versionator
 
 # Verify installation
-versionator version
+versionator output version
 ```
 
 For ARM64 (e.g., Raspberry Pi, AWS Graviton), use `versionator-linux-arm64.tar.gz`.
@@ -66,11 +66,11 @@ Multi-arch container images are available for linux/amd64 and linux/arm64:
 ```bash
 # Docker
 docker pull ghcr.io/benjaminabbitt/versionator:latest
-docker run --rm -v $(pwd):/workspace ghcr.io/benjaminabbitt/versionator version
+docker run --rm -v $(pwd):/workspace ghcr.io/benjaminabbitt/versionator output version
 
 # Podman
 podman pull ghcr.io/benjaminabbitt/versionator:latest
-podman run --rm -v $(pwd):/workspace:Z ghcr.io/benjaminabbitt/versionator version
+podman run --rm -v $(pwd):/workspace:Z ghcr.io/benjaminabbitt/versionator output version
 ```
 
 ### Available Tags
@@ -88,13 +88,13 @@ podman run --rm -v $(pwd):/workspace:Z ghcr.io/benjaminabbitt/versionator versio
 - name: Get version
   run: |
     docker run --rm -v ${{ github.workspace }}:/workspace \
-      ghcr.io/benjaminabbitt/versionator version
+      ghcr.io/benjaminabbitt/versionator output version
 
 # GitLab CI
 get_version:
   image: ghcr.io/benjaminabbitt/versionator:latest
   script:
-    - versionator version
+    - versionator output version
 ```
 
 ## Available Archives
@@ -141,7 +141,7 @@ go build -o versionator .
 After installation, verify versionator is working:
 
 ```bash
-versionator version
+versionator output version
 ```
 
 This should output `0.0.1` (or create a VERSION file if one doesn't exist).
