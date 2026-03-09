@@ -27,12 +27,15 @@ Conflict resolution:
   - Highest bump level wins (major \> minor \> patch)
   - +semver:skip takes precedence and prevents any bump
 
-Examples:
-  versionator bump                   # Auto-bump and amend last commit
-  versionator bump --dry-run         # Show what would happen
-  versionator bump --no-amend        # Bump without amending the commit
-  versionator bump --mode=semver     # Only use +semver: markers
-  versionator bump --mode=conventional  # Only use conventional commits
+**Examples:**
+
+```bash
+versionator bump                   # Auto-bump and amend last commit
+versionator bump --dry-run         # Show what would happen
+versionator bump --no-amend        # Bump without amending the commit
+versionator bump --mode=semver     # Only use +semver: markers
+versionator bump --mode=conventional  # Only use conventional commits
+```
 
 ## Usage
 

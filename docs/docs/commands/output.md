@@ -48,12 +48,15 @@ Variables exported:
   VERSION_PRERELEASE, VERSION_METADATA,
   GIT_SHA, GIT_SHA_SHORT, GIT_BRANCH, BUILD_NUMBER, DIRTY
 
-Examples:
-  versionator ci                    # Auto-detect CI and set vars
-  versionator ci --format=github    # Force GitHub Actions format
-  versionator ci --format=shell     # Print shell exports to stdout
-  versionator ci --output=vars.env  # Write to file
-  versionator ci --prefix=MYAPP_    # Variable prefix (MYAPP_VERSION, etc.)
+**Examples:**
+
+```bash
+versionator ci                    # Auto-detect CI and set vars
+versionator ci --format=github    # Force GitHub Actions format
+versionator ci --format=shell     # Print shell exports to stdout
+versionator ci --output=vars.env  # Write to file
+versionator ci --prefix=MYAPP_    # Variable prefix (MYAPP_VERSION, etc.)
+```
 
 ```bash
 versionator output ci [flags]

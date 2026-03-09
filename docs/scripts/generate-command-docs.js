@@ -39,6 +39,44 @@ function escapeMdx(str) {
     .replace(/\}\}/g, '\\}\\}');
 }
 
+// Format long description, converting Examples: sections to proper code blocks
+function formatLongDescription(text) {
+  if (!text) return '';
+
+  // Split on "Examples:" to separate description from examples
+  const parts = text.split(/\n\nExamples:\n/);
+  if (parts.length === 1) {
+    // No examples section, check if it has template vars
+    if (text.includes('{{')) {
+      return '```\n' + text + '\n```\n\n';
+    }
+    return escapeMdx(text) + '\n\n';
+  }
+
+  // Has examples section
+  let result = '';
+  const description = parts[0];
+  const examples = parts[1];
+
+  // Format description
+  if (description.includes('{{')) {
+    result += '```\n' + description + '\n```\n\n';
+  } else {
+    result += escapeMdx(description) + '\n\n';
+  }
+
+  // Format examples as code block
+  result += '**Examples:**\n\n```bash\n';
+  // Clean up the examples - remove leading spaces
+  const cleanedExamples = examples.split('\n')
+    .map(line => line.replace(/^  /, ''))
+    .join('\n')
+    .trim();
+  result += cleanedExamples + '\n```\n\n';
+
+  return result;
+}
+
 // Generate frontmatter for Docusaurus
 function frontmatter(title, description, sidebar_position) {
   let fm = `---
@@ -67,15 +105,7 @@ function generateCommandDoc(cmd, parentPath = []) {
   md += `${escapeMdx(cmd.short)}\n\n`;
 
   if (cmd.long) {
-    // Wrap long descriptions with template variables in a code block
-    // to prevent MDX from interpreting {{ }} as JSX
-    if (cmd.long.includes('{{')) {
-      md += '```\n';
-      md += `${cmd.long}\n`;
-      md += '```\n\n';
-    } else {
-      md += `${escapeMdx(cmd.long)}\n\n`;
-    }
+    md += formatLongDescription(cmd.long);
   }
 
   // Usage
@@ -110,14 +140,7 @@ function generateCommandDoc(cmd, parentPath = []) {
       md += `### ${sub.name}\n\n`;
       md += `${escapeMdx(sub.short)}\n\n`;
       if (sub.long && sub.long !== sub.short) {
-        // Wrap long descriptions with template variables in a code block
-        if (sub.long.includes('{{')) {
-          md += '```\n';
-          md += `${sub.long}\n`;
-          md += '```\n\n';
-        } else {
-          md += `${escapeMdx(sub.long)}\n\n`;
-        }
+        md += formatLongDescription(sub.long);
       }
       md += '```bash\n';
       md += `versionator ${fullPath} ${sub.name}`;

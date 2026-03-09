@@ -43,16 +43,19 @@ Manage custom key-value pairs in config
 Manage custom key-value pairs that can be used in templates.
 
 Custom variables are stored in .versionator.yaml and available as {{KeyName}} in templates.
+```
 
-Examples:
-  versionator custom set AppName "My Application"
-  versionator custom set BuildEnv production
-  versionator custom get AppName
-  versionator custom list
-  versionator custom delete AppName
+**Examples:**
+
+```bash
+versionator custom set AppName "My Application"
+versionator custom set BuildEnv production
+versionator custom get AppName
+versionator custom list
+versionator custom delete AppName
 
 Then use in templates:
-  versionator version -t "{{AppName}} v{{MajorMinorPatch}}"
+versionator version -t "{{AppName}} v{{MajorMinorPatch}}"
 ```
 
 ```bash
@@ -80,7 +83,6 @@ versionator config metadata
 
 Manage versioning mode (release or continuous-delivery)
 
-```
 Manage versioning mode configuration.
 
 Versioning modes control how pre-release and metadata are generated:
@@ -95,12 +97,14 @@ Versioning modes control how pre-release and metadata are generated:
     - Every build gets a unique version (e.g., 1.2.3-build-42+abc1234)
     - Templates use Mustache syntax with VCS variables
 
-Examples:
-  versionator mode                           # Show current mode
-  versionator mode release                   # Set to release mode
-  versionator mode cd                        # Set to continuous-delivery mode
-  versionator mode cd --prerelease "build-{{CommitsSinceTag}}"
-  versionator mode cd --metadata "{{ShortHash}}"
+**Examples:**
+
+```bash
+versionator mode                           # Show current mode
+versionator mode release                   # Set to release mode
+versionator mode cd                        # Set to continuous-delivery mode
+versionator mode cd --prerelease "build-{{CommitsSinceTag}}"
+versionator mode cd --metadata "{{ShortHash}}"
 ```
 
 ```bash
