@@ -1359,3 +1359,307 @@ func TestPackageLevel_GetGitShortHash_ReturnsHash(t *testing.T) {
 		t.Errorf("expected hash length 7, got %d", len(hash))
 	}
 }
+
+// =============================================================================
+// GITIGNORE FILTERING
+// Tests verifying that gitignored files are excluded from dirty file detection.
+// =============================================================================
+
+// TestGetDirtyFiles_GitignorePattern_ExcludesMatchingFiles validates that
+// files matching gitignore patterns are not reported as dirty.
+//
+// Why: Release and bump workflows should not be blocked by gitignored files
+// like build artifacts, IDE settings, or logs.
+//
+// What: Create a .gitignore pattern, add matching untracked files, verify
+// they are excluded from GetDirtyFiles().
+func TestGetDirtyFiles_GitignorePattern_ExcludesMatchingFiles(t *testing.T) {
+	// Precondition: A git repository with a .gitignore file
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Create .gitignore with patterns
+	gitignoreContent := []byte("*.log\nbuild/\n.env\n")
+	if err := os.WriteFile(filepath.Join(h.dir, ".gitignore"), gitignoreContent, 0644); err != nil {
+		t.Fatalf("failed to create .gitignore: %v", err)
+	}
+
+	// Commit the .gitignore
+	wt, _ := h.repo.Worktree()
+	if _, err := wt.Add(".gitignore"); err != nil {
+		t.Fatalf("failed to add .gitignore: %v", err)
+	}
+	if _, err := wt.Commit("add gitignore", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test Author",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	}); err != nil {
+		t.Fatalf("failed to commit .gitignore: %v", err)
+	}
+
+	// Create files that should be ignored
+	if err := os.WriteFile(filepath.Join(h.dir, "debug.log"), []byte("log"), 0644); err != nil {
+		t.Fatalf("failed to create debug.log: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(h.dir, "error.log"), []byte("error"), 0644); err != nil {
+		t.Fatalf("failed to create error.log: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(h.dir, "build"), 0755); err != nil {
+		t.Fatalf("failed to create build dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(h.dir, "build", "output.bin"), []byte("binary"), 0644); err != nil {
+		t.Fatalf("failed to create output.bin: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(h.dir, ".env"), []byte("SECRET=value"), 0644); err != nil {
+		t.Fatalf("failed to create .env: %v", err)
+	}
+
+	// Create a file that should NOT be ignored
+	if err := os.WriteFile(filepath.Join(h.dir, "src.go"), []byte("package main"), 0644); err != nil {
+		t.Fatalf("failed to create src.go: %v", err)
+	}
+
+	// Action: Get dirty files
+	vcs := NewGitVCSDefault()
+	files, err := vcs.GetDirtyFiles()
+
+	// Expected: Only src.go should be reported as dirty
+	if err != nil {
+		t.Fatalf("GetDirtyFiles() error: %v", err)
+	}
+
+	// Check that ignored files are not in the list
+	for _, f := range files {
+		if f == "debug.log" || f == "error.log" || f == "build/output.bin" || f == ".env" {
+			t.Errorf("gitignored file %q should not be in dirty files", f)
+		}
+	}
+
+	// Check that src.go is in the list
+	found := false
+	for _, f := range files {
+		if f == "src.go" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected src.go to be in dirty files")
+	}
+}
+
+// TestIsWorkingDirectoryClean_OnlyGitignored_ReturnsTrue validates that
+// the working directory is considered clean when only gitignored files exist.
+//
+// Why: A release workflow should succeed when only gitignored files like
+// build artifacts are present in the working directory.
+//
+// What: Create gitignored files, verify IsWorkingDirectoryClean() returns true.
+func TestIsWorkingDirectoryClean_OnlyGitignored_ReturnsTrue(t *testing.T) {
+	// Precondition: A git repository with a .gitignore file
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Create .gitignore with patterns
+	gitignoreContent := []byte("*.log\nbuild/\n")
+	if err := os.WriteFile(filepath.Join(h.dir, ".gitignore"), gitignoreContent, 0644); err != nil {
+		t.Fatalf("failed to create .gitignore: %v", err)
+	}
+
+	// Commit the .gitignore
+	wt, _ := h.repo.Worktree()
+	if _, err := wt.Add(".gitignore"); err != nil {
+		t.Fatalf("failed to add .gitignore: %v", err)
+	}
+	if _, err := wt.Commit("add gitignore", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test Author",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	}); err != nil {
+		t.Fatalf("failed to commit .gitignore: %v", err)
+	}
+
+	// Create ONLY files that should be ignored
+	if err := os.WriteFile(filepath.Join(h.dir, "debug.log"), []byte("log"), 0644); err != nil {
+		t.Fatalf("failed to create debug.log: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(h.dir, "build"), 0755); err != nil {
+		t.Fatalf("failed to create build dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(h.dir, "build", "output.bin"), []byte("binary"), 0644); err != nil {
+		t.Fatalf("failed to create output.bin: %v", err)
+	}
+
+	// Action: Check if working directory is clean
+	vcs := NewGitVCSDefault()
+	clean, err := vcs.IsWorkingDirectoryClean()
+
+	// Expected: Should be clean since only gitignored files exist
+	if err != nil {
+		t.Fatalf("IsWorkingDirectoryClean() error: %v", err)
+	}
+
+	if !clean {
+		t.Error("expected clean working directory when only gitignored files present")
+	}
+}
+
+// TestGetUncommittedChanges_WithGitignored_ExcludesFromCount validates that
+// gitignored files are not counted in uncommitted changes.
+//
+// Why: The dirty indicator in version strings should not reflect gitignored
+// files that are expected to exist locally.
+//
+// What: Create gitignored and non-gitignored files, verify count excludes
+// gitignored files.
+func TestGetUncommittedChanges_WithGitignored_ExcludesFromCount(t *testing.T) {
+	// Precondition: A git repository with a .gitignore file
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Create .gitignore with patterns
+	gitignoreContent := []byte("*.log\n")
+	if err := os.WriteFile(filepath.Join(h.dir, ".gitignore"), gitignoreContent, 0644); err != nil {
+		t.Fatalf("failed to create .gitignore: %v", err)
+	}
+
+	// Commit the .gitignore
+	wt, _ := h.repo.Worktree()
+	if _, err := wt.Add(".gitignore"); err != nil {
+		t.Fatalf("failed to add .gitignore: %v", err)
+	}
+	if _, err := wt.Commit("add gitignore", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test Author",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	}); err != nil {
+		t.Fatalf("failed to commit .gitignore: %v", err)
+	}
+
+	// Create gitignored files (should NOT be counted)
+	if err := os.WriteFile(filepath.Join(h.dir, "debug.log"), []byte("log"), 0644); err != nil {
+		t.Fatalf("failed to create debug.log: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(h.dir, "error.log"), []byte("error"), 0644); err != nil {
+		t.Fatalf("failed to create error.log: %v", err)
+	}
+
+	// Create non-gitignored files (should be counted)
+	if err := os.WriteFile(filepath.Join(h.dir, "file1.txt"), []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to create file1.txt: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(h.dir, "file2.txt"), []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to create file2.txt: %v", err)
+	}
+
+	// Action: Get uncommitted changes count
+	vcs := NewGitVCSDefault()
+	count, err := vcs.GetUncommittedChanges()
+
+	// Expected: Should return 2 (only the non-gitignored files)
+	if err != nil {
+		t.Fatalf("GetUncommittedChanges() error: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("expected 2 uncommitted changes (excluding gitignored), got %d", count)
+	}
+}
+
+// TestGetDirtyFiles_NestedGitignore_ExcludesNestedPatterns validates that
+// nested .gitignore files are respected.
+//
+// Why: Complex projects may have multiple .gitignore files at different levels
+// of the directory hierarchy.
+//
+// What: Create nested .gitignore files, verify patterns at all levels work.
+func TestGetDirtyFiles_NestedGitignore_ExcludesNestedPatterns(t *testing.T) {
+	// Precondition: A git repository with nested .gitignore files
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Create root .gitignore
+	rootGitignore := []byte("*.log\n")
+	if err := os.WriteFile(filepath.Join(h.dir, ".gitignore"), rootGitignore, 0644); err != nil {
+		t.Fatalf("failed to create root .gitignore: %v", err)
+	}
+
+	// Create subdirectory with its own .gitignore
+	subdir := filepath.Join(h.dir, "subdir")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatalf("failed to create subdir: %v", err)
+	}
+	subGitignore := []byte("*.tmp\n")
+	if err := os.WriteFile(filepath.Join(subdir, ".gitignore"), subGitignore, 0644); err != nil {
+		t.Fatalf("failed to create subdir .gitignore: %v", err)
+	}
+
+	// Commit both .gitignore files
+	wt, _ := h.repo.Worktree()
+	if _, err := wt.Add(".gitignore"); err != nil {
+		t.Fatalf("failed to add .gitignore: %v", err)
+	}
+	if _, err := wt.Add("subdir/.gitignore"); err != nil {
+		t.Fatalf("failed to add subdir/.gitignore: %v", err)
+	}
+	if _, err := wt.Commit("add gitignore files", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test Author",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	}); err != nil {
+		t.Fatalf("failed to commit gitignore files: %v", err)
+	}
+
+	// Create files that should be ignored by root .gitignore
+	if err := os.WriteFile(filepath.Join(h.dir, "app.log"), []byte("log"), 0644); err != nil {
+		t.Fatalf("failed to create app.log: %v", err)
+	}
+
+	// Create files that should be ignored by nested .gitignore
+	if err := os.WriteFile(filepath.Join(subdir, "cache.tmp"), []byte("cache"), 0644); err != nil {
+		t.Fatalf("failed to create cache.tmp: %v", err)
+	}
+
+	// Create a file that should NOT be ignored
+	if err := os.WriteFile(filepath.Join(subdir, "code.go"), []byte("package sub"), 0644); err != nil {
+		t.Fatalf("failed to create code.go: %v", err)
+	}
+
+	// Action: Get dirty files
+	vcs := NewGitVCSDefault()
+	files, err := vcs.GetDirtyFiles()
+
+	// Expected: Only subdir/code.go should be reported
+	if err != nil {
+		t.Fatalf("GetDirtyFiles() error: %v", err)
+	}
+
+	for _, f := range files {
+		if f == "app.log" || f == "subdir/cache.tmp" {
+			t.Errorf("gitignored file %q should not be in dirty files", f)
+		}
+	}
+
+	found := false
+	for _, f := range files {
+		if f == "subdir/code.go" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected subdir/code.go to be in dirty files")
+	}
+}
