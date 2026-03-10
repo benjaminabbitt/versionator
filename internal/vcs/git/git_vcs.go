@@ -7,10 +7,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/benjaminabbitt/versionator/internal/plugin"
@@ -112,23 +115,14 @@ func (g *GitVersionControlSystem) GetRepositoryRoot() (string, error) {
 }
 
 // IsWorkingDirectoryClean checks if there are no uncommitted changes
+// Files matching gitignore patterns are not considered when checking for cleanliness
 func (g *GitVersionControlSystem) IsWorkingDirectoryClean() (bool, error) {
-	repo, err := g.openRepository()
+	// Reuse GetDirtyFiles which already handles gitignore filtering
+	files, err := g.GetDirtyFiles()
 	if err != nil {
 		return false, err
 	}
-
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return false, fmt.Errorf("failed to get working tree: %w", err)
-	}
-
-	status, err := worktree.Status()
-	if err != nil {
-		return false, fmt.Errorf("failed to get git status: %w", err)
-	}
-
-	return status.IsClean(), nil
+	return len(files) == 0, nil
 }
 
 // GetVCSIdentifier returns a short hash of the current commit
@@ -331,23 +325,14 @@ func (g *GitVersionControlSystem) GetCommitsSinceTag() (int, error) {
 }
 
 // GetUncommittedChanges returns the count of uncommitted changes (staged + unstaged + untracked)
+// Files matching gitignore patterns are excluded from the count
 func (g *GitVersionControlSystem) GetUncommittedChanges() (int, error) {
-	repo, err := g.openRepository()
+	// Reuse GetDirtyFiles which already handles gitignore filtering
+	files, err := g.GetDirtyFiles()
 	if err != nil {
 		return 0, err
 	}
-
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get working tree: %w", err)
-	}
-
-	status, err := worktree.Status()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get git status: %w", err)
-	}
-
-	return len(status), nil
+	return len(files), nil
 }
 
 // GetLastTag returns the most recent semver tag
@@ -457,6 +442,7 @@ func (g *GitVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) 
 }
 
 // GetDirtyFiles returns the list of files with uncommitted changes
+// Files matching gitignore patterns are excluded from the result
 func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
 	repo, err := g.openRepository()
 	if err != nil {
@@ -473,8 +459,15 @@ func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
 		return nil, fmt.Errorf("failed to get git status: %w", err)
 	}
 
+	// Get gitignore matcher for filtering
+	matcher, _ := g.getGitignoreMatcher()
+
 	var files []string
 	for file := range status {
+		// Skip files that match gitignore patterns
+		if g.isFileIgnored(matcher, file) {
+			continue
+		}
 		files = append(files, file)
 	}
 	return files, nil
@@ -583,6 +576,46 @@ func (g *GitVersionControlSystem) GetHooksPath() (string, error) {
 }
 
 // Helper methods
+
+// getGitignoreMatcher creates a gitignore matcher from repository patterns
+// It reads patterns from .gitignore files and .git/info/exclude
+func (g *GitVersionControlSystem) getGitignoreMatcher() (gitignore.Matcher, error) {
+	root, err := g.GetRepositoryRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a filesystem interface from the repository root
+	fs := osfs.New(root)
+
+	// Read gitignore patterns from repository
+	patterns, err := gitignore.ReadPatterns(fs, nil)
+	if err != nil {
+		// If we can't read patterns, return nil matcher (no filtering)
+		return nil, nil
+	}
+
+	if len(patterns) == 0 {
+		return nil, nil
+	}
+
+	return gitignore.NewMatcher(patterns), nil
+}
+
+// isFileIgnored checks if a file path should be ignored according to gitignore rules
+func (g *GitVersionControlSystem) isFileIgnored(matcher gitignore.Matcher, filePath string) bool {
+	if matcher == nil {
+		return false
+	}
+
+	// Split path into components for the matcher
+	pathComponents := strings.Split(filePath, string(filepath.Separator))
+
+	// Check if the file matches gitignore patterns
+	// We assume it's not a directory since we're checking file status
+	return matcher.Match(pathComponents, false)
+}
+
 func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 	currentPath := startPath
 
