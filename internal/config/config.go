@@ -19,6 +19,7 @@ type Config struct {
 	BranchVersioning BranchVersioningConfig `yaml:"branchVersioning"`
 	Logging          LoggingConfig          `yaml:"logging"`
 	Custom           map[string]string      `yaml:"custom,omitempty"`
+	Updates          []UpdateConfig         `yaml:"updates,omitempty"`
 }
 
 // BranchVersioningConfig holds branch-aware versioning configuration
@@ -94,6 +95,19 @@ type GitConfig struct {
 // LoggingConfig holds logging-specific configuration
 type LoggingConfig struct {
 	Output string `yaml:"output"` // console, json, development
+}
+
+// UpdateConfig holds configuration for a single structured file update
+// Updates are applied during release to keep manifest files in sync with VERSION
+type UpdateConfig struct {
+	// File is the path to the file to update (relative to repo root)
+	File string `yaml:"file"`
+	// Path is the dasel selector for the value to update (e.g., "package.version")
+	Path string `yaml:"path"`
+	// Template is a Mustache template for the new value (e.g., "{{MajorMinorPatch}}")
+	Template string `yaml:"template"`
+	// Format explicitly sets the file format (json, yaml, toml). Auto-detected from extension if empty.
+	Format string `yaml:"format,omitempty"`
 }
 
 // ReadConfig reads the configuration from .versionator.yaml file
@@ -174,6 +188,26 @@ func (c *Config) Validate() error {
 	}
 	if c.BranchVersioning.Mode != "" && c.BranchVersioning.Mode != "replace" && c.BranchVersioning.Mode != "append" {
 		return fmt.Errorf("branch versioning mode must be 'replace' or 'append', got '%s'", c.BranchVersioning.Mode)
+	}
+	for i, update := range c.Updates {
+		if update.File == "" {
+			return fmt.Errorf("updates[%d]: file is required", i)
+		}
+		if update.Path == "" {
+			return fmt.Errorf("updates[%d]: path is required", i)
+		}
+		if update.Template == "" {
+			return fmt.Errorf("updates[%d]: template is required", i)
+		}
+		if err := ValidateTemplate(update.Template); err != nil {
+			return fmt.Errorf("updates[%d] template: %w", i, err)
+		}
+		if update.Format != "" {
+			validFormats := map[string]bool{"json": true, "yaml": true, "toml": true}
+			if !validFormats[update.Format] {
+				return fmt.Errorf("updates[%d]: format must be 'json', 'yaml', or 'toml', got '%s'", i, update.Format)
+			}
+		}
 	}
 	return nil
 }
