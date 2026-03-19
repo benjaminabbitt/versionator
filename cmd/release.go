@@ -4,10 +4,13 @@ import (
 	"fmt"
 
 	"github.com/benjaminabbitt/versionator/internal/config"
+	"github.com/benjaminabbitt/versionator/internal/emit"
+	"github.com/benjaminabbitt/versionator/internal/update"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/version"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // releaseResult holds the results of a release operation
@@ -99,34 +102,59 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 		return nil, fmt.Errorf("not in a version control repository")
 	}
 
+	// Read config early for file updates
+	cfg, err := config.ReadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error reading config: %w", err)
+	}
+
+	// Build set of allowed dirty files: VERSION + .versionator.yaml + files from updates config
+	allowedDirty := map[string]bool{"VERSION": true, ".versionator.yaml": true}
+	for _, u := range cfg.Updates {
+		allowedDirty[u.File] = true
+	}
+
 	// Check if working directory is clean
 	clean, err := vcsImpl.IsWorkingDirectoryClean()
 	if err != nil {
 		return nil, fmt.Errorf("error checking %s status: %w", vcsImpl.Name(), err)
 	}
 
+	var versionDirty bool
 	if !clean {
-		// Check if only VERSION file is dirty
+		// Check what files are dirty
 		dirtyFiles, err := vcsImpl.GetDirtyFiles()
 		if err != nil {
 			return nil, fmt.Errorf("error getting dirty files: %w", err)
 		}
 
-		// Only auto-commit if exactly VERSION file is dirty
-		if len(dirtyFiles) == 1 && dirtyFiles[0] == "VERSION" {
-			// Load version to get the version string for commit message
-			vd, err := version.Load()
-			if err != nil {
-				return nil, fmt.Errorf("error loading version: %w", err)
-			}
+		// If no updates configured, use original behavior: only allow VERSION dirty
+		if len(cfg.Updates) == 0 {
+			if len(dirtyFiles) == 1 && dirtyFiles[0] == "VERSION" {
+				// Load version to get the version string for commit message
+				vd, err := version.Load()
+				if err != nil {
+					return nil, fmt.Errorf("error loading version: %w", err)
+				}
 
-			commitMsg := fmt.Sprintf("Release %s", vd.String())
-			if err := vcsImpl.CommitFiles([]string{"VERSION"}, commitMsg); err != nil {
-				return nil, fmt.Errorf("error committing VERSION file: %w", err)
+				commitMsg := fmt.Sprintf("Release %s", vd.String())
+				if err := vcsImpl.CommitFiles([]string{"VERSION"}, commitMsg); err != nil {
+					return nil, fmt.Errorf("error committing VERSION file: %w", err)
+				}
+				cmd.Printf("Committed VERSION file: %s\n", commitMsg)
+			} else {
+				return nil, fmt.Errorf("working directory is not clean. Please commit or stash your changes first (dirty files: %v)", dirtyFiles)
 			}
-			cmd.Printf("Committed VERSION file: %s\n", commitMsg)
 		} else {
-			return nil, fmt.Errorf("working directory is not clean. Please commit or stash your changes first (dirty files: %v)", dirtyFiles)
+			// With updates configured, allow VERSION + update target files to be dirty
+			for _, f := range dirtyFiles {
+				if !allowedDirty[f] {
+					return nil, fmt.Errorf("working directory is not clean. Please commit or stash your changes first (dirty files: %v)", dirtyFiles)
+				}
+				if f == "VERSION" {
+					versionDirty = true
+				}
+			}
 		}
 	}
 
@@ -167,6 +195,37 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 		message = fmt.Sprintf("Release %s", vd.String())
 	}
 
+	// Apply file updates if configured
+	var updatedFiles []string
+	if len(cfg.Updates) > 0 {
+		logger, _ := zap.NewProduction()
+		updater := update.NewUpdater(cfg.Updates, update.NewDaselFileParser(), logger)
+
+		// Build template data for rendering update templates
+		templateData := emit.BuildCompleteTemplateData(vd, cfg.PreRelease.Template, cfg.Metadata.Template)
+
+		if err := updater.UpdateFiles(templateData); err != nil {
+			return nil, fmt.Errorf("error updating files: %w", err)
+		}
+		updatedFiles = updater.GetFilesToCommit()
+		cmd.Printf("Updated %d file(s)\n", len(updatedFiles))
+	}
+
+	// Commit VERSION + updated files if there are changes to commit
+	filesToCommit := make([]string, 0)
+	if versionDirty {
+		filesToCommit = append(filesToCommit, "VERSION")
+	}
+	filesToCommit = append(filesToCommit, updatedFiles...)
+
+	if len(filesToCommit) > 0 {
+		commitMsg := fmt.Sprintf("Release %s", vd.String())
+		if err := vcsImpl.CommitFiles(filesToCommit, commitMsg); err != nil {
+			return nil, fmt.Errorf("error committing release files: %w", err)
+		}
+		cmd.Printf("Committed: %v\n", filesToCommit)
+	}
+
 	// Create the tag
 	if err := vcsImpl.CreateTag(tagName, message); err != nil {
 		return nil, fmt.Errorf("error creating tag: %w", err)
@@ -177,12 +236,6 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 	result := &releaseResult{
 		tagName: tagName,
 		vcsImpl: vcsImpl,
-	}
-
-	// Read config for release branch settings
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error reading config: %w", err)
 	}
 
 	// Check command-line flag for branch creation (overrides config)
