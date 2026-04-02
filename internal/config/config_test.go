@@ -1316,6 +1316,159 @@ func TestValidateTemplate_InvalidTemplate(t *testing.T) {
 	}
 }
 
+// TestConfig_Validate_UpdatesRequiredFields verifies that updates entries
+// must have file, path, and template fields.
+//
+// Why: Updates without these fields would fail during file update operations.
+//
+// What: Missing file, path, or template should each produce validation errors.
+func TestConfig_Validate_UpdatesRequiredFields(t *testing.T) {
+	tests := []struct {
+		name      string
+		update    UpdateConfig
+		expectErr string
+	}{
+		{
+			name:      "missing file",
+			update:    UpdateConfig{Path: "version", Template: "{{Major}}"},
+			expectErr: "file is required",
+		},
+		{
+			name:      "missing path",
+			update:    UpdateConfig{File: "package.json", Template: "{{Major}}"},
+			expectErr: "path is required",
+		},
+		{
+			name:      "missing template",
+			update:    UpdateConfig{File: "package.json", Path: "version"},
+			expectErr: "template is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &Config{
+				Updates: []UpdateConfig{tt.update},
+			}
+
+			err := config.Validate()
+
+			if err == nil {
+				t.Errorf("Expected error for %s, got nil", tt.name)
+			}
+			if err != nil && !contains(err.Error(), tt.expectErr) {
+				t.Errorf("Expected error containing %q, got: %v", tt.expectErr, err)
+			}
+		})
+	}
+}
+
+// TestConfig_Validate_UpdatesInvalidTemplate verifies that updates with
+// invalid templates are rejected.
+//
+// Why: Invalid templates in updates would fail when processing file updates.
+//
+// What: An update with unclosed mustache tag should fail validation.
+func TestConfig_Validate_UpdatesInvalidTemplate(t *testing.T) {
+	config := &Config{
+		Updates: []UpdateConfig{
+			{
+				File:     "package.json",
+				Path:     "version",
+				Template: "{{unclosed",
+			},
+		},
+	}
+
+	err := config.Validate()
+
+	if err == nil {
+		t.Error("Expected error for invalid update template, got nil")
+	}
+	if err != nil && !contains(err.Error(), "updates[0] template") {
+		t.Errorf("Expected error about updates[0] template, got: %v", err)
+	}
+}
+
+// TestConfig_Validate_UpdatesInvalidFormat verifies that updates with
+// invalid format values are rejected.
+//
+// Why: Only json, yaml, and toml formats are supported. Invalid formats
+// would cause file parsing failures.
+//
+// What: Invalid format value should fail; valid formats should pass.
+func TestConfig_Validate_UpdatesInvalidFormat(t *testing.T) {
+	tests := []struct {
+		name      string
+		format    string
+		expectErr bool
+	}{
+		{name: "empty format is valid", format: "", expectErr: false},
+		{name: "json format is valid", format: "json", expectErr: false},
+		{name: "yaml format is valid", format: "yaml", expectErr: false},
+		{name: "toml format is valid", format: "toml", expectErr: false},
+		{name: "xml format is invalid", format: "xml", expectErr: true},
+		{name: "ini format is invalid", format: "ini", expectErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &Config{
+				Updates: []UpdateConfig{
+					{
+						File:     "config.json",
+						Path:     "version",
+						Template: "{{Major}}.{{Minor}}.{{Patch}}",
+						Format:   tt.format,
+					},
+				},
+			}
+
+			err := config.Validate()
+
+			if tt.expectErr && err == nil {
+				t.Errorf("Expected error for format %q, got nil", tt.format)
+			}
+			if !tt.expectErr && err != nil {
+				t.Errorf("Unexpected error for format %q: %v", tt.format, err)
+			}
+			if tt.expectErr && err != nil && !contains(err.Error(), "format must be") {
+				t.Errorf("Expected error about format, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestConfig_Validate_ValidUpdates verifies that well-formed updates pass validation.
+//
+// Why: Positive test - ensure valid updates are not incorrectly rejected.
+//
+// What: Updates with all required fields and valid values should pass.
+func TestConfig_Validate_ValidUpdates(t *testing.T) {
+	config := &Config{
+		Updates: []UpdateConfig{
+			{
+				File:     "package.json",
+				Path:     "version",
+				Template: "{{Major}}.{{Minor}}.{{Patch}}",
+				Format:   "json",
+			},
+			{
+				File:     "pyproject.toml",
+				Path:     "tool.poetry.version",
+				Template: "{{Major}}.{{Minor}}.{{Patch}}",
+				Format:   "toml",
+			},
+		},
+	}
+
+	err := config.Validate()
+
+	if err != nil {
+		t.Errorf("Expected no error for valid updates, got: %v", err)
+	}
+}
+
 // =============================================================================
 // MINUTIAE
 // Tests for obscure scenarios and internal helper functions.

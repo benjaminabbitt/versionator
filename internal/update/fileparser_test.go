@@ -362,3 +362,102 @@ appVersion: 1.0.0
 	assert.Equal(t, "2.0.0", readBackMap["appVersion"])
 	assert.Equal(t, "myapp", readBackMap["name"])
 }
+
+// =============================================================================
+// READWITHFORMAT EDGE CASES
+// =============================================================================
+
+func TestDaselFileParser_ReadWithFormat_FileNotFound_ReturnsError(t *testing.T) {
+	parser := NewDaselFileParser()
+	_, _, err := parser.ReadWithFormat("/nonexistent/file.txt", "json")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), ErrFileNotFound)
+}
+
+func TestDaselFileParser_ReadWithFormat_InvalidFormat_ReturnsError(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "data.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte(`{"version": "1.0.0"}`), 0644))
+
+	parser := NewDaselFileParser()
+	_, _, err := parser.ReadWithFormat(filePath, "xml")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), ErrUnsupportedFormat)
+}
+
+func TestDaselFileParser_ReadWithFormat_InvalidContent_ReturnsError(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "data.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte(`not valid json`), 0644))
+
+	parser := NewDaselFileParser()
+	_, _, err := parser.ReadWithFormat(filePath, "json")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), ErrFileParseFailed)
+}
+
+func TestDaselFileParser_ReadWithFormat_YAML_ExplicitFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "data.txt")
+	content := `version: 1.0.0`
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+
+	parser := NewDaselFileParser()
+	data, format, err := parser.ReadWithFormat(filePath, "yaml")
+
+	require.NoError(t, err)
+	assert.Equal(t, FormatYAML, format)
+	dataMap := data.(map[string]any)
+	assert.Equal(t, "1.0.0", dataMap["version"])
+}
+
+func TestDaselFileParser_ReadWithFormat_YML_ExplicitFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "data.txt")
+	content := `version: 2.0.0`
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+
+	parser := NewDaselFileParser()
+	data, format, err := parser.ReadWithFormat(filePath, "yml")
+
+	require.NoError(t, err)
+	assert.Equal(t, FormatYAML, format)
+	dataMap := data.(map[string]any)
+	assert.Equal(t, "2.0.0", dataMap["version"])
+}
+
+func TestDaselFileParser_ReadWithFormat_TOML_ExplicitFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "data.txt")
+	content := `version = "3.0.0"`
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+
+	parser := NewDaselFileParser()
+	data, format, err := parser.ReadWithFormat(filePath, "toml")
+
+	require.NoError(t, err)
+	assert.Equal(t, FormatTOML, format)
+	dataMap := data.(map[string]any)
+	assert.Equal(t, "3.0.0", dataMap["version"])
+}
+
+// =============================================================================
+// WRITE EDGE CASES
+// =============================================================================
+
+func TestDaselFileParser_Write_UnsupportedFormat_ReturnsError(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "output.txt")
+
+	parser := NewDaselFileParser()
+	data := map[string]any{"version": "1.0.0"}
+
+	err := parser.Write(filePath, data, Format("invalid"))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), ErrUnsupportedFormat)
+}
+
