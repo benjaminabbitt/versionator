@@ -1,0 +1,21 @@
+{
+    "id": "versionator",
+    "version": "1.0.0",
+    "name": "Versionator",
+    "documentationURL": "https://github.com/benjaminabbitt/versionator",
+    "description": "Installs versionator - a semantic versioning tool for CI/CD pipelines",
+    "options": {
+        "version": {
+            "type": "string",
+            "proposals": ["latest", "0.1.0"],
+            "default": "latest",
+            "description": "Version of versionator to install (e.g., '0.1.0' or 'latest')"
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ],
+    "containerEnv": {
+        "PATH": "/usr/local/bin:${PATH}"
+    }
+}

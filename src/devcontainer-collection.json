@@ -1,0 +1,15 @@
+{
+    "sourceInformation": {
+        "source": "github",
+        "owner": "benjaminabbitt",
+        "repo": "versionator"
+    },
+    "features": [
+        {
+            "id": "versionator",
+            "name": "Versionator",
+            "version": "1.0.0",
+            "description": "Installs versionator - a semantic versioning tool for CI/CD pipelines"
+        }
+    ]
+}

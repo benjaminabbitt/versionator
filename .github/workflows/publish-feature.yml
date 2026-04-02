@@ -1,0 +1,59 @@
+name: Publish Devcontainer Feature
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (without v prefix)'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+            VERSION=${TAG#v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing devcontainer feature version: $VERSION"
+
+      - name: Update feature version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cd src/versionator
+          jq --arg v "$VERSION" '.version = $v' devcontainer-feature.json > tmp.json
+          mv tmp.json devcontainer-feature.json
+          cat devcontainer-feature.json
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish devcontainer feature
+        uses: devcontainers/action@v1
+        with:
+          publish-features: true
+          base-path-to-features: src
+          generate-docs: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
