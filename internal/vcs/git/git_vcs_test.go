@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -1661,5 +1662,189 @@ func TestGetDirtyFiles_NestedGitignore_ExcludesNestedPatterns(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected subdir/code.go to be in dirty files")
+	}
+}
+
+// =============================================================================
+// STANDALONE FUNCTION TESTS
+// Tests for package-level convenience functions that wrap VCS interface.
+// Note: These functions use the global VCS registry which caches state.
+// We test them via fresh VCS instances to verify the delegation logic.
+// =============================================================================
+
+// TestPackageLevel_IsWorkingDirectoryClean_CleanRepo validates the standalone
+// IsWorkingDirectoryClean function delegates correctly to the VCS interface.
+//
+// Why: Package-level convenience function for release workflows.
+// What: Verifies the function correctly calls the underlying VCS method.
+func TestPackageLevel_IsWorkingDirectoryClean_CleanRepo(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Re-register a fresh VCS to clear any cached state
+	freshVCS := NewGitVCSDefault()
+	vcs.RegisterVCS(freshVCS)
+
+	// Action: Check cleanliness using package-level function
+	clean, err := IsWorkingDirectoryClean()
+
+	// Expected: Should be clean
+	if err != nil {
+		t.Fatalf("IsWorkingDirectoryClean() error: %v", err)
+	}
+	if !clean {
+		t.Error("expected clean working directory after commit")
+	}
+}
+
+// TestPackageLevel_IsWorkingDirectoryClean_DirtyRepo validates detection of
+// uncommitted changes via the package-level function.
+func TestPackageLevel_IsWorkingDirectoryClean_DirtyRepo(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Create uncommitted changes
+	if err := os.WriteFile(filepath.Join(h.dir, "dirty.txt"), []byte("uncommitted"), 0644); err != nil {
+		t.Fatalf("failed to create dirty file: %v", err)
+	}
+
+	// Re-register a fresh VCS
+	freshVCS := NewGitVCSDefault()
+	vcs.RegisterVCS(freshVCS)
+
+	// Action: Check cleanliness
+	clean, err := IsWorkingDirectoryClean()
+
+	// Expected: Should not be clean
+	if err != nil {
+		t.Fatalf("IsWorkingDirectoryClean() error: %v", err)
+	}
+	if clean {
+		t.Error("expected dirty working directory with uncommitted file")
+	}
+}
+
+// TestPackageLevel_CreateTag_CreatesTag validates the standalone CreateTag
+// function correctly delegates to the VCS interface.
+func TestPackageLevel_CreateTag_CreatesTag(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Re-register a fresh VCS
+	freshVCS := NewGitVCSDefault()
+	vcs.RegisterVCS(freshVCS)
+
+	// Action: Create tag using package-level function
+	err := CreateTag("v1.0.0", "Release 1.0.0")
+
+	// Expected: Tag should be created without error
+	if err != nil {
+		t.Fatalf("CreateTag() error: %v", err)
+	}
+
+	// Verify tag exists
+	exists, err := freshVCS.TagExists("v1.0.0")
+	if err != nil {
+		t.Fatalf("TagExists() error: %v", err)
+	}
+	if !exists {
+		t.Error("expected tag v1.0.0 to exist after CreateTag")
+	}
+}
+
+// TestPackageLevel_TagExists_ExistingTag validates the standalone TagExists
+// function correctly delegates to the VCS interface.
+func TestPackageLevel_TagExists_ExistingTag(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+	h.CreateTag("v2.0.0", "Release 2.0.0")
+
+	// Re-register a fresh VCS
+	freshVCS := NewGitVCSDefault()
+	vcs.RegisterVCS(freshVCS)
+
+	// Action: Check if tag exists using package-level function
+	exists, err := TagExists("v2.0.0")
+
+	// Expected: Should exist
+	if err != nil {
+		t.Fatalf("TagExists() error: %v", err)
+	}
+	if !exists {
+		t.Error("expected TagExists() to return true for existing tag")
+	}
+}
+
+// TestPackageLevel_TagExists_NonExistingTag validates TagExists correctly
+// reports non-existing tags via the package-level function.
+func TestPackageLevel_TagExists_NonExistingTag(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Re-register a fresh VCS
+	freshVCS := NewGitVCSDefault()
+	vcs.RegisterVCS(freshVCS)
+
+	// Action: Check for non-existing tag using package-level function
+	exists, err := TagExists("v999.0.0")
+
+	// Expected: Should not exist
+	if err != nil {
+		t.Fatalf("TagExists() error: %v", err)
+	}
+	if exists {
+		t.Error("expected TagExists() to return false for non-existing tag")
+	}
+}
+
+// =============================================================================
+// HELPER FUNCTION TESTS
+// =============================================================================
+
+// TestExtractCommitInfo_ExtractsAllFields validates that ExtractCommitInfo
+// correctly extracts all relevant fields from a commit object.
+//
+// Why: ExtractCommitInfo is used to provide commit information for testing
+// and display. All fields must be correctly extracted.
+//
+// What: Create a commit with known values and verify all fields are extracted.
+func TestExtractCommitInfo_ExtractsAllFields(t *testing.T) {
+	// Precondition: A commit object with known values
+	when := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
+	hash := plumbing.NewHash("abc123def456789012345678901234567890abcd")
+
+	commit := &object.Commit{
+		Hash:    hash,
+		Message: "feat: add new feature\n\nDetailed description here.",
+		Author: object.Signature{
+			Name:  "Test Author",
+			Email: "test@example.com",
+			When:  when,
+		},
+	}
+
+	// Action: Extract commit info
+	info := ExtractCommitInfo(commit)
+
+	// Expected: All fields match the commit
+	if info.Hash != hash {
+		t.Errorf("Hash mismatch: expected %v, got %v", hash, info.Hash)
+	}
+	if info.AuthorName != "Test Author" {
+		t.Errorf("AuthorName mismatch: expected 'Test Author', got %q", info.AuthorName)
+	}
+	if info.AuthorEmail != "test@example.com" {
+		t.Errorf("AuthorEmail mismatch: expected 'test@example.com', got %q", info.AuthorEmail)
+	}
+	if !info.AuthorTime.Equal(when) {
+		t.Errorf("AuthorTime mismatch: expected %v, got %v", when, info.AuthorTime)
+	}
+	if info.Message != "feat: add new feature\n\nDetailed description here." {
+		t.Errorf("Message mismatch: expected multiline message, got %q", info.Message)
 	}
 }
