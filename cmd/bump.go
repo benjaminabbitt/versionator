@@ -44,7 +44,7 @@ Examples:
 }
 
 // runLevelIncrement handles incrementing a version level
-func runLevelIncrement(level version.VersionLevel, titleName string) error {
+func runLevelIncrement(cmd *cobra.Command, level version.VersionLevel, titleName string) error {
 	if err := version.Increment(level); err != nil {
 		return err
 	}
@@ -52,12 +52,12 @@ func runLevelIncrement(level version.VersionLevel, titleName string) error {
 	if err != nil {
 		return fmt.Errorf("error reading updated version: %w", err)
 	}
-	fmt.Printf("%s version incremented to: %s\n", titleName, ver)
-	return nil
+	fmt.Fprintf(cmd.OutOrStdout(), "%s version incremented to: %s\n", titleName, ver)
+	return runConfiguredUpdates(cmd)
 }
 
 // runLevelDecrement handles decrementing a version level
-func runLevelDecrement(level version.VersionLevel, titleName string) error {
+func runLevelDecrement(cmd *cobra.Command, level version.VersionLevel, titleName string) error {
 	if err := version.Decrement(level); err != nil {
 		return err
 	}
@@ -65,8 +65,8 @@ func runLevelDecrement(level version.VersionLevel, titleName string) error {
 	if err != nil {
 		return fmt.Errorf("error reading updated version: %w", err)
 	}
-	fmt.Printf("%s version decremented to: %s\n", titleName, ver)
-	return nil
+	fmt.Fprintf(cmd.OutOrStdout(), "%s version decremented to: %s\n", titleName, ver)
+	return runConfiguredUpdates(cmd)
 }
 
 // makeLevelCmd creates a parent command for a version level with increment/decrement subcommands
@@ -78,7 +78,7 @@ func makeLevelCmd(level version.VersionLevel, name string) *cobra.Command {
 		Short: fmt.Sprintf("Increment %s version (default), or use subcommands", name),
 		Long:  fmt.Sprintf("Increment the %s version. Use 'decrement' subcommand to decrement instead.", name),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runLevelIncrement(level, titleName)
+			return runLevelIncrement(c, level, titleName)
 		},
 	}
 
@@ -88,7 +88,7 @@ func makeLevelCmd(level version.VersionLevel, name string) *cobra.Command {
 		Short:   fmt.Sprintf("Increment %s version", name),
 		Long:    fmt.Sprintf("Increment the %s version", name),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runLevelIncrement(level, titleName)
+			return runLevelIncrement(c, level, titleName)
 		},
 	})
 
@@ -98,7 +98,7 @@ func makeLevelCmd(level version.VersionLevel, name string) *cobra.Command {
 		Short:   fmt.Sprintf("Decrement %s version", name),
 		Long:    fmt.Sprintf("Decrement the %s version", name),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runLevelDecrement(level, titleName)
+			return runLevelDecrement(c, level, titleName)
 		},
 	})
 
@@ -191,6 +191,10 @@ func runBump(cmd *cobra.Command, args []string) error {
 	cmd.Printf("Version bumped from %s to %s (%s)\n",
 		oldVersion, newVersion, analysis.BumpLevel.String())
 	cmd.Printf("Triggering commit: %s\n", truncateCommit(analysis.TriggeringCommit))
+
+	if err := runConfiguredUpdates(cmd); err != nil {
+		return err
+	}
 
 	// Amend the last commit by default (unless --no-amend is specified)
 	noAmend, _ := cmd.Flags().GetBool("no-amend")

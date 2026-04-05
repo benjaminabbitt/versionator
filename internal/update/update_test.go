@@ -3,6 +3,7 @@ package update
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/benjaminabbitt/versionator/internal/config"
@@ -122,6 +123,105 @@ version = "1.0.0"
 	pkg := readBack.(map[string]any)["package"].(map[string]any)
 	assert.Equal(t, "2.5.0", pkg["version"])
 	assert.Equal(t, "myapp", pkg["name"])
+}
+
+func TestUpdater_UpdateFiles_TOML_PreservesCommentsAndOrdering(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "Cargo.toml")
+	content := `# This is my Rust project
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[package]
+# Package metadata
+name = "myapp"
+version = "1.0.0"
+edition = "2021"
+description = "A cool app"
+
+[dependencies]
+serde = "1.0"
+tokio = { version = "1", features = ["full"] }
+`
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+
+	configs := []config.UpdateConfig{
+		{
+			File:     filePath,
+			Path:     "package.version",
+			Template: "{{MajorMinorPatch}}",
+		},
+	}
+
+	updater := NewUpdater(configs, NewDaselFileParser(), newTestLogger(t))
+	data := emit.TemplateData{MajorMinorPatch: "2.5.0"}
+
+	err := updater.UpdateFiles(data)
+	require.NoError(t, err)
+
+	// Read raw file to verify structure is preserved
+	result, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+
+	resultStr := string(result)
+
+	// Comments preserved
+	assert.Contains(t, resultStr, "# This is my Rust project")
+	assert.Contains(t, resultStr, "# Package metadata")
+
+	// Ordering preserved: [workspace] before [package]
+	wsIdx := strings.Index(resultStr, "[workspace]")
+	pkgIdx := strings.Index(resultStr, "[package]")
+	assert.Greater(t, pkgIdx, wsIdx, "[workspace] should appear before [package]")
+
+	// Value updated
+	assert.Contains(t, resultStr, `version = "2.5.0"`)
+
+	// Other values untouched
+	assert.Contains(t, resultStr, `name = "myapp"`)
+	assert.Contains(t, resultStr, `edition = "2021"`)
+	assert.Contains(t, resultStr, `resolver = "2"`)
+	assert.Contains(t, resultStr, `serde = "1.0"`)
+}
+
+func TestUpdater_UpdateFiles_TOML_DoesNotClobberDependencyVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "Cargo.toml")
+	content := `[package]
+name = "myapp"
+version = "1.0.0"
+
+[dependencies]
+serde = { version = "1.0.0", features = ["derive"] }
+tokio = { version = "1.0.0", features = ["full"] }
+`
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+
+	configs := []config.UpdateConfig{
+		{
+			File:     filePath,
+			Path:     "package.version",
+			Template: "{{MajorMinorPatch}}",
+		},
+	}
+
+	updater := NewUpdater(configs, NewDaselFileParser(), newTestLogger(t))
+	data := emit.TemplateData{MajorMinorPatch: "2.5.0"}
+
+	err := updater.UpdateFiles(data)
+	require.NoError(t, err)
+
+	result, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	resultStr := string(result)
+
+	// Package version updated
+	assert.Contains(t, resultStr, `version = "2.5.0"`)
+
+	// Dependency versions NOT clobbered
+	assert.Contains(t, resultStr, `serde = { version = "1.0.0"`)
+	assert.Contains(t, resultStr, `tokio = { version = "1.0.0"`)
 }
 
 func TestUpdater_UpdateFiles_WithPreRelease(t *testing.T) {

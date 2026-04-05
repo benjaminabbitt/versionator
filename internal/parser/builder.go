@@ -189,31 +189,42 @@ func (b *Builder) ClearBuildMetadata() *Builder {
 
 // --- Increment/Decrement Operations ---
 
-// IncrementMajor increments major, resets minor and patch to 0, clears pre-release.
+// resetRevision resets revision to 0 if it was set, preserving 4-component format
+func (b *Builder) resetRevision() {
+	if b.revision != nil {
+		zero := 0
+		b.revision = &zero
+	}
+}
+
+// IncrementMajor increments major, resets minor, patch, and revision to 0, clears pre-release.
 func (b *Builder) IncrementMajor() *Builder {
 	b.major++
 	b.minor = 0
 	b.patch = 0
+	b.resetRevision()
 	b.preRelease = ""
 	return b
 }
 
-// IncrementMinor increments minor, resets patch to 0, clears pre-release.
+// IncrementMinor increments minor, resets patch and revision, clears pre-release.
 func (b *Builder) IncrementMinor() *Builder {
 	b.minor++
 	b.patch = 0
+	b.resetRevision()
 	b.preRelease = ""
 	return b
 }
 
-// IncrementPatch increments patch, clears pre-release.
+// IncrementPatch increments patch, resets revision, clears pre-release.
 func (b *Builder) IncrementPatch() *Builder {
 	b.patch++
+	b.resetRevision()
 	b.preRelease = ""
 	return b
 }
 
-// DecrementMajor decrements major, resets minor and patch.
+// DecrementMajor decrements major, resets minor, patch, and revision.
 // Sets error if major would go below 0.
 func (b *Builder) DecrementMajor() *Builder {
 	if b.major == 0 {
@@ -223,10 +234,11 @@ func (b *Builder) DecrementMajor() *Builder {
 	b.major--
 	b.minor = 0
 	b.patch = 0
+	b.resetRevision()
 	return b
 }
 
-// DecrementMinor decrements minor, resets patch.
+// DecrementMinor decrements minor, resets patch and revision.
 // Sets error if minor would go below 0.
 func (b *Builder) DecrementMinor() *Builder {
 	if b.minor == 0 {
@@ -235,10 +247,11 @@ func (b *Builder) DecrementMinor() *Builder {
 	}
 	b.minor--
 	b.patch = 0
+	b.resetRevision()
 	return b
 }
 
-// DecrementPatch decrements patch.
+// DecrementPatch decrements patch, resets revision.
 // Sets error if patch would go below 0.
 func (b *Builder) DecrementPatch() *Builder {
 	if b.patch == 0 {
@@ -246,6 +259,7 @@ func (b *Builder) DecrementPatch() *Builder {
 		return b
 	}
 	b.patch--
+	b.resetRevision()
 	return b
 }
 

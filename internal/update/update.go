@@ -73,9 +73,24 @@ func (u *Updater) updateSingleFile(cfg config.UpdateConfig, data emit.TemplateDa
 		return fmt.Errorf("%s: %w", ErrTemplateRender, err)
 	}
 
-	// Read the file
-	var fileData any
+	// Detect format
 	var format Format
+	if cfg.Format != "" {
+		format, err = u.parser.detectFormat(cfg.File, cfg.Format)
+	} else {
+		format, err = u.parser.detectFormat(cfg.File, "")
+	}
+	if err != nil {
+		return err
+	}
+
+	// TOML: use targeted text replacement to preserve comments and ordering
+	if format == FormatTOML {
+		return u.parser.UpdateTOMLValue(cfg.File, cfg.Path, newValue)
+	}
+
+	// JSON/YAML: parse-modify-serialize (these preserve formatting well enough)
+	var fileData any
 	if cfg.Format != "" {
 		fileData, format, err = u.parser.ReadWithFormat(cfg.File, cfg.Format)
 	} else {
@@ -85,18 +100,15 @@ func (u *Updater) updateSingleFile(cfg config.UpdateConfig, data emit.TemplateDa
 		return err
 	}
 
-	// Convert to map for modification
 	dataMap, ok := fileData.(map[string]any)
 	if !ok {
 		return fmt.Errorf("file content is not a map structure")
 	}
 
-	// Update the value at the specified path
 	if err := u.parser.Put(&dataMap, cfg.Path, newValue); err != nil {
 		return err
 	}
 
-	// Write the file back
 	if err := u.parser.Write(cfg.File, dataMap, format); err != nil {
 		return err
 	}

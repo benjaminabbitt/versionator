@@ -70,7 +70,8 @@ type TemplateData struct {
 	Major           string // Major version number (e.g., "1")
 	Minor           string // Minor version number (e.g., "2")
 	Patch           string // Patch version number (e.g., "3")
-	MajorMinorPatch string // Core version: Major.Minor.Patch (e.g., "1.2.3")
+	Revision        string // Revision number for 4-component versions (e.g., "4"), empty if not set
+	MajorMinorPatch string // Core version: Major.Minor.Patch[.Revision] (e.g., "1.2.3" or "1.2.3.4")
 	MajorMinor      string // Major.Minor (e.g., "1.2")
 	Prefix          string // Version prefix (e.g., "v")
 
@@ -485,6 +486,7 @@ func BuildTemplateDataFromVersion(v *version.Version) TemplateData {
 		Major:           strconv.Itoa(v.Major),
 		Minor:           strconv.Itoa(v.Minor),
 		Patch:           strconv.Itoa(v.Patch),
+		Revision:        v.RevisionString(),
 		MajorMinorPatch: v.CoreVersion(),
 		MajorMinor:      fmt.Sprintf("%d.%d", v.Major, v.Minor),
 		Prefix:          v.Prefix,

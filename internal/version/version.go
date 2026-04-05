@@ -25,6 +25,7 @@ type Version struct {
 	Major         int    // Major version
 	Minor         int    // Minor version
 	Patch         int    // Patch version
+	Revision      *int   // Optional 4th component (nil = 3-component, non-nil = 4-component assembly/MS-style)
 	PreRelease    string // Pre-release identifier (e.g., "alpha.1")
 	BuildMetadata string // Build metadata (e.g., "build.123")
 	Raw           string // Original parsed string
@@ -66,7 +67,7 @@ func fromParserVersion(pv *parser.Version) *Version {
 	if pv == nil {
 		return &Version{}
 	}
-	return &Version{
+	v := &Version{
 		Prefix:        pv.Prefix,
 		Major:         pv.Major(),
 		Minor:         pv.Minor(),
@@ -75,6 +76,11 @@ func fromParserVersion(pv *parser.Version) *Version {
 		BuildMetadata: pv.BuildMetadataString(),
 		Raw:           pv.Raw,
 	}
+	if pv.IsAssemblyVersion() {
+		rev := pv.Revision()
+		v.Revision = &rev
+	}
+	return v
 }
 
 // toBuilder converts a version.Version to a parser.Builder for mutation/validation
@@ -85,6 +91,9 @@ func (v *Version) toBuilder() *parser.Builder {
 		Minor(v.Minor).
 		Patch(v.Patch)
 
+	if v.Revision != nil {
+		b.Revision(*v.Revision)
+	}
 	if v.PreRelease != "" {
 		b.PreRelease(v.PreRelease)
 	}
@@ -231,7 +240,7 @@ func Save(v *Version) error {
 // String returns the SemVer 2.0.0 compliant string (no prefix)
 // Format: Major.Minor.Patch[-PreRelease][+BuildMetadata]
 func (v *Version) String() string {
-	result := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+	result := v.CoreVersion()
 	if v.PreRelease != "" {
 		result += "-" + v.PreRelease
 	}
@@ -241,9 +250,13 @@ func (v *Version) String() string {
 	return result
 }
 
-// CoreVersion returns just Major.Minor.Patch
+// CoreVersion returns just Major.Minor.Patch[.Revision]
 func (v *Version) CoreVersion() string {
-	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+	core := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+	if v.Revision != nil {
+		core += fmt.Sprintf(".%d", *v.Revision)
+	}
+	return core
 }
 
 // FullString returns the full version string with prefix
@@ -355,9 +368,32 @@ func (v *Version) PreReleaseLabelWithDash() string {
 	return ""
 }
 
-// AssemblyVersion returns an assembly-compatible version (Major.Minor.Patch.0)
+// AssemblyVersion returns an assembly-compatible version (Major.Minor.Patch.Revision)
+// Uses actual Revision if set, otherwise defaults to 0
 func (v *Version) AssemblyVersion() string {
-	return v.CoreVersion() + ".0"
+	rev := 0
+	if v.Revision != nil {
+		rev = *v.Revision
+	}
+	return fmt.Sprintf("%d.%d.%d.%d", v.Major, v.Minor, v.Patch, rev)
+}
+
+// RevisionValue returns the revision number (0 if not set)
+func (v *Version) RevisionValue() int {
+	if v.Revision != nil {
+		return *v.Revision
+	}
+	return 0
+}
+
+// RevisionString returns the revision as a string (0 if not set)
+func (v *Version) RevisionString() string {
+	return strconv.Itoa(v.RevisionValue())
+}
+
+// HasRevision returns true if this is a 4-component version
+func (v *Version) HasRevision() bool {
+	return v.Revision != nil
 }
 
 // PrefixedString returns the version with prefix (Major.Minor.Patch)
@@ -411,24 +447,35 @@ func (v *Version) Validate() error {
 	return err
 }
 
-// IncrementMajor increments the major version, resets minor and patch
+// resetRevision resets revision to 0 if it was set, preserving 4-component format
+func (v *Version) resetRevision() {
+	if v.Revision != nil {
+		zero := 0
+		v.Revision = &zero
+	}
+}
+
+// IncrementMajor increments the major version, resets minor, patch, and revision
 func (v *Version) IncrementMajor() {
 	v.Major++
 	v.Minor = 0
 	v.Patch = 0
+	v.resetRevision()
 	v.PreRelease = ""
 }
 
-// IncrementMinor increments the minor version, resets patch
+// IncrementMinor increments the minor version, resets patch and revision
 func (v *Version) IncrementMinor() {
 	v.Minor++
 	v.Patch = 0
+	v.resetRevision()
 	v.PreRelease = ""
 }
 
-// IncrementPatch increments the patch version
+// IncrementPatch increments the patch version, resets revision
 func (v *Version) IncrementPatch() {
 	v.Patch++
+	v.resetRevision()
 	v.PreRelease = ""
 }
 
@@ -440,6 +487,7 @@ func (v *Version) DecrementMajor() error {
 	v.Major--
 	v.Minor = 0
 	v.Patch = 0
+	v.resetRevision()
 	return nil
 }
 
@@ -450,6 +498,7 @@ func (v *Version) DecrementMinor() error {
 	}
 	v.Minor--
 	v.Patch = 0
+	v.resetRevision()
 	return nil
 }
 
@@ -459,6 +508,7 @@ func (v *Version) DecrementPatch() error {
 		return errors.New(ErrCannotDecrementPatch)
 	}
 	v.Patch--
+	v.resetRevision()
 	return nil
 }
 
@@ -595,6 +645,31 @@ func SetMetadata(metadata string) error {
 	}
 	v.BuildMetadata = metadata
 	return Save(v)
+}
+
+// SetVersion sets the VERSION file to the given version string.
+// Validates the input through the parser grammar before writing.
+func SetVersion(versionString string) error {
+	logger := logging.GetLogger()
+
+	v, err := ParseStrict(versionString)
+	if err != nil {
+		return fmt.Errorf("invalid version %q: %w", versionString, err)
+	}
+
+	oldVersion := ""
+	if existing, loadErr := Load(); loadErr == nil {
+		oldVersion = existing.FullString()
+	}
+
+	if err := Save(v); err != nil {
+		return err
+	}
+
+	logger.Info(LogVersionSet,
+		zap.String("from", oldVersion),
+		zap.String("to", v.FullString()))
+	return nil
 }
 
 // StripPrefix removes the 'v' or 'V' prefix from a version string if present
