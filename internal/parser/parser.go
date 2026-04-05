@@ -242,19 +242,15 @@ func (v *Version) IsPartial() bool {
 	return v.Core.Minor == nil || v.Core.Patch == nil
 }
 
-// String returns the SemVer 2.0.0 compliant string (without prefix).
-// Format: Major.Minor.Patch[-PreRelease][+BuildMetadata]
+// String returns the version string without prefix.
+// Format: Major.Minor.Patch[.Revision][-PreRelease][+BuildMetadata]
 func (v *Version) String() string {
 	if v.Core == nil {
 		return "0.0.0"
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("%d", v.Core.Major))
-	sb.WriteByte('.')
-	sb.WriteString(fmt.Sprintf("%d", v.Minor()))
-	sb.WriteByte('.')
-	sb.WriteString(fmt.Sprintf("%d", v.Patch()))
+	sb.WriteString(v.CoreVersion())
 
 	if v.IsPreRelease() {
 		sb.WriteByte('-')
@@ -269,12 +265,16 @@ func (v *Version) String() string {
 	return sb.String()
 }
 
-// CoreVersion returns just Major.Minor.Patch without pre-release or metadata.
+// CoreVersion returns just Major.Minor.Patch[.Revision] without pre-release or metadata.
 func (v *Version) CoreVersion() string {
 	if v.Core == nil {
 		return "0.0.0"
 	}
-	return fmt.Sprintf("%d.%d.%d", v.Core.Major, v.Minor(), v.Patch())
+	core := fmt.Sprintf("%d.%d.%d", v.Core.Major, v.Minor(), v.Patch())
+	if v.IsAssemblyVersion() {
+		core += fmt.Sprintf(".%d", v.Revision())
+	}
+	return core
 }
 
 // FullString returns the version with prefix.

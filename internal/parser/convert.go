@@ -7,16 +7,20 @@ import (
 )
 
 // ToVersionData converts a parser.Version to the data needed for the version package.
-// Returns: prefix, major, minor, patch, preRelease, buildMetadata, raw
-func (v *Version) ToVersionData() (prefix string, major, minor, patch int, preRelease, buildMetadata, raw string) {
+// Returns: prefix, major, minor, patch, revision, preRelease, buildMetadata, raw
+func (v *Version) ToVersionData() (prefix string, major, minor, patch int, revision *int, preRelease, buildMetadata, raw string) {
 	if v == nil {
-		return "", 0, 0, 0, "", "", ""
+		return "", 0, 0, 0, nil, "", "", ""
 	}
 
 	prefix = v.Prefix
 	major = v.Major()
 	minor = v.Minor()
 	patch = v.Patch()
+	if v.IsAssemblyVersion() {
+		rev := v.Revision()
+		revision = &rev
+	}
 	preRelease = v.PreReleaseString()
 	buildMetadata = v.BuildMetadataString()
 	raw = v.Raw
@@ -26,11 +30,14 @@ func (v *Version) ToVersionData() (prefix string, major, minor, patch int, preRe
 
 // FromVersionData creates a parser.Version from version data components.
 // This is used when constructing versions programmatically.
-func FromVersionData(prefix string, major, minor, patch int, preRelease, buildMetadata string) *Version {
+func FromVersionData(prefix string, major, minor, patch int, revision *int, preRelease, buildMetadata string) *Version {
 	// Build the raw string
 	var sb strings.Builder
 	sb.WriteString(prefix)
 	sb.WriteString(fmt.Sprintf("%d.%d.%d", major, minor, patch))
+	if revision != nil {
+		sb.WriteString(fmt.Sprintf(".%d", *revision))
+	}
 	if preRelease != "" {
 		sb.WriteByte('-')
 		sb.WriteString(preRelease)
@@ -48,9 +55,10 @@ func FromVersionData(prefix string, major, minor, patch int, preRelease, buildMe
 	v := &Version{
 		Prefix: prefix,
 		Core: &VersionCore{
-			Major: major,
-			Minor: minorPtr,
-			Patch: patchPtr,
+			Major:    major,
+			Minor:    minorPtr,
+			Patch:    patchPtr,
+			Revision: revision,
 		},
 		Raw: raw,
 	}
@@ -245,7 +253,15 @@ func (v *Version) updateRaw() {
 	v.Raw = v.FullString()
 }
 
-// IncrementMajor increments the major version, resets minor and patch.
+// resetRevision resets revision to 0 if it was set, preserving 4-component format
+func (v *Version) resetRevision() {
+	if v.Core != nil && v.Core.Revision != nil {
+		zero := 0
+		v.Core.Revision = &zero
+	}
+}
+
+// IncrementMajor increments the major version, resets minor, patch, and revision.
 func (v *Version) IncrementMajor() {
 	if v.Core == nil {
 		v.Core = &VersionCore{}
@@ -254,11 +270,12 @@ func (v *Version) IncrementMajor() {
 	zero := 0
 	v.Core.Minor = &zero
 	v.Core.Patch = &zero
+	v.resetRevision()
 	v.PreRelease = nil
 	v.updateRaw()
 }
 
-// IncrementMinor increments the minor version, resets patch.
+// IncrementMinor increments the minor version, resets patch and revision.
 func (v *Version) IncrementMinor() {
 	if v.Core == nil {
 		v.Core = &VersionCore{}
@@ -271,11 +288,12 @@ func (v *Version) IncrementMinor() {
 	}
 	zero := 0
 	v.Core.Patch = &zero
+	v.resetRevision()
 	v.PreRelease = nil
 	v.updateRaw()
 }
 
-// IncrementPatch increments the patch version.
+// IncrementPatch increments the patch version, resets revision.
 func (v *Version) IncrementPatch() {
 	if v.Core == nil {
 		v.Core = &VersionCore{}
@@ -286,6 +304,7 @@ func (v *Version) IncrementPatch() {
 	} else {
 		*v.Core.Patch++
 	}
+	v.resetRevision()
 	v.PreRelease = nil
 	v.updateRaw()
 }

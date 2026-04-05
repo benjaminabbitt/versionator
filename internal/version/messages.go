@@ -31,6 +31,7 @@ const (
 	LogVersionCreated     = "version_created"
 	LogCustomVarSet       = "custom_var_set"
 	LogCustomVarDeleted   = "custom_var_deleted"
+	LogVersionSet         = "version_set"
 	LogPrefixSet          = "prefix_set"
 	LogFileReadError      = "file_read_error"
 	LogFileWriteError     = "file_write_error"

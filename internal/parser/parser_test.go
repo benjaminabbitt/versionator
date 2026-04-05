@@ -7,6 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// intPtr returns a pointer to the given int value.
+func intPtr(n int) *int { return &n }
+
 // =============================================================================
 // CORE FUNCTIONALITY
 // Tests demonstrating the primary purpose: parsing valid SemVer version strings
@@ -781,13 +784,14 @@ func TestToVersionData_NilVersion(t *testing.T) {
 	var v *Version = nil
 
 	// Action: Extract version data
-	prefix, major, minor, patch, preRel, metadata, raw := v.ToVersionData()
+	prefix, major, minor, patch, revision, preRel, metadata, raw := v.ToVersionData()
 
-	// Expected: All values are zero/empty
+	// Expected: All values are zero/empty/nil
 	assert.Empty(t, prefix)
 	assert.Equal(t, 0, major)
 	assert.Equal(t, 0, minor)
 	assert.Equal(t, 0, patch)
+	assert.Nil(t, revision)
 	assert.Empty(t, preRel)
 	assert.Empty(t, metadata)
 	assert.Empty(t, raw)
@@ -927,7 +931,7 @@ func TestToVersionData_RoundTrip(t *testing.T) {
 			require.NoError(t, err)
 
 			// Action: Extract version data tuple
-			prefix, major, minor, patch, preRel, metadata, raw := v.ToVersionData()
+			prefix, major, minor, patch, _, preRel, metadata, raw := v.ToVersionData()
 
 			// Expected: All components correctly extracted
 			assert.Equal(t, tt.expectedPrefix, prefix)
@@ -955,6 +959,7 @@ func TestFromVersionData_Construction(t *testing.T) {
 		major         int
 		minor         int
 		patch         int
+		revision      *int
 		preRelease    string
 		buildMetadata string
 		expected      string
@@ -996,13 +1001,21 @@ func TestFromVersionData_Construction(t *testing.T) {
 			buildMetadata: "sha.def456",
 			expected:      "v2.3.4-rc.1+sha.def456",
 		},
+		{
+			name:     "with revision",
+			major:    1,
+			minor:    2,
+			patch:    3,
+			revision: intPtr(4),
+			expected: "1.2.3.4",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Precondition: Version data components
 			// Action: Construct version from data
-			v := FromVersionData(tt.prefix, tt.major, tt.minor, tt.patch, tt.preRelease, tt.buildMetadata)
+			v := FromVersionData(tt.prefix, tt.major, tt.minor, tt.patch, tt.revision, tt.preRelease, tt.buildMetadata)
 
 			// Expected: Version constructed with correct output
 			require.NotNil(t, v)

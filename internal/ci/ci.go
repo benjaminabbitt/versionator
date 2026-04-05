@@ -59,6 +59,7 @@ type Variables struct {
 	Major             string // Major version
 	Minor             string // Minor version
 	Patch             string // Patch version
+	Revision          string // Revision (4th component, may be empty)
 	PreRelease        string // Pre-release identifier (may be empty)
 	Metadata          string // Build metadata (may be empty)
 	GitSHA            string // Full commit SHA
@@ -77,6 +78,7 @@ func VariableNames(prefix string) map[string]string {
 		"Major":         prefix + "VERSION_MAJOR",
 		"Minor":         prefix + "VERSION_MINOR",
 		"Patch":         prefix + "VERSION_PATCH",
+		"Revision":      prefix + "VERSION_REVISION",
 		"PreRelease":    prefix + "VERSION_PRERELEASE",
 		"Metadata":      prefix + "VERSION_METADATA",
 		"GitSHA":        prefix + "GIT_SHA",
@@ -97,6 +99,7 @@ func (v *Variables) ToMap(prefix string) map[string]string {
 		names["Major"]:         v.Major,
 		names["Minor"]:         v.Minor,
 		names["Patch"]:         v.Patch,
+		names["Revision"]:      v.Revision,
 		names["PreRelease"]:    v.PreRelease,
 		names["Metadata"]:      v.Metadata,
 		names["GitSHA"]:        v.GitSHA,

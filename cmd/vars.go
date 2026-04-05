@@ -63,7 +63,7 @@ func runVars(cmd *cobra.Command, args []string) error {
 	// Group variables by category
 	categories := map[string][]string{
 		"Version Components": {
-			"Major", "Minor", "Patch", "MajorMinorPatch", "MajorMinor", "Prefix",
+			"Major", "Minor", "Patch", "Revision", "MajorMinorPatch", "MajorMinor", "Prefix",
 		},
 		"Pre-release (template-based)": {
 			"PreRelease", "PreReleaseWithDash", "PreReleaseLabel", "PreReleaseNumber",

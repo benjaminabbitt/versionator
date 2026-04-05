@@ -1159,6 +1159,201 @@ func TestValidate_InvalidBuildMetadataCharacter(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// REVISION SUPPORT
+// Tests for 4-component version handling
+// =============================================================================
+
+// intPtr returns a pointer to the given int value.
+func intPtr(n int) *int { return &n }
+
+// Validates that String() and CoreVersion() include revision when set.
+func TestVersion_WithRevision_IncludesRevisionInOutput(t *testing.T) {
+	tests := []struct {
+		name         string
+		version      *Version
+		expectedStr  string
+		expectedCore string
+		expectedFull string
+	}{
+		{
+			name:         "3-component (no revision)",
+			version:      &Version{Major: 1, Minor: 2, Patch: 3},
+			expectedStr:  "1.2.3",
+			expectedCore: "1.2.3",
+			expectedFull: "1.2.3",
+		},
+		{
+			name:         "4-component with revision",
+			version:      &Version{Major: 1, Minor: 2, Patch: 3, Revision: intPtr(4)},
+			expectedStr:  "1.2.3.4",
+			expectedCore: "1.2.3.4",
+			expectedFull: "1.2.3.4",
+		},
+		{
+			name:         "4-component with prefix",
+			version:      &Version{Prefix: "v", Major: 1, Minor: 2, Patch: 3, Revision: intPtr(0)},
+			expectedStr:  "1.2.3.0",
+			expectedCore: "1.2.3.0",
+			expectedFull: "v1.2.3.0",
+		},
+		{
+			name:         "4-component with pre-release",
+			version:      &Version{Major: 1, Minor: 2, Patch: 3, Revision: intPtr(4), PreRelease: "beta.1"},
+			expectedStr:  "1.2.3.4-beta.1",
+			expectedCore: "1.2.3.4",
+			expectedFull: "1.2.3.4-beta.1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.version.String(); got != tt.expectedStr {
+				t.Errorf("String() = %v, want %v", got, tt.expectedStr)
+			}
+			if got := tt.version.CoreVersion(); got != tt.expectedCore {
+				t.Errorf("CoreVersion() = %v, want %v", got, tt.expectedCore)
+			}
+			if got := tt.version.FullString(); got != tt.expectedFull {
+				t.Errorf("FullString() = %v, want %v", got, tt.expectedFull)
+			}
+		})
+	}
+}
+
+// Validates HasRevision and RevisionString methods.
+func TestVersion_RevisionAccessors(t *testing.T) {
+	v3 := &Version{Major: 1, Minor: 0, Patch: 0}
+	if v3.HasRevision() {
+		t.Error("3-component version should not have revision")
+	}
+	if v3.RevisionString() != "0" {
+		t.Errorf("RevisionString() for nil revision = %v, want 0", v3.RevisionString())
+	}
+
+	v4 := &Version{Major: 1, Minor: 0, Patch: 0, Revision: intPtr(5)}
+	if !v4.HasRevision() {
+		t.Error("4-component version should have revision")
+	}
+	if v4.RevisionString() != "5" {
+		t.Errorf("RevisionString() = %v, want 5", v4.RevisionString())
+	}
+}
+
+// Validates AssemblyVersion uses actual revision when set.
+func TestVersion_AssemblyVersion_UsesRevision(t *testing.T) {
+	v := &Version{Major: 1, Minor: 2, Patch: 3, Revision: intPtr(4)}
+	if got := v.AssemblyVersion(); got != "1.2.3.4" {
+		t.Errorf("AssemblyVersion() = %v, want 1.2.3.4", got)
+	}
+
+	vNoRev := &Version{Major: 1, Minor: 2, Patch: 3}
+	if got := vNoRev.AssemblyVersion(); got != "1.2.3.0" {
+		t.Errorf("AssemblyVersion() without revision = %v, want 1.2.3.0", got)
+	}
+}
+
+// Validates round-trip: parse 4-component → fromParserVersion → Save → Load.
+func TestVersion_FourComponent_RoundTrip(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+
+	v := &Version{Major: 1, Minor: 2, Patch: 3, Revision: intPtr(4)}
+	err := Save(v)
+	if err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	content, err := os.ReadFile(versionFile)
+	if err != nil {
+		t.Fatalf("ReadFile error: %v", err)
+	}
+	if got := string(content); got != "1.2.3.4\n" {
+		t.Errorf("VERSION file content = %q, want %q", got, "1.2.3.4\n")
+	}
+
+	loaded, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if !loaded.HasRevision() {
+		t.Error("Loaded version should have revision")
+	}
+	if loaded.RevisionValue() != 4 {
+		t.Errorf("Loaded revision = %d, want 4", loaded.RevisionValue())
+	}
+}
+
+// =============================================================================
+// SET VERSION
+// Tests for SetVersion function
+// =============================================================================
+
+// Validates SetVersion writes the correct content to VERSION file.
+func TestSetVersion_ValidVersion_WritesFile(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+
+	// Create initial VERSION
+	err := os.WriteFile(versionFile, []byte("0.0.1\n"), 0644)
+	if err != nil {
+		t.Fatalf("setup error: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{name: "simple semver", input: "2.0.0", expected: "2.0.0\n"},
+		{name: "with prefix", input: "v1.5.0", expected: "v1.5.0\n"},
+		{name: "with pre-release", input: "1.0.0-rc.1", expected: "1.0.0-rc.1\n"},
+		{name: "with metadata", input: "1.0.0+build.42", expected: "1.0.0+build.42\n"},
+		{name: "4-component", input: "1.2.3.4", expected: "1.2.3.4\n"},
+		{name: "4-component with pre-release", input: "1.2.3.4-beta.1", expected: "1.2.3.4-beta.1\n"},
+		{name: "full version", input: "v1.2.3-alpha.1+sha.abc123", expected: "v1.2.3-alpha.1+sha.abc123\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := SetVersion(tt.input)
+			if err != nil {
+				t.Fatalf("SetVersion(%q) error: %v", tt.input, err)
+			}
+
+			content, err := os.ReadFile(versionFile)
+			if err != nil {
+				t.Fatalf("ReadFile error: %v", err)
+			}
+			if string(content) != tt.expected {
+				t.Errorf("VERSION = %q, want %q", string(content), tt.expected)
+			}
+		})
+	}
+}
+
+// Validates SetVersion rejects invalid input.
+func TestSetVersion_InvalidVersion_ReturnsError(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+
+	err := os.WriteFile(versionFile, []byte("0.0.1\n"), 0644)
+	if err != nil {
+		t.Fatalf("setup error: %v", err)
+	}
+
+	err = SetVersion("not-a-version")
+	if err == nil {
+		t.Error("Expected error for invalid version, got nil")
+	}
+}
+
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {

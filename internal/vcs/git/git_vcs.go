@@ -441,9 +441,21 @@ func (g *GitVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) 
 	return messages, nil
 }
 
-// GetDirtyFiles returns the list of files with uncommitted changes
-// Files matching gitignore patterns are excluded from the result
+// GetDirtyFiles returns the list of files with uncommitted changes.
+// Files matching gitignore patterns are excluded from the result.
+// Uses go-git's worktree.Status() with gitignore filtering.
+// Falls back to git CLI if go-git fails (e.g., permission errors on unreadable gitignored files).
 func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
+	files, err := g.getDirtyFilesGoGit()
+	if err != nil {
+		// Fall back to git CLI — handles permission errors from unreadable gitignored files
+		return g.getDirtyFilesGitCLI()
+	}
+	return files, nil
+}
+
+// getDirtyFilesGoGit uses go-git's worktree.Status() with gitignore filtering.
+func (g *GitVersionControlSystem) getDirtyFilesGoGit() ([]string, error) {
 	repo, err := g.openRepository()
 	if err != nil {
 		return nil, err
@@ -459,16 +471,42 @@ func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
 		return nil, fmt.Errorf("failed to get git status: %w", err)
 	}
 
-	// Get gitignore matcher for filtering
 	matcher, _ := g.getGitignoreMatcher()
 
 	var files []string
 	for file := range status {
-		// Skip files that match gitignore patterns
 		if g.isFileIgnored(matcher, file) {
 			continue
 		}
 		files = append(files, file)
+	}
+	return files, nil
+}
+
+// getDirtyFilesGitCLI falls back to git CLI for status.
+// git status --porcelain natively respects .gitignore and handles unreadable files.
+func (g *GitVersionControlSystem) getDirtyFilesGitCLI() ([]string, error) {
+	root, err := g.GetRepositoryRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git status: %w", err)
+	}
+
+	var files []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		// Porcelain format: XY filename (first 3 chars are status + space)
+		if len(line) > 3 {
+			files = append(files, strings.TrimSpace(line[3:]))
+		}
 	}
 	return files, nil
 }

@@ -152,6 +152,7 @@ func buildCIVariables(v *version.Version) *ci.Variables {
 		Major:         strconv.Itoa(v.Major),
 		Minor:         strconv.Itoa(v.Minor),
 		Patch:         strconv.Itoa(v.Patch),
+		Revision:      v.RevisionString(),
 		PreRelease:    preRelease,
 		Metadata:      metadata,
 	}

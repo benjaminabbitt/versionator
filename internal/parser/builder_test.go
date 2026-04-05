@@ -334,7 +334,7 @@ func TestBuilder_AssemblyVersion_SupportsFourComponents(t *testing.T) {
 	// Expected: IsAssemblyVersion true, both formats correct
 	require.NoError(t, err)
 	assert.True(t, v.IsAssemblyVersion())
-	assert.Equal(t, "1.2.3", v.String())              // SemVer format (3 components)
+	assert.Equal(t, "1.2.3.456", v.String())           // Includes revision
 	assert.Equal(t, "1.2.3.456", v.AssemblyVersion()) // Assembly format (4 components)
 }
 
@@ -781,7 +781,7 @@ func TestBuilder_RoundTrip_ParsesCorrectly(t *testing.T) {
 		{
 			name:       "assembly version",
 			builder:    NewBuilder().Major(1).Minor(2).Patch(3).Revision(456),
-			wantFull:   "1.2.3", // SemVer format (no revision)
+			wantFull:   "1.2.3.456", // Includes revision
 			wantAssem:  "1.2.3.456",
 			isAssembly: true,
 		},
