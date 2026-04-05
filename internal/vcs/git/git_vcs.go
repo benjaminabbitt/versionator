@@ -640,17 +640,24 @@ func (g *GitVersionControlSystem) getGitignoreMatcher() (gitignore.Matcher, erro
 	return gitignore.NewMatcher(patterns), nil
 }
 
-// isFileIgnored checks if a file path should be ignored according to gitignore rules
+// isFileIgnored checks if a file path should be ignored according to gitignore rules.
+// Checks the file itself and all parent directories, since a gitignore pattern
+// like ".cargo-container/" matches the directory and should exclude all children.
 func (g *GitVersionControlSystem) isFileIgnored(matcher gitignore.Matcher, filePath string) bool {
 	if matcher == nil {
 		return false
 	}
 
-	// Split path into components for the matcher
 	pathComponents := strings.Split(filePath, string(filepath.Separator))
 
-	// Check if the file matches gitignore patterns
-	// We assume it's not a directory since we're checking file status
+	// Check each parent directory prefix as a directory match
+	for i := 1; i < len(pathComponents); i++ {
+		if matcher.Match(pathComponents[:i], true) {
+			return true
+		}
+	}
+
+	// Check the full path as a file
 	return matcher.Match(pathComponents, false)
 }
 
