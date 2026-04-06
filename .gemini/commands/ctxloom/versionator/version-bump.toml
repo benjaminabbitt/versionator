@@ -1,0 +1,1 @@
+prompt = "# version-bump\n\nAnalyze changes, recommend semver bump:\n\nCurrent: {{version}}\nChanges: {{changes}}\n\nDecision tree:\n- Breaking API → major\n- New features (backward-compatible) → minor\n- Bug fixes only → patch\n- Pre-1.0: different rules\n\nRecommend version + reasoning."

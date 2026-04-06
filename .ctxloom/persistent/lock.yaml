@@ -1,0 +1,9 @@
+version: 1
+locked_at: 2026-04-05T00:00:00Z
+bundles:
+    personal/prototyping:
+        sha: 225be015a56cdb71860a2b9d8344ab80acd994d5
+        url: https://github.com/benjaminabbitt/ctxloom-personal
+        ctxloom_version: v1
+        fetched_at: 2026-04-02T03:34:02.091310301Z
+profiles: {}

@@ -1,0 +1,10 @@
+version: "1.0.0"
+description: "Go code review profile with personal review standards"
+tags:
+  - golang
+  - review
+  - code-quality
+
+bundles:
+  - core-practices
+  - go-development

@@ -1,0 +1,338 @@
+version: 1.0.0
+tags:
+    - github
+    - ci-cd
+    - release
+    - automation
+    - just
+    - git
+author: scm
+description: GitHub Actions CI/CD pipeline with mutation testing, auto version bump, and release automation
+fragments:
+    cicd-just-targets:
+        tags:
+            - github
+            - ci-cd
+            - just
+            - git
+        content: |-
+            # CI/CD: Use Just Targets
+
+            ## Principle
+
+            All CI/CD pipelines should invoke just targets for project-specific operations. If project-specific information is encoded into a command, wrap it in a just target.
+
+            ## What Goes in Just Targets
+
+            Project-keyed operations that belong in just targets:
+            - **Build**: `just build`, `just build-release`
+            - **Test**: `just test`, `just test-unit`, `just test-integration`
+            - **Lint**: `just lint`, `just fmt-check`
+            - **Deploy**: `just deploy-staging`, `just deploy-prod`
+            - **Package**: `just package`, `just docker-build`
+            - **Release**: `just release`, `just bump-version`
+            - **Generate**: `just codegen`, `just proto`
+
+            ## What Stays in CI/CD Config
+
+            Generic operations that are fine in workflow files:
+            - **Git operations**: `git checkout`, `git fetch`, `git push`
+            - **Tool setup**: `actions/setup-go@v5`, `actions/setup-node@v4`
+            - **Caching**: `actions/cache@v4`
+            - **Artifact handling**: `actions/upload-artifact@v4`
+            - **Environment setup**: setting env vars, secrets injection
+            - **Exploratory**: `ls`, `pwd`, `cat`, `echo` for debugging
+
+            ## Examples
+
+            ### Good: Just Target
+
+            ```yaml
+            - name: Run tests
+              run: just test
+
+            - name: Build release
+              run: just build-release
+            ```
+
+            ### Bad: Inline Project Commands
+
+            ```yaml
+            # Don't do this - project-specific command belongs in justfile
+            - name: Run tests
+              run: go test -race -coverprofile=coverage.out ./...
+
+            - name: Build
+              run: cargo build --release --target x86_64-unknown-linux-musl
+            ```
+
+            ## Benefits
+
+            - **Local/CI parity**: Run the same commands locally as CI
+            - **Single source of truth**: Project commands defined once
+            - **Easier debugging**: Reproduce CI failures locally
+            - **Simplified CI config**: Workflow files stay clean
+            - **Cross-platform**: just handles platform differences
+
+            ## Pattern
+
+            ```yaml
+            jobs:
+              build:
+                steps:
+                  - uses: actions/checkout@v4
+                  - uses: actions/setup-go@v5  # Generic setup, fine here
+                    with:
+                      go-version-file: go.mod
+                  - run: just lint            # Project-specific
+                  - run: just test            # Project-specific
+                  - run: just build-release   # Project-specific
+            ```
+        content_hash: sha256:a26365a5f98f7b472195e1be9d44ad72bd2f2edc0a6dbd1952f384d25edb25d7
+        distilled: |-
+            # CI/CD: Just Targets
+
+            ## Principle
+            CI/CD pipelines invoke just targets for project-specific ops.
+
+            ## In Just Targets (project-keyed)
+            - Build: `just build`, `just build-release`
+            - Test: `just test`, `just test-unit`, `just test-integration`
+            - Lint: `just lint`, `just fmt-check`
+            - Deploy: `just deploy-staging`, `just deploy-prod`
+            - Package: `just package`, `just docker-build`
+            - Release: `just release`, `just bump-version`
+            - Generate: `just codegen`, `just proto`
+
+            ## In CI Config (generic)
+            - Git: checkout, fetch, push
+            - Tool setup: actions/setup-go, setup-node
+            - Caching, artifacts, env vars, secrets
+            - Debug: ls, pwd, cat, echo
+
+            ## Pattern
+            ```yaml
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5      # Generic - OK here
+              with: { go-version-file: go.mod }
+            - run: just lint                 # Project-specific
+            - run: just test
+            - run: just build-release
+            ```
+
+            ## Benefits
+            Local/CI parity, single source of truth, easier debugging, clean CI config
+        distilled_by: claude-3-opus
+    github-release-master:
+        tags:
+            - github
+            - ci-cd
+            - release
+        content: |-
+            # GitHub Release Pipeline (Master Branch)
+
+            ## Overview
+
+            CI/CD pipeline that automatically releases on every push to master:
+            1. Build and test
+            2. Mutation testing gate
+            3. Auto version bump (patch)
+            4. Create release branch and tag
+            5. Trigger full release workflow
+
+            ## Pipeline Flow
+
+            ```
+            push to master
+                 │
+                 ▼
+            ┌─────────────┐
+            │ build-test  │ ── Skip if [skip ci] in commit message
+            └─────────────┘
+                 │
+                 ▼
+            ┌─────────────┐
+            │ integration │
+            └─────────────┘
+                 │
+                 ▼
+            ┌─────────────┐
+            │  mutation   │ ── Fail if score < threshold (60%)
+            └─────────────┘
+                 │
+                 ▼
+            ┌─────────────┐
+            │ bump-release│ ── Bump patch, create release/vX.Y.Z branch, push tag
+            └─────────────┘
+                 │
+                 ▼
+            release.yml triggered by v* tag
+            ```
+
+            ## Mutation Testing Job
+
+            Uses go-mutesting for Go projects:
+
+            ```yaml
+            mutation-test:
+              if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+              runs-on: ubuntu-latest
+              needs: integration-test
+
+              steps:
+              - uses: actions/checkout@v4
+              - uses: actions/setup-go@v5
+                with:
+                  go-version: '1.21'
+
+              - name: Install go-mutesting
+                run: go install github.com/zimmski/go-mutesting/cmd/go-mutesting@latest
+
+              - name: Run mutation tests
+                run: |
+                  go-mutesting ./internal/... 2>&1 | tee mutation-report.txt
+                  SCORE=$(grep -oP 'mutation score is \K[0-9.]+' mutation-report.txt || echo "0")
+                  THRESHOLD=0.60
+                  if (( $(echo "$SCORE < $THRESHOLD" | bc -l) )); then
+                    echo "::error::Mutation score $SCORE below threshold $THRESHOLD"
+                    exit 1
+                  fi
+            ```
+
+            ## Version Bump and Release Job
+
+            Uses the project's own version tool (dogfooding):
+
+            ```yaml
+            bump-and-release:
+              if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+              runs-on: ubuntu-latest
+              needs: mutation-test
+              permissions:
+                contents: write
+
+              steps:
+              - uses: actions/checkout@v4
+                with:
+                  fetch-depth: 0
+
+              - name: Bump version and release
+                run: |
+                  # Bump patch version
+                  ./versionator patch increment
+                  NEW=$(cat VERSION)
+
+                  # Configure git
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  # Commit with [skip ci] to prevent infinite loop
+                  git add VERSION
+                  git commit -m "chore: bump version to $NEW [skip ci]"
+
+                  # Create release branch
+                  git checkout -b "release/v$NEW"
+                  git push origin "release/v$NEW"
+
+                  # Push to master and create tag using versionator
+                  git checkout master
+                  git push origin master
+                  ./versionator tag --message "Release v$NEW"
+                  git push origin "v$NEW"
+            ```
+
+            ## Skip CI Pattern
+
+            Add condition to build job to prevent infinite loops:
+
+            ```yaml
+            build-and-test:
+              if: "!contains(github.event.head_commit.message, '[skip ci]')"
+            ```
+
+            ## Key Patterns
+
+            | Pattern | Purpose |
+            |---------|---------|
+            | `[skip ci]` | Prevent infinite loop on version commits |
+            | `release/vX.Y.Z` | Release branch naming convention |
+            | `v*` tag | Triggers separate release.yml workflow |
+            | Mutation threshold | Quality gate (start at 60%) |
+            | Dogfooding | Use project's own tools for versioning |
+
+            ## Permissions
+
+            Workflow requires `contents: write` for:
+            - Pushing commits to master
+            - Creating release branches
+            - Creating and pushing tags
+
+            ## Integration with Release Workflow
+
+            This pipeline creates the tag which triggers a separate `release.yml` that handles:
+            - Multi-platform binary builds
+            - GitHub Release creation
+            - Package manager updates (Homebrew, Chocolatey, etc.)
+            - Docker image builds and signing
+            - SBOM generation
+        content_hash: sha256:d157d650729b09f6e01ddff91ac7e8f1f055b4627cf237bbe3cc8a311c170165
+        distilled: |-
+            # GitHub Release Pipeline (Master)
+
+            ## Flow
+            ```
+            push master → build-test → integration → mutation → bump-release → release.yml (via v* tag)
+            ```
+
+            Skip if `[skip ci]` in commit msg
+
+            ## Mutation Testing
+
+            ```yaml
+            mutation-test:
+              if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+              needs: integration-test
+              steps:
+              - uses: actions/checkout@v4
+              - uses: actions/setup-go@v5
+                with: { go-version: '1.21' }
+              - run: go install github.com/zimmski/go-mutesting/cmd/go-mutesting@latest
+              - run: |
+                  go-mutesting ./internal/... 2>&1 | tee mutation-report.txt
+                  SCORE=$(grep -oP 'mutation score is \K[0-9.]+' mutation-report.txt || echo "0")
+                  if (( $(echo "$SCORE < 0.60" | bc -l) )); then exit 1; fi
+            ```
+
+            ## Bump & Release
+
+            ```yaml
+            bump-and-release:
+              needs: mutation-test
+              permissions: { contents: write }
+              steps:
+              - uses: actions/checkout@v4
+                with: { fetch-depth: 0 }
+              - run: |
+                  ./versionator patch increment
+                  NEW=$(cat VERSION)
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add VERSION && git commit -m "chore: bump version to $NEW [skip ci]"
+                  git checkout -b "release/v$NEW" && git push origin "release/v$NEW"
+                  git checkout master && git push origin master
+                  ./versionator tag --message "Release v$NEW" && git push origin "v$NEW"
+            ```
+
+            ## Key Patterns
+            - `[skip ci]`: prevent infinite loop
+            - `release/vX.Y.Z`: branch naming
+            - `v*` tag: triggers release.yml
+            - 60% mutation threshold
+            - Dogfooding: use project's versionator
+
+            ## Permissions
+            `contents: write` for: push master, create release branches, create/push tags
+
+            ## release.yml Handles
+            Multi-platform builds, GitHub Release, package managers, Docker, SBOM
+        distilled_by: claude-3-opus

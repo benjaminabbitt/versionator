@@ -1,0 +1,499 @@
+version: 1.0.0
+tags:
+    - ai
+    - coding
+    - best-practices
+    - workflow
+author: ctxloom
+description: AI coding best practices - context engineering, workflows, version specs, review checklists
+fragments:
+    concurrency-warnings:
+        tags:
+            - concurrency
+            - safety
+        content: |-
+            # Concurrency Warnings
+
+            AI makes 2x more concurrency errors than humans.
+
+            ## Critical: Reintroduced Race Conditions
+
+            AI may "optimize" sequential code back to parallel, reintroducing fixed bugs.
+
+            ```javascript
+            // SEQUENTIAL BY DESIGN - email needs user.id from save
+            await saveUser(user);
+            await sendEmail(user);
+
+            // AI "improvement" reintroduces race condition:
+            await Promise.all([saveUser(user), sendEmail(user)]);  // BUG
+            ```
+
+            **Protection:** Comment sequential code: `// SYNC-REQUIRED: [reason]`
+
+            ## Common Mistakes by Language
+
+            ### Go
+            | Mistake | AI Pattern | Fix |
+            |---------|------------|-----|
+            | No shutdown | `go doWork()` | Use errgroup + context |
+            | Channel overuse | Channels for state | Use mutex |
+            | Missing context | No ctx parameter | Always pass context.Context |
+
+            ### JavaScript/TypeScript
+            | Mistake | AI Pattern | Fix |
+            |---------|------------|-----|
+            | Lost errors | Unhandled rejection | Handle or propagate |
+            | Memory leaks | Listeners without cleanup | Remove in cleanup |
+
+            ### Rust
+            | Mistake | AI Pattern | Fix |
+            |---------|------------|-----|
+            | Blocking in async | `std::thread::sleep` | `tokio::time::sleep` |
+            | Unnecessary Arc<Mutex> | Shared state default | Message passing |
+
+            ## Review Checklist
+
+            - [ ] Every goroutine/thread has shutdown path
+            - [ ] Context cancellation propagated
+            - [ ] Async errors handled
+            - [ ] No blocking in async contexts
+            - [ ] Lock order consistent
+            - [ ] Sequential code not parallelized
+            - [ ] No tests deleted/weakened
+        content_hash: sha256:b35f8af858ac6e039afa7d2aaec0eae14c26fbecb7a4251b212df78a267540f3
+        distilled: |-
+            # Concurrency Warnings
+
+            AI makes 2x more concurrency errors than humans.
+
+            ## Race Condition Reintroduction
+
+            AI may "optimize" sequential→parallel, reintroducing bugs.
+
+            ```javascript
+            // SYNC-REQUIRED: email needs user.id from save
+            await saveUser(user);
+            await sendEmail(user);
+
+            // AI BUG: await Promise.all([saveUser, sendEmail])
+            ```
+
+            **Protection:** Comment `// SYNC-REQUIRED: [reason]`
+
+            ## Common Mistakes
+
+            ### Go
+            - No shutdown: `go doWork()` → errgroup + context
+            - Channel overuse for state → mutex
+            - Missing ctx → always pass context.Context
+
+            ### JavaScript/TypeScript
+            - Lost errors: unhandled rejection → handle/propagate
+            - Memory leaks: listeners without cleanup → remove in cleanup
+
+            ### Rust
+            - Blocking in async: `std::thread::sleep` → `tokio::time::sleep`
+            - Unnecessary Arc<Mutex> → message passing
+
+            ## Review Checklist
+            (See human-review-checklist for full list)
+            - Every goroutine/thread has shutdown path
+            - Context cancellation propagated
+            - Async errors handled
+            - No blocking in async
+            - Sequential code not parallelized
+        distilled_by: claude-3-opus
+    context-engineering:
+        tags:
+            - context
+            - claude-code
+            - workflow
+        content: |-
+            # Context Engineering
+
+            ## CLAUDE.md Rules
+
+            **Size: 100-200 lines max.** Move overflow to per-folder CLAUDE.md files.
+
+            ### Must Include
+            ```markdown
+            # Tech Stack
+            Language, framework, database, testing tools with versions
+
+            # Architecture
+            Directory structure with purpose of each folder
+
+            # Commands
+            Build, test, lint, deploy commands
+
+            # Coding Rules
+            Project-specific conventions AI would violate otherwise
+            ```
+
+            ### Do NOT Include
+            - General language syntax
+            - Patterns already enforced by linters
+            - Things Claude does correctly without instruction
+
+            **Test:** Would Claude make a mistake without this line? If no, delete it.
+
+            ## Context Hierarchy
+
+            1. `~/.claude/CLAUDE.md` - User preferences
+            2. `CLAUDE.md` - Project root
+            3. `folder/CLAUDE.md` - Module-specific
+
+            ## Prompt Patterns
+
+            ### Provide Full Context
+            ```
+            BAD: "Fix the bug on line 42"
+            GOOD: "Here's UserService.ts. The fetchUser method doesn't handle network timeouts."
+            ```
+
+            ### Include Constraints
+            ```
+            BAD: "Optimize this query"
+            GOOD: "Optimize this query. Must complete <100ms. Cannot add indexes."
+            ```
+
+            ### Reference Existing Patterns
+            ```
+            BAD: "Add a new endpoint"
+            GOOD: "Add GET /api/users/:id following the pattern in /api/products/:id"
+            ```
+
+            ## Managing Context Rot
+
+            - Use `/clear` between unrelated tasks
+            - Use `/compact` with focus: `/compact focus on API changes and modified files`
+            - Add standing instructions for what to preserve during compaction
+
+            ## Living Documentation
+
+            When Claude makes a mistake, add the correction to CLAUDE.md immediately.
+        content_hash: sha256:94106de56bd916f683a8b8722b91b1ff9d63ed2c1ae5b54c2a637c3d4a2fd82f
+        distilled: |-
+            # Context Engineering
+
+            ## CLAUDE.md Rules
+
+            **100-200 lines max.** Overflow → per-folder files.
+
+            ### Must Include
+            - Tech stack w/ versions
+            - Architecture (dirs + purpose)
+            - Build/test/lint/deploy commands
+            - Project conventions AI would violate
+
+            ### Exclude
+            - General syntax
+            - Linter-enforced patterns
+            - Things Claude does correctly
+
+            **Test:** Would Claude err without this? No → delete.
+
+            ## Hierarchy
+            1. `~/.claude/CLAUDE.md` - User prefs
+            2. `CLAUDE.md` - Project root
+            3. `folder/CLAUDE.md` - Module-specific
+
+            ## Prompt Patterns
+
+            - **Full context:** Include file + specific issue, not just "line 42"
+            - **Constraints:** "Optimize query, <100ms, no indexes"
+            - **Reference patterns:** "Add endpoint like /api/products/:id"
+
+            ## Context Management
+
+            - `/clear` between unrelated tasks
+            - `/compact focus on [topic]` for targeted compaction
+            - Add standing instructions for compaction preservation
+
+            ## Maintenance
+
+            Mistake → immediately add correction to CLAUDE.md.
+        distilled_by: claude-3-opus
+    human-review-checklist:
+        tags:
+            - review
+            - security
+            - quality
+        content: |-
+            # Human Review Checklist
+
+            AI code is confidently incomplete. Correct happy path, dangerous elsewhere.
+
+            ## Security (Never Skip)
+
+            - [ ] Authentication/authorization correct
+            - [ ] All inputs sanitized
+            - [ ] Parameterized queries (no SQL injection)
+            - [ ] Output encoding (no XSS)
+            - [ ] No hardcoded secrets
+            - [ ] Dependencies exist and are secure
+
+            **Always review:** auth, payments, user data, admin functions.
+
+            ## Hallucination Check
+
+            ~20% of AI-suggested packages don't exist.
+
+            - [ ] All imports exist: `npm info`, `pip show`, `cargo search`
+            - [ ] API signatures are correct
+            - [ ] Referenced endpoints exist
+
+            ## Error Handling
+
+            AI frequently omits:
+            - [ ] Null checks
+            - [ ] Early returns
+            - [ ] Exception handling
+            - [ ] Edge cases
+
+            ## Test Integrity
+
+            Watch for AI "fixing" tests by:
+            - [ ] Deleting the test
+            - [ ] Removing assertions
+            - [ ] Mocking away actual behavior
+
+            ```python
+            # RED FLAG
+            def test_user_creation():
+                pass  # AI removed failing assertion
+            ```
+
+            ## Red Flags
+
+            - Deleted code without explanation
+            - Simplified error handling (catch-all replacing specific)
+            - Removed validation
+            - Changed async/sync without reason
+            - New dependencies without justification
+
+            ## Reject Immediately
+
+            - Security vulnerabilities in sensitive code
+            - Deleted tests without justification
+            - Hallucinated dependencies
+            - Race conditions in concurrent code
+            - Missing error handling in critical paths
+        content_hash: sha256:859f5c5a6cb5c48fa422302bd0e8adaa5bcdba26cf67159f95f32410bbdda7c5
+        distilled: |-
+            # Human Review Checklist
+
+            AI code: correct happy path, dangerous elsewhere.
+
+            ## Security (Never Skip)
+            - Auth/authz correct
+            - Inputs sanitized
+            - Parameterized queries
+            - Output encoding
+            - No hardcoded secrets
+            - Deps exist & secure
+
+            **Always review:** auth, payments, user data, admin
+
+            ## Hallucination Check (~20% AI packages don't exist)
+            - Verify imports: `npm info`, `pip show`, `cargo search`
+            - Check API signatures
+            - Confirm endpoints exist
+
+            ## Error Handling (AI frequently omits)
+            - Null checks, early returns, exceptions, edge cases
+
+            ## Test Integrity (AI "fixes" by)
+            - Deleting tests
+            - Removing assertions
+            - Mocking away behavior
+
+            ## Red Flags
+            - Deleted code unexplained
+            - Catch-all replacing specific handlers
+            - Removed validation
+            - async/sync changes without reason
+            - Unjustified new deps
+
+            ## Reject Immediately
+            - Security vulns in sensitive code
+            - Deleted tests w/o justification
+            - Hallucinated deps
+            - Race conditions
+            - Missing error handling in critical paths
+        distilled_by: claude-3-opus
+    multi-step-workflow:
+        tags:
+            - workflow
+            - process
+        content: |-
+            # Multi-Step Workflow
+
+            ## Process
+
+            1. **Outline** - Describe approach before writing code
+            2. **Pseudocode** - Logic and function signatures, no implementation
+            3. **Generate** - Implement in small, testable pieces
+            4. **Integrate** - Wire up components, run full test suite
+
+            ## Per-Stage Rules
+
+            ### Stage 1: Outline
+            Ask AI to describe components, data flow, edge cases before coding.
+            Approve approach before proceeding.
+
+            ### Stage 2: Pseudocode
+            Request function signatures and error handling paths.
+            No implementation code yet.
+
+            ### Stage 3: Generate
+            One function at a time with tests.
+            Verify each piece works before next.
+
+            ### Stage 4: Integrate
+            Follow existing patterns in codebase.
+            Run full test suite after integration.
+
+            ## Task Sizing
+
+            | Task Type | Approach |
+            |-----------|----------|
+            | One-line fix, boilerplate | Single-shot |
+            | New features, architectural changes, multi-file | Multi-step |
+            | Security-sensitive code | Multi-step, extra review |
+
+            ## Iteration
+
+            Treat first output as draft. Refine with follow-ups:
+            ```
+            That works but:
+            1. Add error handling for timeouts
+            2. Use project logging convention (slog)
+            3. Add retry with exponential backoff
+            ```
+
+            ## Anti-Patterns
+
+            - Generating entire system in one prompt
+            - Skipping validation steps
+            - Not reading AI explanations (reveals assumptions)
+        content_hash: sha256:b732765da86bd20985e420c6b995d96b489a3ddb3e62f66d762346680426fe15
+        distilled: |-
+            # Multi-Step Workflow
+
+            ## Process
+            1. **Outline** - Describe approach before code
+            2. **Pseudocode** - Logic/signatures, no impl
+            3. **Generate** - Small testable pieces
+            4. **Integrate** - Wire up, full test suite
+
+            ## Per-Stage
+            - **Outline**: Components, data flow, edge cases → approve before proceeding
+            - **Pseudocode**: Signatures + error paths, no impl
+            - **Generate**: One function + tests at a time
+            - **Integrate**: Follow existing patterns, run full suite
+
+            ## Task Sizing
+            - Single-shot: one-line fix, boilerplate
+            - Multi-step: new features, architectural, multi-file, security-sensitive
+
+            ## Iteration
+            Treat output as draft. Refine:
+            ```
+            Add error handling for timeouts
+            Use slog logging
+            Add retry w/ exponential backoff
+            ```
+
+            ## Anti-Patterns
+            - Entire system in one prompt
+            - Skipping validation
+            - Not reading AI explanations
+        distilled_by: claude-3-opus
+    version-specification:
+        tags:
+            - versioning
+            - configuration
+        content: |-
+            # Version Specification
+
+            AI defaults to older patterns. Always specify versions in CLAUDE.md.
+
+            ## Template
+
+            ```markdown
+            # Versions
+
+            ## Languages
+            - Go: 1.22 (use range over integers, slog; NOT ioutil)
+            - Node: 20.x (native fetch, no node-fetch)
+            - Python: 3.12 (use dict/list not typing.Dict/List, f-strings not %)
+            - Java: 21 (records, pattern matching, virtual threads; NOT Date/Calendar)
+            - Rust: 1.75+ 2024 edition
+            - Swift: 6.0 (strict concurrency, @Observable not ObservableObject)
+            - TypeScript: 5.3+ (satisfies operator, const type params)
+
+            ## Frameworks
+            - React: 19 (Server Components, use() hook; NOT class components)
+            - Next.js: 14 App Router (NOT Pages Router, getServerSideProps)
+            - Spring Boot: 3.2 (constructor injection, virtual threads)
+            ```
+
+            ## DO / DO NOT Quick Reference
+
+            | Language | DO | DO NOT |
+            |----------|-----|--------|
+            | Go | `io.ReadAll`, `slog` | `ioutil`, `log` |
+            | Java | Records, `java.time` | POJOs, `Date`/`Calendar` |
+            | Python | `dict`/`list` hints, f-strings | `typing.Dict`, `%` formatting |
+            | Swift | `@Observable`, `NavigationStack` | `ObservableObject`, `NavigationView` |
+            | React | Server Components, `use()` | Client-first, `useEffect` for data |
+
+            ## Verification
+
+            When AI suggests deprecated patterns:
+            ```
+            Your suggestion uses [old API]. This project uses [version] with [modern API].
+            Regenerate using [modern API].
+            ```
+        content_hash: sha256:03198f5a8d6b12dbe8b67c0c62012e8c44c3d26cc32557678090254662fe93c8
+        distilled: |-
+            # Version Specification
+
+            AI defaults to older patterns—specify versions in CLAUDE.md.
+
+            ## Template
+            ```markdown
+            # Versions
+
+            ## Languages
+            - Go 1.22: range-over-int, slog; NOT ioutil
+            - Node 20.x: native fetch
+            - Python 3.12: dict/list hints, f-strings; NOT typing.Dict, %
+            - Java 21: records, pattern matching, virtual threads; NOT Date/Calendar
+            - Rust 1.75+ 2024 edition
+            - Swift 6.0: strict concurrency, @Observable; NOT ObservableObject
+            - TypeScript 5.3+: satisfies, const type params
+
+            ## Frameworks
+            - React 19: Server Components, use(); NOT class components
+            - Next.js 14 App Router; NOT Pages Router
+            - Spring Boot 3.2: constructor injection, virtual threads
+            ```
+
+            ## Quick Reference
+
+            | Lang | DO | DO NOT |
+            |------|-----|--------|
+            | Go | `io.ReadAll`, `slog` | `ioutil`, `log` |
+            | Java | Records, `java.time` | POJOs, `Date` |
+            | Python | `dict`/`list`, f-strings | `typing.Dict`, `%` |
+            | Swift | `@Observable` | `ObservableObject` |
+            | React | Server Components, `use()` | Client-first, `useEffect` for data |
+
+            ## Verification
+            ```
+            Your suggestion uses [old]. Project uses [version] with [modern]. Regenerate.
+            ```
+        distilled_by: claude-3-opus

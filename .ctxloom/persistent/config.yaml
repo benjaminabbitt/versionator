@@ -1,0 +1,9 @@
+defaults:
+    profiles:
+        - profile:personal/go-developer
+    llm_plugin: claude-code
+    use_distilled: true
+llm:
+    plugins: {}
+mcp:
+    auto_register_ctxloom: true

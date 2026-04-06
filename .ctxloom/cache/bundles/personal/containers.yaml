@@ -1,0 +1,475 @@
+version: 1.0.0
+tags:
+    - containers
+    - docker
+    - podman
+    - testing
+    - devops
+author: scm
+description: Container tooling including devcontainers, testcontainers, and overlay patterns
+fragments:
+    container-overlay:
+        tags:
+            - pattern
+            - containers
+            - docker
+            - podman
+            - makefile
+            - just
+            - devops
+        content: |-
+            # Container Overlay Pattern
+
+            Same command interface, different execution context. Eliminate conditionals from build files while supporting both host and containerized builds.
+
+            ## The Problem
+
+            Containerized builds for consistency across machines and CI. Common approaches have friction:
+
+            - **Dual Makefiles**: `make -f Makefile.docker build` — people forget which to use
+            - **Conditional detection**: `ifeq`/`else`/`endif` blocks everywhere — cluttered, hard to maintain
+            - **Different commands**: `make build` vs `make container-build` — parallel names, duplicate docs
+
+            ## The Solution
+
+            Mount a different build file over the host's file inside the container.
+
+            ```
+            project/
+            ├── Makefile              # Host: delegates to container
+            └── Makefile.container    # Container: runs commands directly
+            ```
+
+            **Host Makefile** — orchestration:
+
+            ```make
+            DOCKER_RUN := docker run --rm \
+                -v ./:/workspace \
+                -v ./Makefile.container:/workspace/Makefile:ro \
+                -w /workspace \
+                myimage
+
+            build:
+                $(DOCKER_RUN) make build
+
+            test:
+                $(DOCKER_RUN) make test
+            ```
+
+            **Container Makefile** — execution:
+
+            ```make
+            build:
+                cargo build
+
+            test:
+                cargo test
+            ```
+
+            The key: `-v ./Makefile.container:/workspace/Makefile:ro`
+
+            This mounts `Makefile.container` **over** `Makefile` inside the container. The file swap *is* the detection mechanism.
+
+            ## How It Works
+
+            - **On host**: `make build` → runs Docker → mounts overlay → `make build` inside sees `Makefile.container`
+            - **In container**: `make build` → runs `cargo build` directly
+
+            No conditionals. No environment checks. No remembering which command.
+
+            ## Separation of Concerns
+
+            **Host file responsibilities:**
+            - Container image selection
+            - Volume mounts
+            - Network configuration
+            - Environment variables
+
+            **Container file responsibilities:**
+            - Compilation
+            - Testing
+            - Linting
+            - Build logic
+
+            When build logic changes, edit container file. When orchestration changes, edit host file.
+
+            ## With just (Cleaner)
+
+            {{=<% %>=}}
+            ```just
+            # justfile (host)
+            _run +ARGS:
+                podman run -v ./justfile.container:/workspace/justfile:ro ... just {{ARGS}}
+
+            build:
+                just _run build
+
+            # justfile.container
+            build:
+                cargo build
+            ```
+            <%={{ }}=%>
+
+            just advantages over Make:
+            - No `.PHONY` declarations
+            - Shell variables work naturally
+            - Recipes take arguments
+            - Better error messages
+            - Cross-platform without gnumake/BSD quirks
+
+            ## Edge Cases
+
+            ### Already in a Container (Devcontainer)
+
+            Optional escape hatch:
+
+            ```make
+            ifdef DEVCONTAINER
+            DOCKER_RUN :=
+            else
+            DOCKER_RUN := docker run --rm -v ... myimage
+            endif
+
+            build:
+                $(DOCKER_RUN) make build
+            ```
+
+            When `DEVCONTAINER` is set, commands run directly.
+
+            ### Podman
+
+            Same pattern, swap `docker` for `podman`. Add `:Z` for SELinux:
+
+            ```make
+            PODMAN_RUN := podman run --rm \
+                -v ./:/workspace:Z \
+                -v ./Makefile.container:/workspace/Makefile:ro \
+                -w /workspace \
+                myimage
+            ```
+
+            ## Tradeoffs
+
+            **Still duplicated:**
+            - Target names in both files
+            - Two files to maintain
+
+            **But:**
+            - Mechanical duplication, not logical mixing
+            - AI assistants handle this well — constrained pattern application
+            - Easier than conditional spaghetti
+
+            ## When to Use
+
+            **Good fit:**
+            - Polyglot projects
+            - Mixed dev teams (Linux/macOS/WSL)
+            - CI/CD requiring consistency
+
+            **Skip it:**
+            - Simple projects without containerization needs
+            - Uniform environments with same toolchain
+            - Single-target deployments
+        content_hash: sha256:dbbb2861516d2389ef78fae9c4f8b6d0e0098bcb5baeccf78d4e98f4472389ef
+        distilled: |-
+            # Container Overlay Pattern
+
+            Mount different build file over host's file inside container. Same command, different context.
+
+            ## Problem
+            - Dual Makefiles: people forget which
+            - Conditional detection: cluttered `ifeq`/`else`
+            - Different commands: parallel names, duplicate docs
+
+            ## Solution
+
+            ```
+            project/
+            ├── Makefile              # Host: delegates to container
+            └── Makefile.container    # Container: runs directly
+            ```
+
+            **Host Makefile:**
+            ```make
+            DOCKER_RUN := docker run --rm \
+                -v ./:/workspace \
+                -v ./Makefile.container:/workspace/Makefile:ro \
+                -w /workspace myimage
+
+            build:
+                $(DOCKER_RUN) make build
+            ```
+
+            **Container Makefile:**
+            ```make
+            build:
+                cargo build
+            ```
+
+            Key: `-v ./Makefile.container:/workspace/Makefile:ro` — file swap *is* detection.
+
+            ## Separation
+            - **Host file:** image, volumes, network, env vars
+            - **Container file:** compilation, testing, build logic
+
+            ## With just
+            {{=<% %>=}}
+            ```just
+            # justfile (host)
+            _run +ARGS:
+                podman run -v ./justfile.container:/workspace/justfile:ro ... just {{ARGS}}
+            build:
+                just _run build
+
+            # justfile.container
+            build:
+                cargo build
+            ```
+            <%={{ }}=%>
+
+            ## Edge Cases
+
+            **Devcontainer escape:**
+            ```make
+            ifdef DEVCONTAINER
+            DOCKER_RUN :=
+            endif
+            ```
+
+            **Podman/SELinux:** Add `:Z` to volumes.
+
+            ## When to Use
+            - Polyglot projects, mixed teams, CI consistency
+            - Skip for simple projects or uniform environments
+        distilled_by: claude-3-opus
+    devcontainer:
+        tags:
+            - tooling
+            - devcontainer
+        content: 'Dev Containers: Maintain .devcontainer config for consistent dev env w/ required tools, deps, system reqs. Enables reproducible builds.'
+        content_hash: sha256:c5b09c56fecf66c2b8886d25765fb25ee55fc8cdf3166d3159415606d41d4ed7
+        distilled: 'Dev Containers: `.devcontainer` config for consistent dev env w/ tools, deps, system reqs. Reproducible builds.'
+        distilled_by: claude-3-opus
+    testcontainers:
+        tags:
+            - tooling
+            - testing
+            - containers
+            - integration-testing
+            - bit
+        content: |-
+            # Testcontainers
+
+            Lib for throwaway containers in tests—real deps (DBs, brokers) vs mocks.
+
+            ## Test Types (by what, not how)
+
+            | Type | Tests | Location |
+            |------|-------|----------|
+            | Unit | Pure logic | Adjacent `.test` |
+            | BIT | Single impl vs interface | Adjacent `.test` (w/ testcontainers) |
+            | Integration | Multi-component | `tests/` |
+            | E2E | Full system | Separate project |
+
+            **BITs w/ testcontainers = unit-adjacent.** Test one thing, fast, colocated.
+
+            ## Mock vs Real
+
+            **Testcontainers:** DBs, brokers, controlled infra
+            **Mocks:** External APIs, failure injection
+
+            If cheap to test real, do it.
+
+            ## Core
+
+            - Real services as Docker/Podman containers
+            - Auto cleanup, randomized ports, cross-platform
+
+            ## Go Quick Start
+
+            ```go
+            container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+                ContainerRequest: testcontainers.ContainerRequest{
+                    Image:        "postgres:16-alpine",
+                    ExposedPorts: []string{"5432/tcp"},
+                    Env:          map[string]string{"POSTGRES_PASSWORD": "test", "POSTGRES_DB": "testdb"},
+                    WaitingFor:   wait.ForLog("database system is ready").WithOccurrence(2),
+                },
+                Started: true,
+            })
+            defer container.Terminate(ctx)
+            host, _ := container.Host(ctx)
+            port, _ := container.MappedPort(ctx, "5432")
+            ```
+
+            ## Wait Strategies
+
+            ```go
+            wait.ForLog("Ready")
+            wait.ForHTTP("/health").WithPort("8080/tcp")
+            wait.ForListeningPort("5432/tcp")
+            wait.ForSQL("5432/tcp", "postgres", connStrFunc)
+            wait.ForAll(wait.ForLog("Started"), wait.ForHTTP("/ready"))
+            ```
+
+            ## Lifecycle
+
+            `Start(ctx)`, `Stop(ctx, nil)`, `Terminate(ctx)`
+
+            ## Modules (Pre-configured)
+
+            ```go
+            container, _ := postgres.Run(ctx, "postgres:16-alpine",
+                postgres.WithDatabase("testdb"), postgres.WithUsername("user"), postgres.WithPassword("pass"))
+            connStr, _ := container.ConnectionString(ctx, "sslmode=disable")
+            ```
+
+            Modules: PostgreSQL, MySQL, Redis, MongoDB, Kafka, RabbitMQ, Elasticsearch, LocalStack, etc.
+
+            ## Networks
+
+            ```go
+            req := testcontainers.ContainerRequest{
+                Networks:       []string{"test-network"},
+                NetworkAliases: map[string][]string{"test-network": {"myservice"}},
+            }
+            ```
+
+            ## Files/Config
+
+            ```go
+            container.CopyFileToContainer(ctx, "local.conf", "/etc/app/config.conf", 0644)
+            // Mounts: testcontainers.BindMount("/host", "/container")
+            // Files: ContainerFile{HostFilePath: "init.sql", ContainerFilePath: "/docker-entrypoint-initdb.d/init.sql"}
+            ```
+
+            ## Exec/Logs
+
+            ```go
+            exitCode, reader, _ := container.Exec(ctx, []string{"psql", "-U", "postgres", "-c", "SELECT 1"})
+            logs, _ := container.Logs(ctx)
+            ```
+
+            ## Reusable Containers
+
+            ```go
+            req := testcontainers.ContainerRequest{Name: "reusable-postgres"}
+            req = req.WithReuse(ctx)
+            ```
+
+            ## Test Categorization
+
+            ```go
+            //go:build testcontainers
+            func TestPostgresStorage(t *testing.T) { /* ... */ }
+            ```
+
+            ```rust
+            #[cfg_attr(not(feature = "testcontainers"), ignore)]
+            fn test_postgres_storage() { /* ... */ }
+            ```
+
+            ## Best Practices
+
+            1. Use modules when available
+            2. Always `defer Terminate()`
+            3. Proper wait strategies
+            4. Never hardcode ports—use `MappedPort()`
+            5. Tag images explicitly, prefer alpine
+            6. Parallel tests OK—each gets own container
+            7. Colocate BITs next to impl
+
+            ## Troubleshooting
+
+            - Slow: lighter images, check wait strategy
+            - Port conflicts: use `MappedPort()`
+            - Not ready: add wait strategy
+            - Cleanup: always `defer Terminate()`
+            - CI: verify Docker access, resource limits
+        content_hash: sha256:d564d938972f0ca1ae3e1caa73e27b15c634a55b7e777369e915e4550084d11c
+        distilled: |-
+            # testcontainers
+
+            Throwaway containers for tests—real deps vs mocks.
+
+            ## Test Types
+
+            | Type | Tests | Location |
+            |------|-------|----------|
+            | Unit | Pure logic | Adjacent `.test` |
+            | BIT | Single impl vs interface | Adjacent `.test` (w/ testcontainers) |
+            | Integration | Multi-component | `tests/` |
+            | E2E | Full system | Separate project |
+
+            **BITs w/ testcontainers = unit-adjacent.** If cheap to test real, do it.
+
+            ## Go Quick Start
+
+            ```go
+            container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+                ContainerRequest: testcontainers.ContainerRequest{
+                    Image:        "postgres:16-alpine",
+                    ExposedPorts: []string{"5432/tcp"},
+                    Env:          map[string]string{"POSTGRES_PASSWORD": "test", "POSTGRES_DB": "testdb"},
+                    WaitingFor:   wait.ForLog("database system is ready").WithOccurrence(2),
+                },
+                Started: true,
+            })
+            defer container.Terminate(ctx)
+            host, _ := container.Host(ctx)
+            port, _ := container.MappedPort(ctx, "5432")
+            ```
+
+            ## Wait Strategies
+
+            ```go
+            wait.ForLog("Ready")
+            wait.ForHTTP("/health").WithPort("8080/tcp")
+            wait.ForListeningPort("5432/tcp")
+            wait.ForSQL("5432/tcp", "postgres", connStrFunc)
+            wait.ForAll(wait.ForLog("Started"), wait.ForHTTP("/ready"))
+            ```
+
+            ## Modules (Pre-configured)
+
+            ```go
+            container, _ := postgres.Run(ctx, "postgres:16-alpine",
+                postgres.WithDatabase("testdb"), postgres.WithUsername("user"), postgres.WithPassword("pass"))
+            connStr, _ := container.ConnectionString(ctx, "sslmode=disable")
+            ```
+
+            Available: PostgreSQL, MySQL, Redis, MongoDB, Kafka, RabbitMQ, Elasticsearch, LocalStack, etc.
+
+            ## Networks
+
+            ```go
+            req := testcontainers.ContainerRequest{
+                Networks:       []string{"test-network"},
+                NetworkAliases: map[string][]string{"test-network": {"myservice"}},
+            }
+            ```
+
+            ## Files/Exec
+
+            ```go
+            container.CopyFileToContainer(ctx, "local.conf", "/etc/app/config.conf", 0644)
+            exitCode, reader, _ := container.Exec(ctx, []string{"psql", "-U", "postgres", "-c", "SELECT 1"})
+            ```
+
+            ## Test Tags
+
+            ```go
+            //go:build testcontainers
+            func TestPostgresStorage(t *testing.T) { /* ... */ }
+            ```
+
+            ## Rules
+
+            - Use modules when available
+            - Always `defer Terminate()`
+            - Proper wait strategies
+            - Never hardcode ports—use `MappedPort()`
+            - Tag images explicitly, prefer alpine
+            - Parallel OK—each gets own container
+            - Colocate BITs next to impl
+        distilled_by: claude-3-opus

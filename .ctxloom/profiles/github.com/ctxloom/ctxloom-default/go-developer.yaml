@@ -1,0 +1,14 @@
+bundles:
+    - ctxloom-default/ai-coding-general
+    - ctxloom-default/go-ai-practices
+    - ctxloom-default/testing
+    - ctxloom-default/12-factor
+    - ctxloom-default/git
+    - ctxloom-default/ast-grep
+    - ctxloom-default/lsp
+description: Go development profile with AI coding practices
+tags:
+    - golang
+    - development
+    - backend
+version: 1.0.0

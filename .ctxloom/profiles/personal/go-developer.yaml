@@ -1,0 +1,16 @@
+version: "1.0.0"
+description: "Go development profile with personal practices and tooling"
+tags:
+  - golang
+  - development
+  - backend
+
+bundles:
+  # Personal practices
+  - core-practices
+  - developer-mindset
+  - go-development
+
+  # Personal tooling preferences
+  - just
+  - containers

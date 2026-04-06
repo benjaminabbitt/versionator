@@ -1,0 +1,54 @@
+version: 1
+locked_at: 2026-04-05T21:15:17.690316349Z
+bundles:
+    ctxloom-default/12-factor:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:15.678228423Z
+    ctxloom-default/ai-coding-general:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:12.976118734Z
+    ctxloom-default/ast-grep:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:14.966245814Z
+    ctxloom-default/code-review-checklists:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:14.332861356Z
+    ctxloom-default/git:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:16.403428337Z
+    ctxloom-default/go-ai-practices:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:13.676163014Z
+    ctxloom-default/lsp:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:17.05278752Z
+    ctxloom-default/testing:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:15:17.690316056Z
+profiles:
+    ctxloom-default/go-code-reviewer:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:14:16.582070238Z
+    ctxloom-default/go-developer:
+        sha: c3ad15aa832d9c520bb5b0ce54f1f616518a7144
+        url: https://github.com/ctxloom/ctxloom-default
+        ctxloom_version: v1
+        fetched_at: 2026-04-05T21:14:17.378552013Z
