@@ -62,3 +62,7 @@ docs/node_modules/
 
 # Claude settings
 .claude/**/*
+
+# ctxloom ephemeral and persistent data (local state, synced bundles)
+.ctxloom/ephemeral/
+.ctxloom/persistent/
