@@ -442,50 +442,10 @@ func (g *GitVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) 
 }
 
 // GetDirtyFiles returns the list of files with uncommitted changes.
-// Files matching gitignore patterns are excluded from the result.
-// Uses go-git's worktree.Status() with gitignore filtering.
-// Falls back to git CLI if go-git fails (e.g., permission errors on unreadable gitignored files).
+// Uses git CLI which natively respects .gitignore and skips ignored directories
+// during the walk, avoiding performance issues with large ignored trees
+// (e.g., .cargo-container/) and permission errors on unreadable files.
 func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
-	files, err := g.getDirtyFilesGoGit()
-	if err != nil {
-		// Fall back to git CLI — handles permission errors from unreadable gitignored files
-		return g.getDirtyFilesGitCLI()
-	}
-	return files, nil
-}
-
-// getDirtyFilesGoGit uses go-git's worktree.Status() with gitignore filtering.
-func (g *GitVersionControlSystem) getDirtyFilesGoGit() ([]string, error) {
-	repo, err := g.openRepository()
-	if err != nil {
-		return nil, err
-	}
-
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get working tree: %w", err)
-	}
-
-	status, err := worktree.Status()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get git status: %w", err)
-	}
-
-	matcher, _ := g.getGitignoreMatcher()
-
-	var files []string
-	for file := range status {
-		if g.isFileIgnored(matcher, file) {
-			continue
-		}
-		files = append(files, file)
-	}
-	return files, nil
-}
-
-// getDirtyFilesGitCLI falls back to git CLI for status.
-// git status --porcelain natively respects .gitignore and handles unreadable files.
-func (g *GitVersionControlSystem) getDirtyFilesGitCLI() ([]string, error) {
 	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return nil, err

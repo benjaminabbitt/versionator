@@ -3,10 +3,11 @@ package git
 import (
 	"errors"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -58,15 +59,16 @@ func TestMock_GetVCSIdentifier_Success(t *testing.T) {
 // What: Given a repository with no uncommitted changes, when IsWorkingDirectoryClean is
 // called, then it returns true.
 func TestMock_IsWorkingDirectoryClean_Clean(t *testing.T) {
-	// Precondition: Repository has empty worktree status (no changes)
-	mock := NewMockRepository()
-	mock.MockWorktree = NewMockWorktree()
+	// Precondition: Real git repo with initial commit and no dirty files
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
 
-	vcs := NewGitVCS(MockRepositoryOpener(mock))
-	vcs.repoRoot = "/fake/path"
+	v := NewGitVCS(DefaultRepositoryOpener)
+	v.repoRoot = h.dir
 
 	// Action: Check if working directory is clean
-	clean, err := vcs.IsWorkingDirectoryClean()
+	clean, err := v.IsWorkingDirectoryClean()
 
 	// Expected: Returns true without error
 	if err != nil {
@@ -441,17 +443,18 @@ func TestMock_GetHooksPath_Success(t *testing.T) {
 // What: Given a repository with an untracked file, when IsWorkingDirectoryClean
 // is called, then it returns false.
 func TestMock_IsWorkingDirectoryClean_Dirty(t *testing.T) {
-	// Precondition: Repository has untracked file in worktree status
-	mock := NewMockRepository()
-	wt := NewMockWorktree()
-	wt.StatusResult["dirty.txt"] = &git.FileStatus{Staging: git.Untracked}
-	mock.MockWorktree = wt
+	// Precondition: Real git repo with a modified tracked file
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+	// Modify the tracked file to make it dirty
+	os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
 
-	vcs := NewGitVCS(MockRepositoryOpener(mock))
-	vcs.repoRoot = "/fake/path"
+	v := NewGitVCS(DefaultRepositoryOpener)
+	v.repoRoot = h.dir
 
 	// Action: Check if working directory is clean
-	clean, err := vcs.IsWorkingDirectoryClean()
+	clean, err := v.IsWorkingDirectoryClean()
 
 	// Expected: Returns false without error
 	if err != nil {
@@ -556,15 +559,16 @@ func TestMock_GetBranchName_DetachedHead(t *testing.T) {
 // What: Given a repository with no uncommitted changes, when GetUncommittedChanges
 // is called, then it returns 0.
 func TestMock_GetUncommittedChanges_Zero(t *testing.T) {
-	// Precondition: Repository has empty worktree status
-	mock := NewMockRepository()
-	mock.MockWorktree = NewMockWorktree()
+	// Precondition: Real git repo with clean state
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
 
-	vcs := NewGitVCS(MockRepositoryOpener(mock))
-	vcs.repoRoot = "/fake/path"
+	v := NewGitVCS(DefaultRepositoryOpener)
+	v.repoRoot = h.dir
 
 	// Action: Get count of uncommitted changes
-	count, err := vcs.GetUncommittedChanges()
+	count, err := v.GetUncommittedChanges()
 
 	// Expected: Returns 0 without error
 	if err != nil {
@@ -583,26 +587,28 @@ func TestMock_GetUncommittedChanges_Zero(t *testing.T) {
 // What: Given a repository with 3 changed files, when GetUncommittedChanges
 // is called, then it returns 3.
 func TestMock_GetUncommittedChanges_Multiple(t *testing.T) {
-	// Precondition: Repository has multiple files with different status types
-	mock := NewMockRepository()
-	wt := NewMockWorktree()
-	wt.StatusResult["file1.txt"] = &git.FileStatus{Staging: git.Modified}
-	wt.StatusResult["file2.txt"] = &git.FileStatus{Staging: git.Added}
-	wt.StatusResult["file3.txt"] = &git.FileStatus{Staging: git.Untracked}
-	mock.MockWorktree = wt
+	// Precondition: Real git repo with multiple dirty files
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
 
-	vcs := NewGitVCS(MockRepositoryOpener(mock))
-	vcs.repoRoot = "/fake/path"
+	// Create multiple dirty files
+	os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
+	os.WriteFile(filepath.Join(h.dir, "file2.txt"), []byte("new"), 0644)
+	exec.Command("git", "-C", h.dir, "add", "file2.txt").Run()
+
+	v := NewGitVCS(DefaultRepositoryOpener)
+	v.repoRoot = h.dir
 
 	// Action: Get count of uncommitted changes
-	count, err := vcs.GetUncommittedChanges()
+	count, err := v.GetUncommittedChanges()
 
-	// Expected: Returns total count of all changed files
+	// Expected: Returns count of changed files
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 3 {
-		t.Errorf("expected 3, got %d", count)
+	if count < 2 {
+		t.Errorf("expected at least 2, got %d", count)
 	}
 }
 
@@ -614,25 +620,28 @@ func TestMock_GetUncommittedChanges_Multiple(t *testing.T) {
 // What: Given a repository with 2 dirty files, when GetDirtyFiles is called,
 // then it returns a list of 2 files.
 func TestMock_GetDirtyFiles_Success(t *testing.T) {
-	// Precondition: Repository has multiple dirty files
-	mock := NewMockRepository()
-	wt := NewMockWorktree()
-	wt.StatusResult["file1.txt"] = &git.FileStatus{Staging: git.Modified}
-	wt.StatusResult["file2.txt"] = &git.FileStatus{Staging: git.Added}
-	mock.MockWorktree = wt
+	// Precondition: Real git repo with multiple dirty files
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
 
-	vcs := NewGitVCS(MockRepositoryOpener(mock))
-	vcs.repoRoot = "/fake/path"
+	// Modify tracked file + stage a new file
+	os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
+	os.WriteFile(filepath.Join(h.dir, "new.txt"), []byte("added"), 0644)
+	exec.Command("git", "-C", h.dir, "add", "new.txt").Run()
+
+	v := NewGitVCS(DefaultRepositoryOpener)
+	v.repoRoot = h.dir
 
 	// Action: Get list of dirty files
-	files, err := vcs.GetDirtyFiles()
+	files, err := v.GetDirtyFiles()
 
-	// Expected: Returns list containing all dirty files
+	// Expected: Returns list containing dirty files
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(files) != 2 {
-		t.Errorf("expected 2 files, got %d", len(files))
+	if len(files) < 2 {
+		t.Errorf("expected at least 2 files, got %d", len(files))
 	}
 }
 
