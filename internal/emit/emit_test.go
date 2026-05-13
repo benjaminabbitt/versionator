@@ -1776,6 +1776,62 @@ func TestDirtyFlag(t *testing.T) {
 	}
 }
 
+// TestDateTimeDirtyFlag validates the DateTimeDirty composition helper.
+//
+// Why: DateTimeDirty replaces the older bare "dirty" literal in prerelease
+// templates; two dirty builds at different times must yield different
+// version strings, while clean builds must produce nothing (so the template
+// doesn't accumulate stray separators).
+func TestDateTimeDirtyFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		dirty    int
+		compact  string
+		expected string
+	}{
+		{name: "clean tree produces empty", dirty: 0, compact: "20240115103045", expected: ""},
+		{name: "dirty tree prefixes dot", dirty: 1, compact: "20240115103045", expected: ".20240115103045"},
+		{name: "many dirty files still dot-prefixed", dirty: 42, compact: "20240115103045", expected: ".20240115103045"},
+		{name: "empty compact still emitted when dirty", dirty: 1, compact: "", expected: "."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := dateTimeDirtyFlag(tt.dirty, tt.compact)
+			if got != tt.expected {
+				t.Errorf("dateTimeDirtyFlag(%d, %q) = %q, want %q",
+					tt.dirty, tt.compact, got, tt.expected)
+			}
+		})
+	}
+}
+
+// TestRenderTemplateWithData_DateTimeDirty validates that DateTimeDirty is
+// available as a mustache variable end-to-end (proves the wiring through
+// templateDataToMap).
+func TestRenderTemplateWithData_DateTimeDirty(t *testing.T) {
+	data := TemplateData{
+		ShortHash:     "abc1234",
+		DateTimeDirty: ".20240115103045",
+	}
+	out, err := RenderTemplateWithData("{{ShortHash}}{{DateTimeDirty}}", data)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	if out != "abc1234.20240115103045" {
+		t.Errorf("got %q, want %q", out, "abc1234.20240115103045")
+	}
+
+	// Clean case: empty DateTimeDirty leaves no trailing dot.
+	data.DateTimeDirty = ""
+	out, err = RenderTemplateWithData("{{ShortHash}}{{DateTimeDirty}}", data)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	if out != "abc1234" {
+		t.Errorf("got %q, want %q", out, "abc1234")
+	}
+}
+
 // TestFormatPreReleaseNumber validates pre-release number formatting.
 //
 // Why: Pre-release numbers may be negative (-1 indicates none) or zero.

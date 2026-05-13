@@ -109,6 +109,7 @@ TEMPLATE VARIABLES:
   Build Timestamps:
     {{BuildDateTimeCompact}} - Compact: 20241211103045
     {{BuildDateUTC}}         - Date only: 2024-12-11
+    {{DateTimeDirty}}        - ".{BuildDateTimeCompact}" if uncommitted, empty otherwise
 
   Custom Variables:
     Use --set key=value to inject custom variables

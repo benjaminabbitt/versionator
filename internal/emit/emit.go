@@ -120,6 +120,16 @@ type TemplateData struct {
 	BuildMonth           string // Month: 01 (zero-padded)
 	BuildDay             string // Day: 15 (zero-padded)
 
+	// DateTimeDirty is the dot-prefixed compact build datetime when the
+	// working tree has uncommitted changes, empty when clean. Intended as a
+	// drop-in for the legacy ".dirty" suffix in prerelease templates: it
+	// preserves the dirty-or-not signal but pins each dirty build to the
+	// moment it was produced, so two dirty builds of the same commit do not
+	// collide on version strings.
+	// Example clean:  ""
+	// Example dirty:  ".20240115103045"
+	DateTimeDirty string
+
 	// Custom holds arbitrary key-value pairs from config and --set flags
 	Custom map[string]string
 
@@ -186,6 +196,16 @@ func Render(format Format, version string) (string, error) {
 func dirtyFlag(uncommittedChanges int) string {
 	if uncommittedChanges > 0 {
 		return "dirty"
+	}
+	return ""
+}
+
+// dateTimeDirtyFlag returns "." + compactDateTime when the tree is dirty,
+// empty string when clean. Concentrates the compose-with-dot pattern in one
+// place so callers don't have to coordinate the separator with the value.
+func dateTimeDirtyFlag(uncommittedChanges int, compactDateTime string) string {
+	if uncommittedChanges > 0 {
+		return "." + compactDateTime
 	}
 	return ""
 }
@@ -383,6 +403,8 @@ func RenderTemplate(tmplStr string, versionStr string) (string, error) {
 		BuildYear:            buildTime.Year,
 		BuildMonth:           buildTime.Month,
 		BuildDay:             buildTime.Day,
+
+		DateTimeDirty: dateTimeDirtyFlag(vcsInfo.UncommittedChanges, buildTime.DateCompact),
 	}
 
 	result, err := mustache.Render(tmplStr, data)
@@ -530,6 +552,8 @@ func BuildTemplateDataFromVersion(v *version.Version) TemplateData {
 		BuildYear:            buildTime.Year,
 		BuildMonth:           buildTime.Month,
 		BuildDay:             buildTime.Day,
+
+		DateTimeDirty: dateTimeDirtyFlag(vcsInfo.UncommittedChanges, buildTime.DateCompact),
 	}
 }
 
@@ -602,6 +626,8 @@ func templateDataToMap(data TemplateData) map[string]interface{} {
 		"BuildYear":            data.BuildYear,
 		"BuildMonth":           data.BuildMonth,
 		"BuildDay":             data.BuildDay,
+
+		"DateTimeDirty": data.DateTimeDirty,
 	}
 
 	// Merge custom variables (they can override built-ins if desired)
@@ -743,6 +769,8 @@ func TemplateDataToStringMap(data TemplateData) map[string]string {
 		"BuildYear":            data.BuildYear,
 		"BuildMonth":           data.BuildMonth,
 		"BuildDay":             data.BuildDay,
+
+		"DateTimeDirty": data.DateTimeDirty,
 	}
 
 	// Merge custom variables

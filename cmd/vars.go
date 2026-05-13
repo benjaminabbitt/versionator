@@ -88,6 +88,7 @@ func runVars(cmd *cobra.Command, args []string) error {
 		"Build Timestamps": {
 			"BuildDateTimeUTC", "BuildDateTimeCompact", "BuildDateUTC",
 			"BuildYear", "BuildMonth", "BuildDay",
+			"DateTimeDirty",
 		},
 	}
 

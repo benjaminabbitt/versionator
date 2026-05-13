@@ -215,6 +215,7 @@ func buildTemplateVarsSchema() TemplateVarsSchema {
 		BuildTimestamps: []TemplateVarSchema{
 			{Name: "BuildDateTimeUTC", Description: "ISO 8601 build time", Example: "2024-01-15T10:30:00Z"},
 			{Name: "BuildDateTimeCompact", Description: "Compact build time", Example: "20240115103045"},
+			{Name: "DateTimeDirty", Description: "'.{BuildDateTimeCompact}' if uncommitted, empty otherwise", Example: ".20240115103045"},
 			{Name: "BuildDateUTC", Description: "Build date only", Example: "2024-01-15"},
 			{Name: "BuildYear", Description: "Build year", Example: "2024"},
 			{Name: "BuildMonth", Description: "Build month (zero-padded)", Example: "01"},
