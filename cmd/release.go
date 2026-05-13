@@ -176,16 +176,34 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 
 	tagName := prefix + vd.String()
 
-	// Check if tag already exists
+	// Tag idempotency: if the tag already exists AND points to the commit
+	// we'd be tagging anyway, skip creation and proceed (this is what makes
+	// `release` followed by `release push` work cleanly — the second
+	// invocation finds the tag already at HEAD and treats it as a no-op).
+	// If the tag exists but points elsewhere, that's a real conflict —
+	// require --force. The "what we'd tag" target is HEAD because
+	// CreateTag uses repo.Head() as the target commit.
 	exists, err := vcsImpl.TagExists(tagName)
 	if err != nil {
 		return nil, fmt.Errorf("error checking if tag exists: %w", err)
 	}
 
+	tagAlreadyAtTarget := false
 	if exists {
 		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			return nil, fmt.Errorf("tag '%s' already exists. Use --force to overwrite", tagName)
+		headCommit, err := vcsImpl.GetVCSIdentifier(40)
+		if err != nil {
+			return nil, fmt.Errorf("error reading HEAD: %w", err)
+		}
+		existingTagCommit, err := vcsImpl.GetTagCommit(tagName)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving existing tag %q: %w", tagName, err)
+		}
+		if existingTagCommit == headCommit {
+			tagAlreadyAtTarget = true
+		} else if !force {
+			return nil, fmt.Errorf("tag '%s' already exists at %s (not HEAD %s). Use --force to overwrite",
+				tagName, existingTagCommit[:7], headCommit[:7])
 		}
 	}
 
@@ -226,12 +244,16 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 		cmd.Printf("Committed: %v\n", filesToCommit)
 	}
 
-	// Create the tag
-	if err := vcsImpl.CreateTag(tagName, message); err != nil {
-		return nil, fmt.Errorf("error creating tag: %w", err)
+	// Create the tag (skip when it already points at HEAD — idempotent path
+	// for `release push` after `release`).
+	if tagAlreadyAtTarget {
+		cmd.Printf("Tag '%s' already at HEAD; skipping tag creation\n", tagName)
+	} else {
+		if err := vcsImpl.CreateTag(tagName, message); err != nil {
+			return nil, fmt.Errorf("error creating tag: %w", err)
+		}
+		cmd.Printf("Successfully created tag '%s' for version %s using %s\n", tagName, vd.String(), vcsImpl.Name())
 	}
-
-	cmd.Printf("Successfully created tag '%s' for version %s using %s\n", tagName, vd.String(), vcsImpl.Name())
 
 	result := &releaseResult{
 		tagName: tagName,
@@ -245,16 +267,31 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 	if createBranch {
 		branchName := cfg.Release.BranchPrefix + tagName
 
-		// Check if branch already exists
+		// Same idempotency rule as tags: if the branch already points to HEAD,
+		// treat as success and queue it for push. If it points elsewhere,
+		// warn and skip (--force does not currently overwrite branches; see
+		// CreateBranch in the git VCS — and clobbering a release branch is
+		// usually not what the user wants).
 		branchExists, err := vcsImpl.BranchExists(branchName)
 		if err != nil {
 			return nil, fmt.Errorf("error checking if branch exists: %w", err)
 		}
 
 		if branchExists {
-			force, _ := cmd.Flags().GetBool("force")
-			if !force {
-				cmd.Printf("Warning: branch '%s' already exists, skipping branch creation\n", branchName)
+			headCommit, err := vcsImpl.GetVCSIdentifier(40)
+			if err != nil {
+				return nil, fmt.Errorf("error reading HEAD: %w", err)
+			}
+			existingBranchCommit, err := vcsImpl.GetBranchCommit(branchName)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving branch %q: %w", branchName, err)
+			}
+			if existingBranchCommit == headCommit {
+				cmd.Printf("Branch '%s' already at HEAD; skipping branch creation\n", branchName)
+				result.branchName = branchName
+			} else {
+				cmd.Printf("Warning: branch '%s' exists at %s (not HEAD %s); skipping branch creation\n",
+					branchName, existingBranchCommit[:7], headCommit[:7])
 			}
 		} else {
 			if err := vcsImpl.CreateBranch(branchName); err != nil {

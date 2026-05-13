@@ -387,22 +387,24 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_NoVCS() {
 }
 
 // TestReleaseCommand_TagExists_NoForce validates that the release command refuses
-// to overwrite an existing tag without the --force flag.
+// to overwrite an existing tag at a DIFFERENT commit without --force.
 //
 // Why: Prevents accidental tag overwrites that could cause confusion or break CI/CD.
-// What: Given tag v1.0.0 already exists and --force is not used,
-// when release runs, then it fails with an error about the existing tag.
+// What: Given tag v1.0.0 already exists at a commit other than HEAD and --force
+// is not used, when release runs, then it fails with an error.
 func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_NoForce() {
 	// Precondition: VERSION file with 1.0.0
 	suite.createTestFiles("1.0.0")
 
-	// Precondition: VCS reports tag already exists
+	// Precondition: tag exists at a different commit than HEAD
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
 	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
+	mockVCS.EXPECT().GetVCSIdentifier(40).Return("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil)
+	mockVCS.EXPECT().GetTagCommit("v1.0.0").Return("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", nil)
 
 	vcs.RegisterVCS(mockVCS)
 
@@ -410,11 +412,47 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_NoForce() {
 	rootCmd.SetErr(&buf)
 	rootCmd.SetArgs([]string{"release"})
 
-	// Action: Execute release without --force when tag exists
+	// Action: Execute release without --force when tag exists elsewhere
 	err := rootCmd.Execute()
 
 	// Expected: Command fails, refusing to overwrite tag
-	suite.Error(err, "Expected release command to fail when tag exists and force is not used")
+	suite.Error(err, "Expected release command to fail when tag exists elsewhere and force is not used")
+}
+
+// TestReleaseCommand_TagAlreadyAtHead validates the idempotent path: when the
+// tag already exists AND points to HEAD, release skips creation and succeeds.
+// This is what makes `release` followed by `release push` work cleanly.
+//
+// Why: The natural workflow is to call `release` (creates tag locally) and
+// `release push` (re-enters runRelease and then pushes). Without idempotency
+// the second call would error.
+func (suite *ReleaseTestSuite) TestReleaseCommand_TagAlreadyAtHead() {
+	suite.createTestFiles("1.0.0")
+
+	headSHA := "cccccccccccccccccccccccccccccccccccccccc"
+	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
+	mockVCS.EXPECT().Name().Return("git").AnyTimes()
+	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
+	mockVCS.EXPECT().GetVCSIdentifier(40).Return(headSHA, nil)
+	mockVCS.EXPECT().GetTagCommit("v1.0.0").Return(headSHA, nil)
+	// CreateTag should NOT be called — tag is already where we'd put it.
+	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/v1.0.0").Return(nil)
+
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	err := rootCmd.Execute()
+
+	suite.Require().NoError(err, "release should succeed when tag already at HEAD")
+	suite.Contains(buf.String(), "already at HEAD; skipping tag creation",
+		"output should mention the idempotent skip")
 }
 
 // TestReleaseCommand_DirtyWithOtherFiles validates that the release command refuses
@@ -462,13 +500,15 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_WithForce() {
 	// Precondition: VERSION file with 1.0.0
 	suite.createTestFiles("1.0.0")
 
-	// Precondition: VCS reports tag exists but CreateTag will be called anyway
+	// Precondition: tag exists at a different commit; --force lets it pass.
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
 	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
+	mockVCS.EXPECT().GetVCSIdentifier(40).Return("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil)
+	mockVCS.EXPECT().GetTagCommit("v1.0.0").Return("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
 	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateBranch("release/v1.0.0").Return(nil)
@@ -546,7 +586,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyExists() {
 	// Precondition: Config has branch creation enabled
 	suite.createTestFiles("1.0.0")
 
-	// Precondition: VCS reports branch exists, so CreateBranch won't be called
+	// Precondition: branch exists at a DIFFERENT commit; should warn and skip.
 	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
 	mockVCS.EXPECT().Name().Return("git").AnyTimes()
 	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
@@ -555,7 +595,9 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyExists() {
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
 	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(true, nil)
-	// CreateBranch should NOT be called since branch exists
+	mockVCS.EXPECT().GetVCSIdentifier(40).Return("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil)
+	mockVCS.EXPECT().GetBranchCommit("release/v1.0.0").Return("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", nil)
+	// CreateBranch should NOT be called since branch exists elsewhere
 
 	vcs.RegisterVCS(mockVCS)
 
@@ -563,14 +605,46 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyExists() {
 	rootCmd.SetOut(&buf)
 	rootCmd.SetArgs([]string{"release"})
 
-	// Action: Execute release when branch already exists
+	// Action: Execute release when branch already exists at different commit
 	err := rootCmd.Execute()
 
 	// Expected: Tag created, warning about existing branch
 	suite.Require().NoError(err, "release command should succeed")
 	output := buf.String()
 	suite.Contains(output, "Successfully created tag 'v1.0.0'", "Should contain tag success message")
-	suite.Contains(output, "Warning: branch 'release/v1.0.0' already exists", "Should contain warning about existing branch")
+	suite.Contains(output, "Warning: branch 'release/v1.0.0' exists at", "Should warn about existing branch at different commit")
+}
+
+// TestReleaseCommand_BranchAlreadyAtHead validates the idempotent branch path:
+// when the release branch already points at HEAD, skip creation, record it
+// for push, and succeed. Companion to TestReleaseCommand_TagAlreadyAtHead.
+func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyAtHead() {
+	suite.createTestFiles("1.0.0")
+
+	headSHA := "dddddddddddddddddddddddddddddddddddddddd"
+	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
+	mockVCS.EXPECT().Name().Return("git").AnyTimes()
+	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(true, nil)
+	mockVCS.EXPECT().GetVCSIdentifier(40).Return(headSHA, nil)
+	mockVCS.EXPECT().GetBranchCommit("release/v1.0.0").Return(headSHA, nil)
+	// CreateBranch should NOT be called — branch is already at HEAD.
+
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	err := rootCmd.Execute()
+
+	suite.Require().NoError(err)
+	suite.Contains(buf.String(), "already at HEAD; skipping branch creation",
+		"output should mention the idempotent skip")
 }
 
 // =============================================================================

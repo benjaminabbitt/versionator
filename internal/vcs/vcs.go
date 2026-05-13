@@ -25,11 +25,20 @@ type VersionControlSystem interface {
 	// TagExists checks if a tag with the specified name exists
 	TagExists(tagName string) (bool, error)
 
+	// GetTagCommit returns the commit hash that the named tag points to.
+	// Returns an error if the tag does not exist. The returned hash is the
+	// full-length identifier (40 chars for git).
+	GetTagCommit(tagName string) (string, error)
+
 	// CreateBranch creates a branch with the specified name from the current HEAD
 	CreateBranch(branchName string) error
 
 	// BranchExists checks if a branch with the specified name exists
 	BranchExists(branchName string) (bool, error)
+
+	// GetBranchCommit returns the commit hash that the named branch points to.
+	// Returns an error if the branch does not exist.
+	GetBranchCommit(branchName string) (string, error)
 
 	// GetBranchName returns the current branch name
 	GetBranchName() (string, error)
