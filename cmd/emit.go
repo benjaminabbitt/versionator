@@ -90,6 +90,7 @@ TEMPLATE VARIABLES (Mustache syntax):
     {{BuildYear}}            - Year: 2024
     {{BuildMonth}}           - Month: 01 (zero-padded)
     {{BuildDay}}             - Day: 15 (zero-padded)
+    {{DateTimeDirty}}        - ".{BuildDateTimeCompact}" if uncommitted, empty otherwise
 
 Use 'versionator vars' to see all template variables and their current values.
 
