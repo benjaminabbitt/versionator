@@ -218,6 +218,48 @@ func (g *GitVersionControlSystem) TagExists(tagName string) (bool, error) {
 	return exists, nil
 }
 
+// GetTagCommit returns the commit SHA the named tag points to. For annotated
+// tags, this resolves through the tag object to the underlying commit. For
+// lightweight tags, the ref hash IS the commit. Returns an error if the tag
+// does not exist.
+func (g *GitVersionControlSystem) GetTagCommit(tagName string) (string, error) {
+	repo, err := g.openRepository()
+	if err != nil {
+		return "", err
+	}
+
+	tags, err := repo.Tags()
+	if err != nil {
+		return "", fmt.Errorf("failed to get tags: %w", err)
+	}
+
+	var found *plumbing.Reference
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Name().Short() == tagName {
+			found = ref
+			return errStopIteration
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, errStopIteration) {
+		return "", fmt.Errorf("failed to iterate tags: %w", err)
+	}
+	if found == nil {
+		return "", fmt.Errorf("tag %q not found", tagName)
+	}
+
+	// Annotated tag: peel through the tag object to its commit.
+	// Lightweight tag: TagObject errors and ref.Hash() is already the commit.
+	if tagObj, err := repo.TagObject(found.Hash()); err == nil {
+		commit, err := tagObj.Commit()
+		if err != nil {
+			return "", fmt.Errorf("failed to peel tag %q to commit: %w", tagName, err)
+		}
+		return commit.Hash.String(), nil
+	}
+	return found.Hash().String(), nil
+}
+
 // CreateBranch creates a branch with the specified name from the current HEAD
 func (g *GitVersionControlSystem) CreateBranch(branchName string) error {
 	repo, err := g.openRepository()
@@ -271,6 +313,36 @@ func (g *GitVersionControlSystem) BranchExists(branchName string) (bool, error) 
 	}
 
 	return exists, nil
+}
+
+// GetBranchCommit returns the commit SHA the named branch points to. Returns
+// an error if the branch does not exist.
+func (g *GitVersionControlSystem) GetBranchCommit(branchName string) (string, error) {
+	repo, err := g.openRepository()
+	if err != nil {
+		return "", err
+	}
+
+	branches, err := repo.Branches()
+	if err != nil {
+		return "", fmt.Errorf("failed to get branches: %w", err)
+	}
+
+	var found *plumbing.Reference
+	err = branches.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Name().Short() == branchName {
+			found = ref
+			return errStopIteration
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, errStopIteration) {
+		return "", fmt.Errorf("failed to iterate branches: %w", err)
+	}
+	if found == nil {
+		return "", fmt.Errorf("branch %q not found", branchName)
+	}
+	return found.Hash().String(), nil
 }
 
 // GetBranchName returns the current branch name
