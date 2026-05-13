@@ -516,6 +516,27 @@ func TestRender_Rust(t *testing.T) {
 	}
 }
 
+// TestRender_Dart validates Dart format output.
+//
+// Why: Dart uses top-level const declarations with explicit types.
+// Single quotes are idiomatic for Dart string literals.
+//
+// What: Render should produce Dart const declaration with single-quoted string.
+func TestRender_Dart(t *testing.T) {
+	// Precondition: Version string and Dart format
+	// Action: Render
+	result, err := Render(FormatDart, "1.2.3")
+
+	// Expected: Dart constant
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, `const String version = '1.2.3'`) {
+		t.Errorf("expected Dart version string, got: %s", result)
+	}
+}
+
 // TestRenderTemplate_MajorMinor validates the two-component version shorthand.
 //
 // Why: Some systems (like Docker tags) use Major.Minor without patch.

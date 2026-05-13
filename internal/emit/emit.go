@@ -40,6 +40,7 @@ const (
 	FormatSwift     Format = "swift"
 	FormatRuby      Format = "ruby"
 	FormatRust      Format = "rust"
+	FormatDart      Format = "dart"
 )
 
 // templateFiles maps formats to their template file names
@@ -62,6 +63,7 @@ var templateFiles = map[Format]string{
 	FormatSwift:     "templates/swift.tmpl",
 	FormatRuby:      "templates/ruby.tmpl",
 	FormatRust:      "templates/rust.tmpl",
+	FormatDart:      "templates/dart.tmpl",
 }
 
 // TemplateData holds the data passed to templates
@@ -145,6 +147,7 @@ func SupportedFormats() []string {
 		string(FormatSwift),
 		string(FormatRuby),
 		string(FormatRust),
+		string(FormatDart),
 	}
 }
 
