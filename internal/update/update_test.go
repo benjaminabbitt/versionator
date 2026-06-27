@@ -185,6 +185,53 @@ tokio = { version = "1", features = ["full"] }
 	assert.Contains(t, resultStr, `serde = "1.0"`)
 }
 
+func TestUpdater_UpdateFiles_JSON_PreservesOrderingAndFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "package.json")
+	// Hand-ordered keys (deliberately not alphabetical) plus a dependency pinned
+	// to the same value as the top-level version, proving the update targets the
+	// path: it must not reorder keys nor clobber the lookalike value.
+	content := `{
+  "name": "myapp",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "leftpad": "1.0.0"
+  }
+}
+`
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
+
+	configs := []config.UpdateConfig{
+		{File: filePath, Path: "version", Template: "{{MajorMinorPatch}}"},
+	}
+	updater := NewUpdater(configs, NewDaselFileParser(), newTestLogger(t))
+	require.NoError(t, updater.UpdateFiles(emit.TemplateData{MajorMinorPatch: "2.5.0"}))
+
+	result, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	resultStr := string(result)
+
+	// Value updated.
+	assert.Contains(t, resultStr, `"version": "2.5.0"`)
+
+	// Key order preserved (NOT alphabetized): name -> version -> private.
+	nameIdx := strings.Index(resultStr, `"name"`)
+	verIdx := strings.Index(resultStr, `"version"`)
+	privIdx := strings.Index(resultStr, `"private"`)
+	assert.Less(t, nameIdx, verIdx, "name should stay before version")
+	assert.Less(t, verIdx, privIdx, "version should stay before private")
+
+	// Lookalike dependency value untouched (targeted by path, not by text match).
+	assert.Contains(t, resultStr, `"leftpad": "1.0.0"`)
+
+	// Two-space indentation preserved.
+	assert.Contains(t, resultStr, "\n  \"name\": \"myapp\"")
+}
+
 func TestUpdater_UpdateFiles_TOML_DoesNotClobberDependencyVersions(t *testing.T) {
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "Cargo.toml")
@@ -294,7 +341,9 @@ func TestUpdater_UpdateFiles_PathNotFound_ReturnsError(t *testing.T) {
 	err := updater.UpdateFiles(data)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), ErrInvalidSelector)
+	// JSON updates report a missing path precisely (the sjson path targets the
+	// value), rather than the generic dasel "invalid selector syntax".
+	assert.Contains(t, err.Error(), ErrPathNotFound)
 }
 
 func TestUpdater_UpdateFiles_InvalidTemplate_ReturnsError(t *testing.T) {

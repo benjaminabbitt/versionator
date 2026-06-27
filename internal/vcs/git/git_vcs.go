@@ -589,51 +589,35 @@ func (g *GitVersionControlSystem) CommitFiles(files []string, message string) er
 	return nil
 }
 
-// AmendCommit stages the specified files and amends the last commit
+// AmendCommit stages the given files and folds them into the last commit.
+//
+// It shells out to git rather than using go-git's worktree.Commit{Amend:true}.
+// go-git's amend is unreliable here: under `bump` it could leave a *new* commit
+// whose tree omitted the just-staged VERSION, so the file ended up staged but
+// never committed (the version bump silently didn't land). git's own --amend is
+// authoritative. --no-verify preserves the prior behavior of not running commit
+// hooks during an automated bump.
 func (g *GitVersionControlSystem) AmendCommit(files []string) error {
-	repo, err := g.openRepository()
+	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return err
 	}
 
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get working tree: %w", err)
+	if out, err := runGitCmd(root, append([]string{"add", "--"}, files...)...); err != nil {
+		return fmt.Errorf("failed to stage files for amend: %w: %s", err, out)
 	}
-
-	// Stage each file
-	for _, file := range files {
-		_, err := worktree.Add(file)
-		if err != nil {
-			return fmt.Errorf("failed to stage file %s: %w", file, err)
-		}
+	if out, err := runGitCmd(root, "commit", "--amend", "--no-edit", "--no-verify"); err != nil {
+		return fmt.Errorf("failed to amend commit: %w: %s", err, out)
 	}
-
-	// Get the last commit to preserve its message and author
-	head, err := repo.Head()
-	if err != nil {
-		return fmt.Errorf("failed to get HEAD reference: %w", err)
-	}
-
-	lastCommit, err := repo.CommitObject(head.Hash())
-	if err != nil {
-		return fmt.Errorf("failed to get commit object: %w", err)
-	}
-
-	// Amend the commit (reuse message, update author timestamp)
-	_, err = worktree.Commit(lastCommit.Message, &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  lastCommit.Author.Name,
-			Email: lastCommit.Author.Email,
-			When:  time.Now(),
-		},
-		Amend: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to amend commit: %w", err)
-	}
-
 	return nil
+}
+
+// runGitCmd runs a git subcommand in dir and returns its combined output.
+func runGitCmd(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
 // GetHooksPath returns the path to the git hooks directory

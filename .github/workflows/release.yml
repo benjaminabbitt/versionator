@@ -1,220 +1,142 @@
 name: Release
 
+# Single release pipeline, triggered when auto-release.yml pushes a v* tag on a
+# merge to main. It merges the two former release flows:
+#
+#   - GoReleaser owns the binaries, archives, checksums, changelog, the GitHub
+#     Release, and the Homebrew cask (benjaminabbitt/homebrew-tap).
+#   - A second job preserves what the old hand-rolled release.yml uniquely did:
+#     publish the multi-arch container images to ghcr.io, and (best-effort)
+#     append VirusTotal scan links to the GoReleaser-created release notes.
+#
+# This avoids the previous conflict where two workflows each tried to create the
+# same GitHub Release.
+
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+
+permissions:
+  contents: write # create the GitHub Release / edit its notes
+  packages: write # push container images to ghcr.io
 
 jobs:
-  release:
+  goreleaser:
+    name: Binaries, Release & Homebrew (GoReleaser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags so the changelog has commits
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with contents:write on benjaminabbitt/homebrew-tap (cross-repo
+          # cask push; the default token can't reach another repository).
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  containers:
+    name: Container images (ghcr.io) + VirusTotal
+    needs: goreleaser # the Release must exist before we append VT notes to it
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
-
+      contents: write # append the VirusTotal section to the release notes
+      packages: write # push images to ghcr.io
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: extractions/setup-just@v2
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      - name: Extract tag/version
+        id: tag_version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Build all-platform static binaries
+        run: just build-all
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract tag version
-      id: tag_version
-      run: |
-        TAG=${GITHUB_REF#refs/tags/}
-        VERSION=${TAG#v}
-        echo "tag=$TAG" >> $GITHUB_OUTPUT
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Processing release for tag: $TAG (version: $VERSION)"
-
-    - name: Build and package release
-      uses: devcontainers/ci@v0.3
-      with:
-        imageName: ghcr.io/${{ github.repository }}/release-build
-        cacheFrom: ghcr.io/${{ github.repository }}/devcontainer
-        runCmd: |
-          # Initialize project
-          just init
-
-          # Build for all platforms (static binaries with CGO_ENABLED=0)
-          just build-all
-
-          # Create release directory
+      - name: Package archives (for scanning)
+        run: |
           mkdir -p release
-
-          # Create tar.gz archives for Unix platforms (preserves +x bit)
-          for binary in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 freebsd-amd64; do
-            chmod +x bin/versionator-${binary}
-            tar -czvf release/versionator-${binary}.tar.gz -C bin versionator-${binary}
+          for b in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 freebsd-amd64; do
+            chmod +x "bin/versionator-$b"
+            tar -czf "release/versionator-$b.tar.gz" -C bin "versionator-$b"
+          done
+          for b in windows-amd64 windows-arm64; do
+            (cd bin && zip "../release/versionator-$b.zip" "versionator-$b.exe")
           done
 
-          # Create zip archives for Windows
-          for binary in windows-amd64 windows-arm64; do
-            (cd bin && zip ../release/versionator-${binary}.zip versionator-${binary}.exe)
-          done
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-          # Create checksums
-          cd release
-          sha256sum * > checksums.txt
-          ls -la
+      - name: Prepare container context
+        run: |
+          mkdir -p container-context
+          cp bin/versionator-linux-amd64 bin/versionator-linux-arm64 container-context/
+          cp Containerfile container-context/
 
-    - name: Prepare container build context
-      run: |
-        # Extract binaries from archives for container build
-        mkdir -p container-context
-        tar xzf release/versionator-linux-amd64.tar.gz -C container-context
-        tar xzf release/versionator-linux-arm64.tar.gz -C container-context
-        cp Containerfile container-context/
+      - name: Build & push container images
+        uses: docker/build-push-action@v5
+        with:
+          context: container-context
+          file: container-context/Containerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.tag_version.outputs.tag }}
+            ghcr.io/${{ github.repository }}:${{ steps.tag_version.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
 
-    - name: Build and push container images
-      uses: docker/build-push-action@v5
-      with:
-        context: container-context
-        file: container-context/Containerfile
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: |
-          ghcr.io/${{ github.repository }}:${{ steps.tag_version.outputs.tag }}
-          ghcr.io/${{ github.repository }}:${{ steps.tag_version.outputs.version }}
-          ghcr.io/${{ github.repository }}:latest
-
-    - name: Submit to VirusTotal
-      id: virustotal
-      run: |
-        # Debug: Check if secret is present (shows length, not value)
-        echo "VIRUSTOTAL_API_KEY length: ${#VIRUSTOTAL_API_KEY}"
-
-        if [ -z "$VIRUSTOTAL_API_KEY" ]; then
-          echo "VIRUSTOTAL_API_KEY not set, skipping VirusTotal submission"
-          echo "VT_RESULTS=_VirusTotal scanning not configured for this release._" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        echo "Submitting binaries to VirusTotal..."
-
-        # Create markdown table for results
-        echo "| Archive | VirusTotal Analysis |" > vt_results.md
-        echo "|---------|---------------------|" >> vt_results.md
-
-        for archive in release/*.tar.gz release/*.zip; do
-          filename=$(basename "$archive")
-          echo "Uploading $filename..."
-
-          # Upload to VirusTotal and get analysis ID
-          response=$(curl -s --request POST \
-            --url 'https://www.virustotal.com/api/v3/files' \
-            --header "x-apikey: $VIRUSTOTAL_API_KEY" \
-            --form "file=@$archive")
-
-          # Extract analysis ID
-          analysis_id=$(echo "$response" | jq -r '.data.id // empty')
-
-          if [ -n "$analysis_id" ]; then
-            # VirusTotal GUI URL for the analysis
-            vt_url="https://www.virustotal.com/gui/file-analysis/${analysis_id}"
-            echo "| \`$filename\` | [View Analysis]($vt_url) |" >> vt_results.md
-            echo "  -> $vt_url"
-          else
-            echo "| \`$filename\` | Upload failed |" >> vt_results.md
-            echo "  -> Upload failed: $response"
+      - name: VirusTotal scan and append to release notes (best-effort)
+        continue-on-error: true
+        env:
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag_version.outputs.tag }}
+        run: |
+          if [ -z "$VIRUSTOTAL_API_KEY" ]; then
+            echo "VIRUSTOTAL_API_KEY not set; skipping VirusTotal."; exit 0
           fi
-
-          # Rate limit: VirusTotal free tier is 4 requests/minute
-          sleep 16
-        done
-
-        # Output results for use in release notes (multiline)
-        {
-          echo "VT_RESULTS<<EOF"
-          cat vt_results.md
-          echo "EOF"
-        } >> $GITHUB_OUTPUT
-      env:
-        VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.tag_version.outputs.tag }}
-        name: Versionator ${{ steps.tag_version.outputs.version }}
-        body: |
-          ## Versionator ${{ steps.tag_version.outputs.version }}
-
-          ### Installation
-
-          #### Linux/macOS/FreeBSD
-          ```bash
-          curl -LO https://github.com/benjaminabbitt/versionator/releases/download/${{ steps.tag_version.outputs.tag }}/versionator-linux-amd64.tar.gz
-          tar xzf versionator-linux-amd64.tar.gz
-          sudo mv versionator-linux-amd64 /usr/local/bin/versionator
-          ```
-
-          #### Windows
-          ```powershell
-          Invoke-WebRequest -Uri https://github.com/benjaminabbitt/versionator/releases/download/${{ steps.tag_version.outputs.tag }}/versionator-windows-amd64.zip -OutFile versionator.zip
-          Expand-Archive versionator.zip -DestinationPath .
-          Move-Item versionator-windows-amd64.exe versionator.exe
-          ```
-
-          ### Available Archives
-
-          | Platform | Architecture | Archive |
-          |----------|--------------|---------|
-          | Linux | x64 | `versionator-linux-amd64.tar.gz` |
-          | Linux | arm64 | `versionator-linux-arm64.tar.gz` |
-          | macOS | Intel | `versionator-darwin-amd64.tar.gz` |
-          | macOS | Apple Silicon | `versionator-darwin-arm64.tar.gz` |
-          | Windows | x64 | `versionator-windows-amd64.zip` |
-          | Windows | arm64 | `versionator-windows-arm64.zip` |
-          | FreeBSD | x64 | `versionator-freebsd-amd64.tar.gz` |
-
-          ### Container Images
-
-          Multi-arch container images (linux/amd64, linux/arm64) are available:
-
-          ```bash
-          # Docker
-          docker pull ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.tag }}
-          docker run --rm -v $(pwd):/workspace ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.tag }} version
-
-          # Podman
-          podman pull ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.tag }}
-          podman run --rm -v $(pwd):/workspace:Z ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.tag }} version
-          ```
-
-          Available tags:
-          - `ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.tag }}` (version tag)
-          - `ghcr.io/benjaminabbitt/versionator:${{ steps.tag_version.outputs.version }}` (without v prefix)
-          - `ghcr.io/benjaminabbitt/versionator:latest` (latest release)
-
-          ### Verification
-
-          All archives are provided with SHA256 checksums in `checksums.txt`.
-          ```bash
-          sha256sum -c checksums.txt --ignore-missing
-          ```
-
-          ### Security Scanning
-
-          > ⚠️ **Disclaimer**: These VirusTotal scans are provided for transparency. A clean scan does not guarantee the software is safe, and false positives can occur. You should always review source code and build from source if you have concerns. We provide these links so you can make your own informed decision.
-
-          ${{ steps.virustotal.outputs.VT_RESULTS }}
-
-        files: |
-          release/*
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          {
+            echo "### Security Scanning"
+            echo ""
+            echo "> ⚠️ A clean scan does not guarantee safety, and false positives occur. Build from source if you have concerns."
+            echo ""
+            echo "| Archive | VirusTotal Analysis |"
+            echo "|---------|---------------------|"
+          } > vt.md
+          for archive in release/*.tar.gz release/*.zip; do
+            name=$(basename "$archive")
+            resp=$(curl -s --request POST --url 'https://www.virustotal.com/api/v3/files' \
+              --header "x-apikey: $VIRUSTOTAL_API_KEY" --form "file=@$archive")
+            id=$(echo "$resp" | jq -r '.data.id // empty')
+            if [ -n "$id" ]; then
+              echo "| \`$name\` | [View Analysis](https://www.virustotal.com/gui/file-analysis/$id) |" >> vt.md
+            else
+              echo "| \`$name\` | Upload failed |" >> vt.md
+            fi
+            sleep 16 # free-tier rate limit: 4 req/min
+          done
+          body=$(gh release view "$TAG" --json body -q .body)
+          printf '%s\n\n%s\n' "$body" "$(cat vt.md)" | gh release edit "$TAG" --notes-file -

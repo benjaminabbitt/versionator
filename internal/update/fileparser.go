@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"github.com/tomwright/dasel/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -232,6 +234,33 @@ func (p *DaselFileParser) UpdateTOMLValue(filePath string, path string, newValue
 
 	if bytes.Equal(result, raw) {
 		return fmt.Errorf("could not find value %q to replace in %s", oldStr, filePath)
+	}
+
+	return os.WriteFile(filePath, result, FilePermission)
+}
+
+// UpdateJSONValue does a targeted value replacement in a JSON file, preserving
+// key order and formatting. It edits only the scalar at the given path in the
+// raw bytes, leaving the rest of the document byte-for-byte intact — unlike a
+// parse-then-marshal round-trip, which loses key order (Go marshals maps with
+// keys sorted alphabetically). The path uses gjson/sjson dot syntax, e.g.
+// "version" or "packages.dependencies.foo".
+func (p *DaselFileParser) UpdateJSONValue(filePath string, path string, newValue string) error {
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s: %s", ErrFileNotFound, filePath)
+		}
+		return fmt.Errorf("failed to read %s: %w", filePath, err)
+	}
+
+	if !gjson.GetBytes(raw, path).Exists() {
+		return fmt.Errorf("%s: %s", ErrPathNotFound, path)
+	}
+
+	result, err := sjson.SetBytes(raw, path, newValue)
+	if err != nil {
+		return fmt.Errorf("%s: %s: %w", ErrInvalidSelector, path, err)
 	}
 
 	return os.WriteFile(filePath, result, FilePermission)

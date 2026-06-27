@@ -2,7 +2,10 @@ package git
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,6 +138,63 @@ func (h *TestHelper) CreateLightweightTag(name string) {
 	_, err = h.repo.CreateTag(name, head.Hash(), nil)
 	if err != nil {
 		h.t.Fatalf("failed to create lightweight tag: %v", err)
+	}
+}
+
+// gitCommitCount returns the number of commits reachable from HEAD in dir.
+func gitCommitCount(t *testing.T, dir string) int {
+	t.Helper()
+	out, err := exec.Command("git", "-C", dir, "rev-list", "--count", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("rev-list: %v", err)
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		t.Fatalf("parse commit count %q: %v", out, err)
+	}
+	return n
+}
+
+// TestAmendCommit_RealGit folds a freshly-written file into the last commit
+// against a real repository — the regression test for the bump bug, where
+// go-git's amend left a *new* commit without the staged file (so the version
+// bump never landed and the file stayed staged). It must: not add a commit,
+// put the file in HEAD's tree, and leave the working tree clean.
+func TestAmendCommit_RealGit(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	// `git commit --amend` needs an identity in this throwaway repo.
+	_ = exec.Command("git", "-C", h.dir, "config", "user.email", "test@example.com").Run()
+	_ = exec.Command("git", "-C", h.dir, "config", "user.name", "Test Author").Run()
+	h.CreateCommit("feat: a thing +semver:patch")
+
+	countBefore := gitCommitCount(t, h.dir)
+
+	// Mirror what `bump` does: write the new VERSION, then amend it in.
+	if err := os.WriteFile(filepath.Join(h.dir, "VERSION"), []byte("0.0.4\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	v := NewGitVCS(DefaultRepositoryOpener)
+	v.repoRoot = h.dir
+	if err := v.AmendCommit([]string{"VERSION"}); err != nil {
+		t.Fatalf("AmendCommit: %v", err)
+	}
+
+	// No new commit — it was an amend, not an add.
+	if got := gitCommitCount(t, h.dir); got != countBefore {
+		t.Errorf("commit count changed %d→%d: amend created a new commit instead of amending", countBefore, got)
+	}
+	// The bump actually landed: VERSION is in HEAD's tree.
+	out, err := exec.Command("git", "-C", h.dir, "show", "HEAD:VERSION").Output()
+	if err != nil {
+		t.Fatalf("VERSION not committed to HEAD: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "0.0.4" {
+		t.Errorf("HEAD:VERSION = %q, want 0.0.4", got)
+	}
+	// Nothing left staged or dirty (the bug left VERSION staged-but-uncommitted).
+	if out, _ := exec.Command("git", "-C", h.dir, "status", "--porcelain").Output(); strings.TrimSpace(string(out)) != "" {
+		t.Errorf("working tree not clean after amend:\n%s", out)
 	}
 }
 

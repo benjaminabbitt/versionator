@@ -1,0 +1,105 @@
+# GoReleaser config — builds cross-platform static binaries and cuts a GitHub
+# Release when a v* tag is pushed. Run locally with `goreleaser release --clean`
+# (needs GITHUB_TOKEN); CI runs it via .github/workflows/release-completer.yml on tag.
+version: 2
+
+project_name: versionator
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: versionator
+    main: .
+    binary: versionator
+    env:
+      - CGO_ENABLED=0 # no libc linkage at all → static on every target
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64 # not a release target
+    # Pure-Go resolvers (no libc) so linux/windows binaries are unambiguously
+    # static even if CGO ever gets re-enabled.
+    tags:
+      - netgo
+      - osusergo
+    flags:
+      - -trimpath
+    # Stamp the version the same way the justfile does, so `versionator` reports
+    # the release tag. -extldflags=-static forces static linking if an external
+    # linker is ever used (no-op under CGO_ENABLED=0).
+    ldflags:
+      - -s -w -extldflags=-static -X github.com/benjaminabbitt/versionator/internal/buildinfo.Version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}" # reproducible builds
+
+archives:
+  - id: versionator
+    formats: [tar.gz]
+    # Windows users get a zip instead.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+# Homebrew cask published to benjaminabbitt/homebrew-tap. macOS users:
+#   brew install benjaminabbitt/tap/versionator
+#
+# Cross-repo push needs a PAT with contents:write on the tap, provided as the
+# HOMEBREW_TAP_GITHUB_TOKEN secret (wired in release-completer.yml) — the per-repo
+# GITHUB_TOKEN cannot push to another repository. The post-install hook strips the
+# macOS quarantine attribute so the unsigned binary launches without a Gatekeeper
+# prompt. Casks are macOS-only; Linux/Windows users use the release archives.
+homebrew_casks:
+  - name: versionator
+    binary: versionator
+    repository:
+      owner: benjaminabbitt
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/benjaminabbitt/versionator"
+    description: "CLI for managing semantic versions from a VERSION file"
+    license: "BSD-3-Clause"
+    # Don't push a cask for prereleases (e.g. v0.2.1-rc.1) or snapshots — only
+    # real tags update the tap.
+    skip_upload: auto
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/versionator"]
+          end
+
+release:
+  draft: false
+  prerelease: auto # tags like v0.2.1-rc1 are marked pre-release
+  footer: |
+    ---
+    Install: `brew install benjaminabbitt/tap/versionator` (macOS),
+    `go install github.com/benjaminabbitt/versionator@{{ .Tag }}`,
+    or download a binary above.

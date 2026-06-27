@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Release gate: every change to main must carry a fresh, untagged VERSION.
+  # Fails the PR/push if the version already has a git tag, forcing a deliberate
+  # `versionator set` bump (no auto-increment). On merge, auto-release.yml tags
+  # this VERSION and triggers the release. The VERSION file holds the bare
+  # version (0.2.1); the tag is v-prefixed (v0.2.1).
+  version-guard:
+    name: Version Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fail if VERSION is already tagged
+        run: |
+          V="$(tr -d '[:space:]' < VERSION)"
+          if [ -z "$V" ]; then
+            echo "::error::VERSION file is empty"; exit 1
+          fi
+          TAG="v${V#v}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error file=VERSION::VERSION $V is already tagged ($TAG). Bump it (versionator set <next>) before merging."
+            exit 1
+          fi
+          echo "VERSION $V ($TAG) is not yet tagged — OK to merge and release."
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: extractions/setup-just@v2
+
+      # Build the (static) binary, then run the full test suite. versionator's
+      # own VERSION stamps the build; some acceptance tests want the binary on
+      # disk, so build first.
+      - name: just build
+        run: just build
+
+      - name: just test
+        run: just test
+
+  # Diff-only mutation testing on PR and push (the whole-codebase run is too slow
+  # for every change — it runs weekly, see mutation-weekly.yml).
+  #
+  # NOTE: report-only for now (continue-on-error) so it can't block merges/the
+  # release pipeline while versionator's mutation baseline is still unmeasured.
+  # Measure with `gremlins unleash`, tune the thresholds in .gremlins.yaml, then
+  # drop continue-on-error to make this a real gate (as ctxloom does).
+  mutation:
+    name: Mutation Testing (diff, report-only)
+    runs-on: ubuntu-latest
+    needs: check
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.0
+
+      - name: Run mutation tests (diff)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "No base commit to diff against — skipping mutation testing."; exit 0
+          fi
+          # gremlins fails an empty changeset (0 mutants => 0% efficacy => exit
+          # 10); skip when the diff has no mutable Go (mirrors .gremlins.yaml
+          # exclude-files) so docs/workflow/test-only changes aren't flagged.
+          mutable="$(git diff --name-only "$base"...HEAD -- '*.go' \
+            | grep -vE '(_test\.go$|/mock_[^/]*\.go$|(^|/)testdata/|(^|/)tests/acceptance/)' || true)"
+          if [ -z "$mutable" ]; then
+            echo "No mutable Go files changed vs $base — skipping mutation testing."; exit 0
+          fi
+          echo "Mutable Go files in diff:"; printf '  %s\n' $mutable
+          gremlins unleash --diff "$base"

@@ -368,44 +368,9 @@ func TestMock_CommitFiles_Success(t *testing.T) {
 	}
 }
 
-// TestMock_AmendCommit_Success validates amending an existing commit.
-//
-// Why: AmendCommit is used to add forgotten files to a version bump commit
-// or fix commit content without creating additional commits.
-//
-// What: Given an existing commit, when AmendCommit is called with files, then
-// the files are staged and the commit is amended with the original message.
-func TestMock_AmendCommit_Success(t *testing.T) {
-	// Precondition: Repository has an existing HEAD commit with known message
-	commitHash := plumbing.NewHash("abc123def456789012345678901234567890dead")
-	headRef := plumbing.NewHashReference(plumbing.HEAD, commitHash)
-
-	mock := NewMockRepository()
-	mock.HeadRef = headRef
-	mock.Commits[commitHash] = MakeTestCommit(commitHash, "original message", "Test", "test@test.com", time.Now())
-	wt := NewMockWorktree()
-	mock.MockWorktree = wt
-
-	vcs := NewGitVCS(MockRepositoryOpener(mock))
-	vcs.repoRoot = "/fake/path"
-
-	// Action: Amend commit with additional files
-	err := vcs.AmendCommit([]string{"file1.txt"})
-
-	// Expected: Commit is amended with Amend option and original message preserved
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(wt.CommitCalls) != 1 {
-		t.Errorf("expected 1 Commit call, got %d", len(wt.CommitCalls))
-	}
-	if wt.CommitCalls[0].Msg != "original message" {
-		t.Errorf("expected message 'original message', got '%s'", wt.CommitCalls[0].Msg)
-	}
-	if !wt.CommitCalls[0].Opts.Amend {
-		t.Error("expected Amend option to be true")
-	}
-}
+// AmendCommit now shells out to real git (go-git's amend was unreliable), so it
+// is covered by a real-git integration test in git_vcs_test.go rather than a
+// mock that would only assert the old, broken go-git call shape.
 
 // TestMock_GetHooksPath_Success validates git hooks directory path construction.
 //

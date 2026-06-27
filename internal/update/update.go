@@ -20,10 +20,10 @@ type FileUpdater interface {
 
 // Updater implements FileUpdater with actual file operations
 type Updater struct {
-	configs       []config.UpdateConfig
-	parser        *DaselFileParser
-	logger        *zap.Logger
-	updatedFiles  []string
+	configs      []config.UpdateConfig
+	parser       *DaselFileParser
+	logger       *zap.Logger
+	updatedFiles []string
 }
 
 // NewUpdater creates an Updater (IoC constructor accepting dependencies)
@@ -89,7 +89,14 @@ func (u *Updater) updateSingleFile(cfg config.UpdateConfig, data emit.TemplateDa
 		return u.parser.UpdateTOMLValue(cfg.File, cfg.Path, newValue)
 	}
 
-	// JSON/YAML: parse-modify-serialize (these preserve formatting well enough)
+	// JSON: surgical value replacement preserves key order and formatting. A
+	// parse-modify-serialize round-trip would reorder keys (Go marshals maps
+	// alphabetically), mangling hand-ordered manifests like package.json.
+	if format == FormatJSON {
+		return u.parser.UpdateJSONValue(cfg.File, cfg.Path, newValue)
+	}
+
+	// YAML: parse-modify-serialize.
 	var fileData any
 	if cfg.Format != "" {
 		fileData, format, err = u.parser.ReadWithFormat(cfg.File, cfg.Format)

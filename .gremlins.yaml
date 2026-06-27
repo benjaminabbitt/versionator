@@ -1,0 +1,66 @@
+# Gremlins mutation testing configuration
+# https://gremlins.dev/0.5/usage/configuration/
+#
+# Copied from the ctxloom family standard and adapted for versionator (no
+# protobuf; acceptance harness excluded because it needs the built binary).
+
+silent: false
+
+# Files to exclude from mutation (don't mutate tests, generated mocks, testdata,
+# or the acceptance harness — the latter shells out to a built `versionator`).
+exclude-files:
+  - ".*_test\\.go$"
+  - ".*/mock_.*\\.go$"
+  - ".*/testdata/.*"
+  - "tests/acceptance/.*"
+  - ".*/tests/acceptance/.*"
+  # Non-core: sample apps, doc tooling, and the thin root entrypoint. (Each keeps
+  # a trivial *_test.go so module-wide `go test -cover` can build a coverage
+  # binary — without one, gremlins fails with "no such tool covdata" on go1.25.)
+  - "examples/.*"
+  - "docs/.*"
+  - "^main\\.go$"
+
+unleash:
+  # Unit tests only (acceptance/integration are too slow and need the binary).
+  integration: false
+  dry-run: false
+  tags: ""
+  output: ""
+  workers: 0 # 0 = number of CPUs
+  test-cpu: 0 # 0 = no limit
+  # Higher coefficient reduces false timeouts at the cost of run time.
+  timeout-coefficient: 5
+
+  # Quality gates — gremlins exits non-zero if a score drops below these.
+  # Set just under the measured whole-module baseline (efficacy 87.0%, mutant
+  # coverage 92.5% — `gremlins unleash`, 2026-05-31), leaving ~7pt headroom for
+  # run-to-run noise. Raise as the suite improves; lower only with justification.
+  threshold:
+    efficacy: 80 # % of mutants killed by tests (0 = disabled)
+    mutant-coverage: 85 # % of mutants covered by tests (0 = disabled)
+
+# Mutation operators. Start with the high-value ones; bitwise are off by default.
+mutants:
+  arithmetic-base:
+    enabled: true
+  conditionals-boundary:
+    enabled: true
+  conditionals-negation:
+    enabled: true
+  increment-decrement:
+    enabled: true
+  invert-assignments:
+    enabled: true
+  invert-bitwise:
+    enabled: false
+  invert-bwassign:
+    enabled: false
+  invert-negatives:
+    enabled: true
+  invert-logical:
+    enabled: true
+  invert-loopctrl:
+    enabled: true
+  remove-self-assignments:
+    enabled: true
