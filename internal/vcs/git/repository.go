@@ -55,9 +55,19 @@ type Worktree interface {
 // RepositoryOpener is a function that opens a git repository at the given path.
 type RepositoryOpener func(path string) (Repository, error)
 
-// DefaultRepositoryOpener opens a git repository using go-git's PlainOpen.
+// DefaultRepositoryOpener opens a git repository using go-git, with options that
+// make it work inside a linked worktree as well as a normal checkout.
+//
+// DetectDotGit follows a worktree's ".git" pointer file from the worktree root,
+// and EnableDotGitCommonDir resolves objects and packed-refs from the shared
+// common dir. Without the latter a worktree's HEAD resolves but CommitObject
+// fails with "object not found", so commit-derived template values (ShortHash,
+// CommitDate, ...) silently render empty.
 func DefaultRepositoryOpener(path string) (Repository, error) {
-	repo, err := git.PlainOpen(path)
+	repo, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{
+		DetectDotGit:          true,
+		EnableDotGitCommonDir: true,
+	})
 	if err != nil {
 		return nil, err
 	}

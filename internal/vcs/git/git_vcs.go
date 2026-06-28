@@ -682,7 +682,11 @@ func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 
 	for {
 		gitPath := filepath.Join(currentPath, ".git")
-		if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
+		// Accept .git whether it is a directory (a normal checkout) or a regular
+		// file (a linked worktree or submodule stores a "gitdir:" pointer file).
+		// Requiring a directory makes findGitDir climb past a worktree root and
+		// miss the repo, so commit-derived template values render empty.
+		if info, err := os.Stat(gitPath); err == nil && (info.IsDir() || info.Mode().IsRegular()) {
 			return currentPath
 		}
 

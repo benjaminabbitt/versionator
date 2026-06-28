@@ -1908,3 +1908,63 @@ func TestExtractCommitInfo_ExtractsAllFields(t *testing.T) {
 		t.Errorf("Message mismatch: expected multiline message, got %q", info.Message)
 	}
 }
+
+// TestGitVCS_LinkedWorktree is a regression test for stamp resolution inside a
+// linked git worktree, where ".git" is a "gitdir:" pointer file rather than a
+// directory. findGitDir used to require a directory and would climb past the
+// worktree root (yielding an empty ShortHash/CommitDate), and the opener needs
+// EnableDotGitCommonDir to read objects from the shared common dir.
+func TestGitVCS_LinkedWorktree(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	head, err := h.repo.Head()
+	if err != nil {
+		t.Fatalf("failed to get HEAD: %v", err)
+	}
+	wantShort := head.Hash().String()[:7]
+
+	// Add a linked worktree as a sibling of the primary checkout.
+	wtDir := h.dir + "-wt"
+	if out, err := exec.Command("git", "-C", h.dir, "worktree", "add", "--detach", wtDir, "HEAD").CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add failed: %v: %s", err, out)
+	}
+	defer func() {
+		_ = os.Chdir(h.origDir)
+		_, _ = exec.Command("git", "-C", h.dir, "worktree", "remove", "--force", wtDir).CombinedOutput()
+		_ = os.RemoveAll(wtDir)
+	}()
+
+	// Precondition: the worktree's .git is a regular pointer file, not a dir.
+	info, err := os.Stat(filepath.Join(wtDir, ".git"))
+	if err != nil {
+		t.Fatalf("stat worktree .git: %v", err)
+	}
+	if info.IsDir() {
+		t.Fatal("expected the worktree .git to be a regular pointer file, got a directory")
+	}
+
+	// Run the VCS from inside the linked worktree.
+	if err := os.Chdir(wtDir); err != nil {
+		t.Fatalf("chdir to worktree: %v", err)
+	}
+
+	g := NewGitVCSDefault()
+	if !g.IsRepository() {
+		t.Fatal("IsRepository() = false inside a linked worktree; want true")
+	}
+
+	got, err := g.GetVCSIdentifier(7)
+	if err != nil {
+		t.Fatalf("GetVCSIdentifier inside worktree: %v", err)
+	}
+	if got != wantShort {
+		t.Fatalf("GetVCSIdentifier = %q, want %q", got, wantShort)
+	}
+
+	// Commit objects must resolve from the shared common dir, not just HEAD.
+	if _, err := g.GetCommitDate(); err != nil {
+		t.Fatalf("GetCommitDate inside worktree: %v", err)
+	}
+}
