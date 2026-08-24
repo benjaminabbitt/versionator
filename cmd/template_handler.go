@@ -18,42 +18,60 @@ const (
 	templateKindMetadata   templateKind = "metadata"
 )
 
-// templateAccessor provides access to template-related config and version fields
-type templateAccessor struct {
-	kind          templateKind
-	getStable     func(*config.Config) bool
-	setStable     func(*config.Config, bool)
-	getTemplate   func(*config.Config) string
-	setTemplate   func(*config.Config, string)
-	setVersion    func(string) error
-	labelTitle    string // e.g., "Pre-release" or "Metadata"
-	labelLower    string // e.g., "pre-release" or "metadata"
+// versionFieldAccessor names everything that differs between the two SemVer
+// fields versionator manages as commands (pre-release and build metadata).
+// Every `config <field>` subcommand body is shared and parameterized by one of
+// these, so a change to one field's behaviour cannot silently skip the other.
+type versionFieldAccessor struct {
+	kind        templateKind
+	getStable   func(*config.Config) bool
+	setStable   func(*config.Config, bool)
+	getTemplate func(*config.Config) string
+	setTemplate func(*config.Config, string)
+	setVersion  func(string) error
+	getVersion  func(*version.Version) string
+	// defaultValue supplies the value `enable` writes when the template renders
+	// empty. This is the one genuinely field-specific rule: metadata falls back
+	// to a git hash, pre-release to a fixed label.
+	defaultValue func(*config.Config, *version.Version) string
+	forceFlag    *bool
+	cmdName      string // subcommand and flag spelling, e.g. "prerelease"
+	labelTitle   string // sentence-initial label, e.g., "Pre-release" or "Metadata"
+	labelLower   string // mid-sentence label, e.g., "pre-release" or "metadata"
 }
 
-var prereleaseAccessor = templateAccessor{
-	kind:        templateKindPreRelease,
-	getStable:   func(c *config.Config) bool { return c.PreRelease.Stable },
-	setStable:   func(c *config.Config, v bool) { c.PreRelease.Stable = v },
-	getTemplate: func(c *config.Config) string { return c.PreRelease.Template },
-	setTemplate: func(c *config.Config, t string) { c.PreRelease.Template = t },
-	setVersion:  version.SetPreRelease,
-	labelTitle:  "Pre-release",
-	labelLower:  "pre-release",
+var prereleaseAccessor = versionFieldAccessor{
+	kind:         templateKindPreRelease,
+	getStable:    func(c *config.Config) bool { return c.PreRelease.Stable },
+	setStable:    func(c *config.Config, v bool) { c.PreRelease.Stable = v },
+	getTemplate:  func(c *config.Config) string { return c.PreRelease.Template },
+	setTemplate:  func(c *config.Config, t string) { c.PreRelease.Template = t },
+	setVersion:   version.SetPreRelease,
+	getVersion:   func(v *version.Version) string { return v.PreRelease },
+	defaultValue: func(*config.Config, *version.Version) string { return defaultPreReleaseValue },
+	forceFlag:    &prereleaseForceFlag,
+	cmdName:      "prerelease",
+	labelTitle:   "Pre-release",
+	labelLower:   "pre-release",
 }
 
-var metadataAccessor = templateAccessor{
-	kind:        templateKindMetadata,
-	getStable:   func(c *config.Config) bool { return c.Metadata.Stable },
-	setStable:   func(c *config.Config, v bool) { c.Metadata.Stable = v },
-	getTemplate: func(c *config.Config) string { return c.Metadata.Template },
-	setTemplate: func(c *config.Config, t string) { c.Metadata.Template = t },
-	setVersion:  version.SetMetadata,
-	labelTitle:  "Metadata",
-	labelLower:  "metadata",
+var metadataAccessor = versionFieldAccessor{
+	kind:         templateKindMetadata,
+	getStable:    func(c *config.Config) bool { return c.Metadata.Stable },
+	setStable:    func(c *config.Config, v bool) { c.Metadata.Stable = v },
+	getTemplate:  func(c *config.Config) string { return c.Metadata.Template },
+	setTemplate:  func(c *config.Config, t string) { c.Metadata.Template = t },
+	setVersion:   version.SetMetadata,
+	getVersion:   func(v *version.Version) string { return v.BuildMetadata },
+	defaultValue: metadataDefaultValue,
+	forceFlag:    &metadataForceFlag,
+	cmdName:      "metadata",
+	labelTitle:   "Metadata",
+	labelLower:   "metadata",
 }
 
 // runTemplateCommand handles the template subcommand for both prerelease and metadata
-func runTemplateCommand(cmd *cobra.Command, args []string, acc templateAccessor) error {
+func runTemplateCommand(cmd *cobra.Command, args []string, acc versionFieldAccessor) error {
 	cfg, err := config.ReadConfig()
 	if err != nil {
 		return fmt.Errorf("error reading config: %w", err)
@@ -69,7 +87,7 @@ func runTemplateCommand(cmd *cobra.Command, args []string, acc templateAccessor)
 }
 
 // showTemplate displays the current template configuration
-func showTemplate(cmd *cobra.Command, cfg *config.Config, acc templateAccessor) error {
+func showTemplate(cmd *cobra.Command, cfg *config.Config, acc versionFieldAccessor) error {
 	cmd.Printf("Stable: %t\n", acc.getStable(cfg))
 	cmd.Printf("Template: %s\n", acc.getTemplate(cfg))
 
@@ -89,7 +107,7 @@ func showTemplate(cmd *cobra.Command, cfg *config.Config, acc templateAccessor) 
 }
 
 // setTemplate sets a new template value
-func setTemplate(cmd *cobra.Command, cfg *config.Config, template string, acc templateAccessor) error {
+func setTemplate(cmd *cobra.Command, cfg *config.Config, template string, acc versionFieldAccessor) error {
 	acc.setTemplate(cfg, template)
 	if err := config.WriteConfig(cfg); err != nil {
 		return fmt.Errorf("error writing config: %w", err)

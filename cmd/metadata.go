@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/benjaminabbitt/versionator/internal/config"
-	"github.com/benjaminabbitt/versionator/internal/emit"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/version"
 
@@ -56,48 +55,7 @@ Examples:
 }
 
 func runMetadataStable(cmd *cobra.Command, args []string) error {
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-	}
-
-	// If no argument, show current setting
-	if len(args) == 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "Metadata stable: %t\n", cfg.Metadata.Stable)
-		if cfg.Metadata.Stable {
-			fmt.Fprintln(cmd.OutOrStdout(), "  Value is stored in VERSION file")
-		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "  Value is generated from template at output time")
-			fmt.Fprintf(cmd.OutOrStdout(), "  Template: %s\n", cfg.Metadata.Template)
-		}
-		return nil
-	}
-
-	// Set new value
-	switch args[0] {
-	case "true", "1", "yes":
-		cfg.Metadata.Stable = true
-	case "false", "0", "no":
-		cfg.Metadata.Stable = false
-	default:
-		return fmt.Errorf("invalid value '%s': use 'true' or 'false'", args[0])
-	}
-
-	if err := config.WriteConfig(cfg); err != nil {
-		return fmt.Errorf("error writing config: %w", err)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "Metadata stable set to: %t\n", cfg.Metadata.Stable)
-
-	// If switching to stable=false, clear metadata from VERSION file
-	if !cfg.Metadata.Stable {
-		if err := version.SetMetadata(""); err != nil {
-			return fmt.Errorf("error clearing metadata from VERSION: %w", err)
-		}
-		fmt.Fprintln(cmd.OutOrStdout(), "Metadata cleared from VERSION file (will be generated at output time)")
-	}
-
-	return nil
+	return runStableCommand(cmd, args, metadataAccessor)
 }
 
 var metadataEnableCmd = &cobra.Command{
@@ -114,68 +72,7 @@ If no template is configured, defaults to the git short hash.`,
 }
 
 func runMetadataEnable(cmd *cobra.Command, args []string) error {
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-	}
-
-	// Check stability
-	if !cfg.Metadata.Stable {
-		return fmt.Errorf("metadata is configured as dynamic (stable: false)\n" +
-			"In dynamic mode, metadata is generated at output time.\n" +
-			"To use this command, first run: versionator config metadata stable true")
-	}
-
-	// Load current version
-	vd, err := version.Load()
-	if err != nil {
-		return fmt.Errorf("error getting version: %w", err)
-	}
-
-	// Determine metadata value: use config template if set, else default to git hash
-	metadata := ""
-	if cfg.Metadata.Template != "" {
-		templateData := emit.BuildTemplateDataFromVersion(vd)
-		rendered, err := emit.RenderTemplateWithData(cfg.Metadata.Template, templateData)
-		if err == nil && rendered != "" {
-			metadata = rendered
-		}
-	}
-
-	// If no template or render failed, use git hash as default
-	if metadata == "" {
-		gitVCS := vcs.GetVCS("git")
-		hashLength := 7
-		if cfg.Metadata.Git.HashLength > 0 {
-			hashLength = cfg.Metadata.Git.HashLength
-		}
-		if gitVCS != nil && gitVCS.IsRepository() {
-			if hash, err := gitVCS.GetVCSIdentifier(hashLength); err == nil {
-				metadata = hash
-			}
-		}
-	}
-
-	// If still no metadata, use a default
-	if metadata == "" {
-		metadata = "build"
-	}
-
-	// Set metadata in VERSION file
-	if err := version.SetMetadata(metadata); err != nil {
-		return fmt.Errorf("error setting metadata: %w", err)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "Metadata enabled with value '%s'\n", metadata)
-
-	// Show current version
-	vd, err = version.Load()
-	if err != nil {
-		return fmt.Errorf("error getting version: %w", err)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return runEnableCommand(cmd, args, metadataAccessor)
 }
 
 var metadataDisableCmd = &cobra.Command{
@@ -189,33 +86,7 @@ the metadata is already not in the VERSION file.`,
 }
 
 func runMetadataDisable(cmd *cobra.Command, args []string) error {
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-	}
-
-	// Check stability
-	if !cfg.Metadata.Stable {
-		return fmt.Errorf("metadata is configured as dynamic (stable: false)\n" +
-			"In dynamic mode, metadata is not stored in VERSION file.\n" +
-			"To disable dynamic metadata at output, use --metadata=\"\" flag or clear the template.")
-	}
-
-	// Clear metadata from VERSION file
-	if err := version.SetMetadata(""); err != nil {
-		return fmt.Errorf("error clearing metadata: %w", err)
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout(), "Metadata disabled")
-
-	// Show current version without metadata
-	vd, err := version.Load()
-	if err != nil {
-		return fmt.Errorf("error getting version: %w", err)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return runDisableCommand(cmd, args, metadataAccessor)
 }
 
 var metadataStatusCmd = &cobra.Command{
@@ -226,42 +97,7 @@ var metadataStatusCmd = &cobra.Command{
 }
 
 func runMetadataStatus(cmd *cobra.Command, args []string) error {
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-	}
-
-	// Load version
-	vd, err := version.Load()
-	if err != nil {
-		return fmt.Errorf("error reading version: %w", err)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "Stable: %t\n", cfg.Metadata.Stable)
-	fmt.Fprintf(cmd.OutOrStdout(), "Template: %s\n", cfg.Metadata.Template)
-
-	if cfg.Metadata.Stable {
-		// Show value from VERSION file
-		if vd.BuildMetadata != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "VALUE (from VERSION file): %s\n", vd.BuildMetadata)
-		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "VALUE (from VERSION file): (none)")
-		}
-	} else {
-		// Show what would be rendered
-		if cfg.Metadata.Template != "" {
-			templateData := emit.BuildTemplateDataFromVersion(vd)
-			result, err := emit.RenderTemplateWithData(cfg.Metadata.Template, templateData)
-			if err == nil && result != "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "VALUE (rendered from template): %s\n", result)
-			}
-		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "VALUE: (no template configured)")
-		}
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "VERSION file: %s\n", vd.FullString())
-	return nil
+	return runStatusCommand(cmd, args, metadataAccessor)
 }
 
 var metadataConfigureCmd = &cobra.Command{
@@ -307,49 +143,7 @@ Examples:
 }
 
 func runMetadataSet(cmd *cobra.Command, args []string) error {
-	value := args[0]
-
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-	}
-
-	// Check stability
-	if !cfg.Metadata.Stable && !metadataForceFlag {
-		return fmt.Errorf("metadata is configured as dynamic (stable: false)\n" +
-			"Cannot set a static value when metadata is generated at output time.\n" +
-			"Options:\n" +
-			"  1. Switch to stable mode: versionator config metadata stable true\n" +
-			"  2. Use --force to set the template to this literal value\n" +
-			"  3. Use 'template' command to set a dynamic template")
-	}
-
-	// Update template in config
-	cfg.Metadata.Template = value
-	if err := config.WriteConfig(cfg); err != nil {
-		return fmt.Errorf("error writing config: %w", err)
-	}
-
-	if cfg.Metadata.Stable {
-		// Write to VERSION file
-		if err := version.SetMetadata(value); err != nil {
-			return fmt.Errorf("error setting metadata: %w", err)
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Metadata set to: %s\n", value)
-
-		// Show current version with metadata
-		vd, err := version.Load()
-		if err != nil {
-			return fmt.Errorf("error getting version: %w", err)
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	} else {
-		// --force was used: set template to literal, don't write to VERSION
-		fmt.Fprintf(cmd.OutOrStdout(), "Metadata template set to literal: %s\n", value)
-		fmt.Fprintln(cmd.OutOrStdout(), "(Value will be used at output time, not stored in VERSION file)")
-	}
-
-	return nil
+	return runSetCommand(cmd, args, metadataAccessor)
 }
 
 var metadataClearCmd = &cobra.Command{
@@ -363,32 +157,7 @@ the metadata is already not in the VERSION file.`,
 }
 
 func runMetadataClear(cmd *cobra.Command, args []string) error {
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-	}
-
-	// Check stability
-	if !cfg.Metadata.Stable {
-		return fmt.Errorf("metadata is configured as dynamic (stable: false)\n" +
-			"In dynamic mode, metadata is not stored in VERSION file.\n" +
-			"To clear the template, use: versionator config metadata template \"\"")
-	}
-
-	if err := version.SetMetadata(""); err != nil {
-		return fmt.Errorf("error clearing metadata: %w", err)
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout(), "Metadata cleared")
-
-	// Show current version without metadata
-	vd, err := version.Load()
-	if err != nil {
-		return fmt.Errorf("error getting version: %w", err)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return runClearCommand(cmd, args, metadataAccessor)
 }
 
 var metadataTemplateCmd = &cobra.Command{
@@ -442,4 +211,30 @@ func init() {
 
 	// Add --force flag to set command
 	metadataSetCmd.Flags().BoolVarP(&metadataForceFlag, "force", "f", false, "Force set on dynamic mode (sets template to literal value)")
+}
+
+// defaultMetadataFallback is used when metadata has no template and the
+// repository cannot supply a commit hash.
+const defaultMetadataFallback = "build"
+
+// defaultMetadataHashLength is the short-hash width used when the config does
+// not specify one.
+const defaultMetadataHashLength = 7
+
+// metadataDefaultValue supplies `enable`'s value when the template renders
+// empty: the short commit hash, falling back to a fixed label outside a repo.
+func metadataDefaultValue(cfg *config.Config, _ *version.Version) string {
+	hashLength := defaultMetadataHashLength
+	if cfg.Metadata.Git.HashLength > 0 {
+		hashLength = cfg.Metadata.Git.HashLength
+	}
+
+	gitVCS := vcs.GetVCS("git")
+	if gitVCS != nil && gitVCS.IsRepository() {
+		if hash, err := gitVCS.GetVCSIdentifier(hashLength); err == nil && hash != "" {
+			return hash
+		}
+	}
+
+	return defaultMetadataFallback
 }
