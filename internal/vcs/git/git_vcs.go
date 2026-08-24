@@ -10,10 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/benjaminabbitt/versionator/internal/plugin"
@@ -630,52 +628,6 @@ func (g *GitVersionControlSystem) GetHooksPath() (string, error) {
 }
 
 // Helper methods
-
-// getGitignoreMatcher creates a gitignore matcher from repository patterns
-// It reads patterns from .gitignore files and .git/info/exclude
-func (g *GitVersionControlSystem) getGitignoreMatcher() (gitignore.Matcher, error) {
-	root, err := g.GetRepositoryRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a filesystem interface from the repository root
-	fs := osfs.New(root)
-
-	// Read gitignore patterns from repository
-	patterns, err := gitignore.ReadPatterns(fs, nil)
-	if err != nil {
-		// If we can't read patterns, return nil matcher (no filtering)
-		return nil, nil
-	}
-
-	if len(patterns) == 0 {
-		return nil, nil
-	}
-
-	return gitignore.NewMatcher(patterns), nil
-}
-
-// isFileIgnored checks if a file path should be ignored according to gitignore rules.
-// Checks the file itself and all parent directories, since a gitignore pattern
-// like ".cargo-container/" matches the directory and should exclude all children.
-func (g *GitVersionControlSystem) isFileIgnored(matcher gitignore.Matcher, filePath string) bool {
-	if matcher == nil {
-		return false
-	}
-
-	pathComponents := strings.Split(filePath, string(filepath.Separator))
-
-	// Check each parent directory prefix as a directory match
-	for i := 1; i < len(pathComponents); i++ {
-		if matcher.Match(pathComponents[:i], true) {
-			return true
-		}
-	}
-
-	// Check the full path as a file
-	return matcher.Match(pathComponents, false)
-}
 
 func (g *GitVersionControlSystem) findGitDir(startPath string) string {
 	currentPath := startPath
