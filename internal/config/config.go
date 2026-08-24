@@ -115,12 +115,12 @@ func ReadConfig() (*Config, error) {
 	config := &Config{
 		Prefix: "v", // default prefix
 		PreRelease: PreReleaseConfig{
-			Template: "", // default empty - templates must be explicitly configured
-			Stable:   false,                       // default: generated at output time (CD workflow)
+			Template: "",    // default empty - templates must be explicitly configured
+			Stable:   false, // default: generated at output time (CD workflow)
 		},
 		Metadata: MetadataConfig{
-			Template: "", // default empty - templates must be explicitly configured
-			Stable:   false,           // default: generated at output time
+			Template: "",    // default empty - templates must be explicitly configured
+			Stable:   false, // default: generated at output time
 			Git: GitConfig{
 				HashLength: 12, // default hash length for MediumHash
 			},
@@ -292,19 +292,31 @@ func DeleteCustom(key string) error {
 	return WriteConfig(cfg)
 }
 
+// isASCIILetter reports whether r is an unaccented A-Z or a-z. Template keys are
+// restricted to ASCII deliberately, so a key resolves identically regardless of
+// the host's locale or normalization form.
+func isASCIILetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+// isTemplateKeyChar reports whether r may appear after a template key's first
+// character.
+func isTemplateKeyChar(r rune) bool {
+	return isASCIILetter(r) || (r >= '0' && r <= '9') || r == '_'
+}
+
 // isValidTemplateKey checks if a key is valid for use in templates
 func isValidTemplateKey(key string) bool {
 	if len(key) == 0 {
 		return false
 	}
 
-	first := rune(key[0])
-	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z')) {
+	if !isASCIILetter(rune(key[0])) {
 		return false
 	}
 
 	for _, c := range key {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+		if !isTemplateKeyChar(c) {
 			return false
 		}
 	}
