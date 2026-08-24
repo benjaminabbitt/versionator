@@ -13,8 +13,8 @@ fix-perms:
     if [ -d "/go" ]; then
         echo "Fixing /go directory permissions..."
         if command -v sudo >/dev/null 2>&1; then
-            sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
-            sudo chmod -R u+w /go 2>/dev/null || true
+            sudo -n chown -R $(whoami):$(whoami) /go 2>/dev/null || true
+            sudo -n chmod -R u+w /go 2>/dev/null || true
         else
             chown -R $(whoami):$(whoami) /go 2>/dev/null || true
             chmod -R u+w /go 2>/dev/null || true
@@ -33,8 +33,8 @@ fix-perms:
     mkdir -p $HOME/go/pkg/mod 2>/dev/null || true
 
     # Set proper ownership for created directories
-    if command -v sudo >/dev/null 2>&1; then
-        sudo chown -R $(whoami):$(whoami) /go 2>/dev/null || true
+    if [ -d "/go" ] && command -v sudo >/dev/null 2>&1; then
+        sudo -n chown -R $(whoami):$(whoami) /go 2>/dev/null || true
     fi
 
 # Clean Go module cache and fix permissions

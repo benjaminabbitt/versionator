@@ -1,0 +1,20 @@
+# Pre-commit gate: nothing broken or duplicated lands on a commit.
+# Recipes are delegated to just so the same commands work in CI and by hand.
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      # gofmt reports unformatted files by name; any output is a failure.
+      run: test -z "$(gofmt -l $(git ls-files '*.go'))"
+      fail_text: "gofmt found unformatted files; run `just fmt`"
+    lint:
+      run: just lint
+    test:
+      # Git exports GIT_DIR/GIT_INDEX_FILE to hooks. Tests that shell out to git
+      # against their own temp repositories would otherwise operate on this
+      # commit's in-progress index, so the hook's git context is cleared here.
+      run: env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE -u GIT_PREFIX just test
+    reprise:
+      # Duplicate-drift gate: fails when a change edits one copy of a known
+      # duplicate group but not the others.
+      run: reprise check "$(git rev-parse --show-toplevel)"

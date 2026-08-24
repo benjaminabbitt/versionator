@@ -1,0 +1,12 @@
+# Vendored dependencies and build output are not ours to deduplicate.
+[scan]
+exclude = [
+    "**/node_modules/**",
+    "website/dist/**",
+    "website/.astro/**",
+    "bin/**",
+    "railroad/**",
+]
+
+[report]
+top = 30
