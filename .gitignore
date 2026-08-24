@@ -66,3 +66,25 @@ docs/node_modules/
 # ctxloom ephemeral and persistent data (local state, synced bundles)
 .ctxloom/ephemeral/
 .ctxloom/persistent/
+
+# ctxloom private working state (rebuildable/local — cache, sessions, project id, local state)
+.agents/
+.codex/config.toml
+.codex/auth.json
+
+# ctxloom private working state (rebuildable/local — cache, sessions, project id, local state)
+.ctxloom/cache/
+.ctxloom/sessions/
+.ctxloom/project-id
+.ctxloom/state/
+.ctxloom/*.lock
+
+# Website: vendored deps, build output and framework cache are rebuildable.
+# Pages deploys from docs/ built in CI, so website/dist is not a deploy artifact.
+website/node_modules/
+website/dist/
+website/.astro/
+
+# serena local state
+.serena/cache/
+.serena/project.local.yml
