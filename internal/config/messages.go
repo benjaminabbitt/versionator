@@ -12,8 +12,8 @@ const (
 
 // Error messages
 const (
-	ErrConfigNotFound       = "config file not found"
-	ErrConfigParseFail      = "failed to parse config file"
+	ErrConfigNotFound        = "config file not found"
+	ErrConfigParseFail       = "failed to parse config file"
 	ErrInvalidTemplateSyntax = "invalid template syntax"
 )
 

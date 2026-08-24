@@ -630,7 +630,7 @@ func TestPrefixSetCommand_InvalidPrefix_ReturnsError(t *testing.T) {
 // prefix. This provides an alternative to the "disable" command and ensures
 // consistency in the prefix configuration behavior.
 //
-// What: When the user runs "config prefix set ''", the prefix should be cleared
+// What: When the user runs "config prefix set ”", the prefix should be cleared
 // and the output should indicate the prefix has been disabled.
 func TestPrefixSetCommand_EmptyString_DisablesPrefix(t *testing.T) {
 	// Precondition: Create isolated test environment with existing prefix

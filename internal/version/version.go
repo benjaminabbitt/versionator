@@ -681,4 +681,3 @@ func StripPrefix(version string) string {
 func EscapedBranchName(branchName string) string {
 	return strings.ReplaceAll(branchName, "/", "-")
 }
-

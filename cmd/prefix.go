@@ -43,7 +43,7 @@ func runPrefixEnable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error setting prefix: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Version prefix enabled with value '%s'\n", prefix)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Version prefix enabled with value '%s'\n", prefix)
 
 	// Show current version with prefix
 	vd, err := version.Load()
@@ -51,7 +51,7 @@ func runPrefixEnable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error getting version: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
 	return nil
 }
 
@@ -67,7 +67,7 @@ func runPrefixDisable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error setting prefix: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "Version prefix disabled")
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Version prefix disabled")
 
 	// Show current version without prefix
 	v, err := version.GetCurrentVersion()
@@ -75,7 +75,7 @@ func runPrefixDisable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error getting version: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", v)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", v)
 	return nil
 }
 
@@ -118,9 +118,9 @@ func runPrefixSet(cmd *cobra.Command, args []string) error {
 	}
 
 	if prefix == "" {
-		fmt.Fprintln(cmd.OutOrStdout(), "Version prefix disabled (set to empty)")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Version prefix disabled (set to empty)")
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "Version prefix set to: %s\n", prefix)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Version prefix set to: %s\n", prefix)
 	}
 
 	// Show current version with new prefix
@@ -129,7 +129,7 @@ func runPrefixSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error getting version: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
 	return nil
 }
 
@@ -150,10 +150,10 @@ func runPrefixStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	if vd.Prefix == "" {
-		fmt.Fprintln(cmd.OutOrStdout(), "Prefix: DISABLED")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Prefix: DISABLED")
 	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "Prefix: ENABLED")
-		fmt.Fprintf(cmd.OutOrStdout(), "Value: %s\n", vd.Prefix)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Prefix: ENABLED")
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Value: %s\n", vd.Prefix)
 	}
 
 	// Show config prefix (what will be restored on enable)
@@ -161,9 +161,9 @@ func runPrefixStatus(cmd *cobra.Command, args []string) error {
 	if cfg, err := config.ReadConfig(); err == nil && cfg.Prefix != "" {
 		configPrefix = cfg.Prefix
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Config prefix (for enable): %s\n", configPrefix)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Config prefix (for enable): %s\n", configPrefix)
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
 	return nil
 }
 

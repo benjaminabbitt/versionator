@@ -25,7 +25,7 @@ func captureStdout(f func()) string {
 
 	f()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
@@ -198,11 +198,11 @@ func TestEmit_StabilityTrue_UsesPrereleaseAndMetadataFromVersionFile(t *testing.
 	cfg := &config.Config{
 		Prefix: "",
 		PreRelease: config.PreReleaseConfig{
-			Template: "alpha",  // This should be ignored when stable=true
+			Template: "alpha", // This should be ignored when stable=true
 			Stable:   true,
 		},
 		Metadata: config.MetadataConfig{
-			Template: "build99",  // This should be ignored when stable=true
+			Template: "build99", // This should be ignored when stable=true
 			Stable:   true,
 		},
 	}

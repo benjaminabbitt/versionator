@@ -17,8 +17,8 @@ type MockRepository struct {
 	HeadErr error
 
 	// CommitObject configuration
-	Commits    map[plumbing.Hash]*object.Commit
-	CommitErr  error
+	Commits   map[plumbing.Hash]*object.Commit
+	CommitErr error
 
 	// CreateTag configuration
 	CreateTagRef *plumbing.Reference
@@ -29,7 +29,7 @@ type MockRepository struct {
 	TagsErr error
 
 	// Branches configuration
-	BranchRefs []plumbing.Reference
+	BranchRefs  []plumbing.Reference
 	BranchesErr error
 
 	// TagObject configuration
@@ -41,9 +41,9 @@ type MockRepository struct {
 	LogErr     error
 
 	// SetReference configuration
-	SetRefErr error
+	SetRefErr    error
 	SetRefCalled bool
-	SetRefArg *plumbing.Reference
+	SetRefArg    *plumbing.Reference
 
 	// Worktree configuration
 	MockWorktree *MockWorktree
@@ -125,13 +125,13 @@ type MockWorktree struct {
 	StatusResult git.Status
 	StatusErr    error
 
-	AddHash plumbing.Hash
-	AddErr  error
+	AddHash  plumbing.Hash
+	AddErr   error
 	AddCalls []string
 
-	CommitHash plumbing.Hash
-	CommitErr  error
-	CommitCalls []struct{
+	CommitHash  plumbing.Hash
+	CommitErr   error
+	CommitCalls []struct {
 		Msg  string
 		Opts *git.CommitOptions
 	}
@@ -154,7 +154,10 @@ func (m *MockWorktree) Add(path string) (plumbing.Hash, error) {
 }
 
 func (m *MockWorktree) Commit(msg string, opts *git.CommitOptions) (plumbing.Hash, error) {
-	m.CommitCalls = append(m.CommitCalls, struct{Msg string; Opts *git.CommitOptions}{msg, opts})
+	m.CommitCalls = append(m.CommitCalls, struct {
+		Msg  string
+		Opts *git.CommitOptions
+	}{msg, opts})
 	return m.CommitHash, m.CommitErr
 }
 

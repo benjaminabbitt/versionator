@@ -1273,11 +1273,11 @@ func TestConfig_Validate_ValidConfig(t *testing.T) {
 // should all be valid.
 func TestValidateTemplate_ValidTemplate(t *testing.T) {
 	tests := []string{
-		"",                                        // empty is valid
-		"alpha",                                   // no mustache tags
-		"{{Major}}",                               // single tag
-		"{{Major}}.{{Minor}}.{{Patch}}",           // multiple tags
-		"alpha-{{CommitsSinceTag}}",               // mixed
+		"",                              // empty is valid
+		"alpha",                         // no mustache tags
+		"{{Major}}",                     // single tag
+		"{{Major}}.{{Minor}}.{{Patch}}", // multiple tags
+		"alpha-{{CommitsSinceTag}}",     // mixed
 		"{{BuildDateTimeCompact}}.{{MediumHash}}", // typical metadata
 	}
 

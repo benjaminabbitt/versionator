@@ -149,7 +149,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 
 	// If no template specified, output full SemVer (including prerelease and metadata from VERSION file)
 	if versionTemplate == "" {
-		fmt.Fprintln(cmd.OutOrStdout(), vd.String())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), vd.String())
 		return nil
 	}
 
@@ -242,7 +242,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 	}
 
 	// Trim any trailing newlines that might be added by template rendering
-	fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(result))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), strings.TrimSpace(result))
 	return nil
 }
 

@@ -547,9 +547,9 @@ func (suite *CITestSuite) TestRunCI_AutoDetect_NoCI() {
 	suite.setupMockVCSWithDefaults()
 
 	// Clear CI env vars to ensure no CI is detected
-	os.Unsetenv("GITHUB_ACTIONS")
-	os.Unsetenv("GITLAB_CI")
-	os.Unsetenv("CIRCLECI")
+	_ = os.Unsetenv("GITHUB_ACTIONS")
+	_ = os.Unsetenv("GITLAB_CI")
+	_ = os.Unsetenv("CIRCLECI")
 
 	// Action: Execute CI command without format flag
 	var buf bytes.Buffer

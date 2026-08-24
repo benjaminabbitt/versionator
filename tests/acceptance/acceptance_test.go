@@ -17,11 +17,11 @@ import (
 
 // testContext holds state between step definitions
 type testContext struct {
-	workDir      string
-	output       string
-	exitCode     int
-	versionator  string // path to versionator binary
-	originalDir  string
+	workDir     string
+	output      string
+	exitCode    int
+	versionator string // path to versionator binary
+	originalDir string
 }
 
 // Singleton for current test context
@@ -103,7 +103,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	// Assertion steps
 	sc.Step(`^the output should be "([^"]*)"$`, theOutputShouldBe)
 	sc.Step(`^the output should contain "([^"]*)"$`, theOutputShouldContain)
-	sc.Step(`^the output should contain '([^']*)'$`, theOutputShouldContain)  // Single-quoted variant
+	sc.Step(`^the output should contain '([^']*)'$`, theOutputShouldContain)   // Single-quoted variant
 	sc.Step(`^the output should contain ""([^"]*)""$`, theOutputShouldContain) // Double-quoted variant (for values with embedded quotes)
 	sc.Step(`^the output should match pattern "([^"]*)"$`, theOutputShouldMatchPattern)
 	sc.Step(`^the exit code should be (\d+)$`, theExitCodeShouldBe)
@@ -160,7 +160,7 @@ func teardownTestContext(c context.Context) (context.Context, error) {
 
 	// Remove temp directory
 	if ctx.workDir != "" {
-		os.RemoveAll(ctx.workDir)
+		_ = os.RemoveAll(ctx.workDir)
 	}
 
 	ctx = nil

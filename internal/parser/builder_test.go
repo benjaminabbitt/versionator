@@ -334,7 +334,7 @@ func TestBuilder_AssemblyVersion_SupportsFourComponents(t *testing.T) {
 	// Expected: IsAssemblyVersion true, both formats correct
 	require.NoError(t, err)
 	assert.True(t, v.IsAssemblyVersion())
-	assert.Equal(t, "1.2.3.456", v.String())           // Includes revision
+	assert.Equal(t, "1.2.3.456", v.String())          // Includes revision
 	assert.Equal(t, "1.2.3.456", v.AssemblyVersion()) // Assembly format (4 components)
 }
 

@@ -41,20 +41,20 @@ func NewTestHelper(t *testing.T) *TestHelper {
 	// Initialize git repository
 	repo, err := git.PlainInit(dir, false)
 	if err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 		t.Fatalf("failed to init git repo: %v", err)
 	}
 
 	// Save original directory
 	origDir, err := os.Getwd()
 	if err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 		t.Fatalf("failed to get current directory: %v", err)
 	}
 
 	// Change to temp directory
 	if err := os.Chdir(dir); err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 		t.Fatalf("failed to change to temp dir: %v", err)
 	}
 
@@ -69,7 +69,7 @@ func NewTestHelper(t *testing.T) *TestHelper {
 // Cleanup restores original directory and removes temp directory
 func (h *TestHelper) Cleanup() {
 	_ = os.Chdir(h.origDir)
-	os.RemoveAll(h.dir)
+	_ = os.RemoveAll(h.dir)
 }
 
 // CreateCommit creates a commit in the test repository
@@ -866,7 +866,7 @@ func TestIsRepository_NotInGitRepo_ReturnsFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	origDir, _ := os.Getwd()
 	defer func() { _ = os.Chdir(origDir) }()
@@ -898,7 +898,7 @@ func TestGetRepositoryRoot_NotInRepo_ReturnsError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	origDir, _ := os.Getwd()
 	defer func() { _ = os.Chdir(origDir) }()
@@ -1174,7 +1174,7 @@ func TestFindGitDir_NotInGitRepo_ReturnsEmptyString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Action: Find the git directory outside a repo
 	vcs := NewGitVCSDefault()
@@ -1236,7 +1236,7 @@ func TestCreateBranch_MultipleBranches(t *testing.T) {
 // What: Unset the environment variable, verify GetHashLength() returns 7.
 func TestGetHashLength_Default_ReturnsSeven(t *testing.T) {
 	// Precondition: No environment variable set
-	os.Unsetenv("VERSIONATOR_HASH_LENGTH")
+	_ = os.Unsetenv("VERSIONATOR_HASH_LENGTH")
 
 	// Action: Get the hash length
 	length := GetHashLength()
@@ -1256,8 +1256,8 @@ func TestGetHashLength_Default_ReturnsSeven(t *testing.T) {
 // What: Set the environment variable to 12, verify GetHashLength() returns 12.
 func TestGetHashLength_FromEnv_ReturnsEnvValue(t *testing.T) {
 	// Precondition: Environment variable set to a valid value
-	os.Setenv("VERSIONATOR_HASH_LENGTH", "12")
-	defer os.Unsetenv("VERSIONATOR_HASH_LENGTH")
+	_ = os.Setenv("VERSIONATOR_HASH_LENGTH", "12")
+	defer func() { _ = os.Unsetenv("VERSIONATOR_HASH_LENGTH") }()
 
 	// Action: Get the hash length
 	length := GetHashLength()
@@ -1290,8 +1290,8 @@ func TestGetHashLength_InvalidEnv_ReturnsDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Precondition: Invalid environment variable value
-			os.Setenv("VERSIONATOR_HASH_LENGTH", tt.envValue)
-			defer os.Unsetenv("VERSIONATOR_HASH_LENGTH")
+			_ = os.Setenv("VERSIONATOR_HASH_LENGTH", tt.envValue)
+			defer func() { _ = os.Unsetenv("VERSIONATOR_HASH_LENGTH") }()
 
 			// Action: Get the hash length
 			length := GetHashLength()
@@ -1313,7 +1313,7 @@ func TestGetHashLength_InvalidEnv_ReturnsDefault(t *testing.T) {
 // What: Pass a valid config value, verify GetHashLengthFromConfig() returns it.
 func TestGetHashLengthFromConfig_ValidConfig_ReturnsConfigValue(t *testing.T) {
 	// Precondition: No conflicting environment variable
-	os.Unsetenv("VERSIONATOR_HASH_LENGTH")
+	_ = os.Unsetenv("VERSIONATOR_HASH_LENGTH")
 
 	// Action: Get hash length from config
 	length := GetHashLengthFromConfig(10)
@@ -1349,11 +1349,11 @@ func TestGetHashLengthFromConfig_InvalidConfig_FallsBackToEnvOrDefault(t *testin
 		t.Run(tt.name, func(t *testing.T) {
 			// Precondition: Set up config and env as specified
 			if tt.envValue != "" {
-				os.Setenv("VERSIONATOR_HASH_LENGTH", tt.envValue)
+				_ = os.Setenv("VERSIONATOR_HASH_LENGTH", tt.envValue)
 			} else {
-				os.Unsetenv("VERSIONATOR_HASH_LENGTH")
+				_ = os.Unsetenv("VERSIONATOR_HASH_LENGTH")
 			}
-			defer os.Unsetenv("VERSIONATOR_HASH_LENGTH")
+			defer func() { _ = os.Unsetenv("VERSIONATOR_HASH_LENGTH") }()
 
 			// Action: Get hash length from config
 			length := GetHashLengthFromConfig(tt.configValue)

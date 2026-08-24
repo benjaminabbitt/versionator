@@ -491,7 +491,7 @@ func TestMetadataSetCommand_WhenStableFalse_WithForce_UpdatesTemplate(t *testing
 	rootCmd.SetArgs(nil)
 
 	// Reset the force flag to prevent state pollution to subsequent tests
-	metadataSetCmd.Flags().Set("force", "false")
+	_ = metadataSetCmd.Flags().Set("force", "false")
 }
 
 // =============================================================================

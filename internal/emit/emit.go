@@ -610,14 +610,14 @@ func templateDataToMap(data TemplateData) map[string]interface{} {
 		"CommitUserEmail":   data.CommitAuthorEmail, // Alias for CommitAuthorEmail
 
 		// Commit timestamps
-		"CommitDate":          data.CommitDate,
-		"CommitDateTime":      data.CommitDate, // Alias for CommitDate
-		"CommitDateCompact":   data.CommitDateCompact,
+		"CommitDate":            data.CommitDate,
+		"CommitDateTime":        data.CommitDate, // Alias for CommitDate
+		"CommitDateCompact":     data.CommitDateCompact,
 		"CommitDateTimeCompact": data.CommitDateCompact, // Alias for CommitDateCompact
-		"CommitDateShort":     data.CommitDateShort,
-		"CommitYear":          data.CommitYear,
-		"CommitMonth":         data.CommitMonth,
-		"CommitDay":           data.CommitDay,
+		"CommitDateShort":       data.CommitDateShort,
+		"CommitYear":            data.CommitYear,
+		"CommitMonth":           data.CommitMonth,
+		"CommitDay":             data.CommitDay,
 
 		// Build timestamps
 		"BuildDateTimeUTC":     data.BuildDateTimeUTC,

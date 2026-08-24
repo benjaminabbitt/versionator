@@ -460,4 +460,3 @@ func TestDaselFileParser_Write_UnsupportedFormat_ReturnsError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), ErrUnsupportedFormat)
 }
-

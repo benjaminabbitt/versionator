@@ -92,11 +92,11 @@ func runSchema(cmd *cobra.Command, args []string) error {
 		if err := os.WriteFile(schemaOutput, output, FilePermission); err != nil {
 			return fmt.Errorf("error writing schema to %s: %w", schemaOutput, err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Schema written to %s\n", schemaOutput)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Schema written to %s\n", schemaOutput)
 		return nil
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), string(output))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(output))
 	return nil
 }
 

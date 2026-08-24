@@ -53,20 +53,20 @@ func Detect() Environment {
 
 // Variables defines the standard set of version variables to export
 type Variables struct {
-	Version           string // Full version string (e.g., "v1.2.3" or "1.2.3-alpha+build")
-	VersionSemver     string // SemVer without prefix (e.g., "1.2.3-alpha")
-	VersionCore       string // Core version only (e.g., "1.2.3")
-	Major             string // Major version
-	Minor             string // Minor version
-	Patch             string // Patch version
-	Revision          string // Revision (4th component, may be empty)
-	PreRelease        string // Pre-release identifier (may be empty)
-	Metadata          string // Build metadata (may be empty)
-	GitSHA            string // Full commit SHA
-	GitSHAShort       string // Short commit SHA (7 chars)
-	GitBranch         string // Current branch name
-	BuildNumber       string // Commits since last tag
-	Dirty             string // "true" if uncommitted changes, "false" otherwise
+	Version       string // Full version string (e.g., "v1.2.3" or "1.2.3-alpha+build")
+	VersionSemver string // SemVer without prefix (e.g., "1.2.3-alpha")
+	VersionCore   string // Core version only (e.g., "1.2.3")
+	Major         string // Major version
+	Minor         string // Minor version
+	Patch         string // Patch version
+	Revision      string // Revision (4th component, may be empty)
+	PreRelease    string // Pre-release identifier (may be empty)
+	Metadata      string // Build metadata (may be empty)
+	GitSHA        string // Full commit SHA
+	GitSHAShort   string // Short commit SHA (7 chars)
+	GitBranch     string // Current branch name
+	BuildNumber   string // Commits since last tag
+	Dirty         string // "true" if uncommitted changes, "false" otherwise
 }
 
 // VariableNames returns the standard variable names with optional prefix

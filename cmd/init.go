@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	initVersion     string
-	initPrefix      string
-	initWithConfig  bool
-	initForce       bool
-	hookUninstall   bool
+	initVersion    string
+	initPrefix     string
+	initWithConfig bool
+	initForce      bool
+	hookUninstall  bool
 )
 
 const postCommitHookScript = `#!/bin/sh
@@ -88,7 +88,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := os.WriteFile(versionPath, []byte(content), FilePermission); err != nil {
 		return fmt.Errorf("error writing VERSION file: %w", err)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Created VERSION: %s\n", v.FullString())
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Created VERSION: %s\n", v.FullString())
 
 	// Write config if requested
 	if initWithConfig {
@@ -96,7 +96,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err := os.WriteFile(configPath, []byte(defaultConfig), FilePermission); err != nil {
 			return fmt.Errorf("error writing .versionator.yaml: %w", err)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Created .versionator.yaml\n")
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Created .versionator.yaml\n")
 	}
 
 	return nil

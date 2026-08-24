@@ -413,7 +413,7 @@ func TestMock_IsWorkingDirectoryClean_Dirty(t *testing.T) {
 	defer h.Cleanup()
 	h.CreateCommit("initial commit")
 	// Modify the tracked file to make it dirty
-	os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
+	_ = os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
 
 	v := NewGitVCS(DefaultRepositoryOpener)
 	v.repoRoot = h.dir
@@ -558,9 +558,9 @@ func TestMock_GetUncommittedChanges_Multiple(t *testing.T) {
 	h.CreateCommit("initial commit")
 
 	// Create multiple dirty files
-	os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
-	os.WriteFile(filepath.Join(h.dir, "file2.txt"), []byte("new"), 0644)
-	exec.Command("git", "-C", h.dir, "add", "file2.txt").Run()
+	_ = os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
+	_ = os.WriteFile(filepath.Join(h.dir, "file2.txt"), []byte("new"), 0644)
+	_ = exec.Command("git", "-C", h.dir, "add", "file2.txt").Run()
 
 	v := NewGitVCS(DefaultRepositoryOpener)
 	v.repoRoot = h.dir
@@ -591,9 +591,9 @@ func TestMock_GetDirtyFiles_Success(t *testing.T) {
 	h.CreateCommit("initial commit")
 
 	// Modify tracked file + stage a new file
-	os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
-	os.WriteFile(filepath.Join(h.dir, "new.txt"), []byte("added"), 0644)
-	exec.Command("git", "-C", h.dir, "add", "new.txt").Run()
+	_ = os.WriteFile(filepath.Join(h.dir, "test.txt"), []byte("modified"), 0644)
+	_ = os.WriteFile(filepath.Join(h.dir, "new.txt"), []byte("added"), 0644)
+	_ = exec.Command("git", "-C", h.dir, "add", "new.txt").Run()
 
 	v := NewGitVCS(DefaultRepositoryOpener)
 	v.repoRoot = h.dir

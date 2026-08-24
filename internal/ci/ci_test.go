@@ -23,8 +23,8 @@ import (
 // What: When GITHUB_ACTIONS=true is set, Detect should return EnvGitHubActions.
 func TestDetect_GitHubActions_ReturnsGitHubEnvironment(t *testing.T) {
 	// Precondition: GITHUB_ACTIONS environment variable is set to "true"
-	os.Setenv("GITHUB_ACTIONS", "true")
-	defer os.Unsetenv("GITHUB_ACTIONS")
+	_ = os.Setenv("GITHUB_ACTIONS", "true")
+	defer func() { _ = os.Unsetenv("GITHUB_ACTIONS") }()
 
 	// Action: Detect the CI environment
 	env := Detect()
@@ -144,8 +144,8 @@ func TestVariables_ToMap_ConvertsStructToStandardVariableNames(t *testing.T) {
 // What: When GITLAB_CI=true is set, Detect should return EnvGitLabCI.
 func TestDetect_GitLabCI_ReturnsGitLabEnvironment(t *testing.T) {
 	// Precondition: GITLAB_CI environment variable is set to "true"
-	os.Setenv("GITLAB_CI", "true")
-	defer os.Unsetenv("GITLAB_CI")
+	_ = os.Setenv("GITLAB_CI", "true")
+	defer func() { _ = os.Unsetenv("GITLAB_CI") }()
 
 	// Action: Detect the CI environment
 	env := Detect()
@@ -163,8 +163,8 @@ func TestDetect_GitLabCI_ReturnsGitLabEnvironment(t *testing.T) {
 // What: When TF_BUILD=True is set, Detect should return EnvAzureDevOps.
 func TestDetect_AzureDevOps_ReturnsAzureEnvironment(t *testing.T) {
 	// Precondition: TF_BUILD environment variable is set to "True"
-	os.Setenv("TF_BUILD", "True")
-	defer os.Unsetenv("TF_BUILD")
+	_ = os.Setenv("TF_BUILD", "True")
+	defer func() { _ = os.Unsetenv("TF_BUILD") }()
 
 	// Action: Detect the CI environment
 	env := Detect()
@@ -182,8 +182,8 @@ func TestDetect_AzureDevOps_ReturnsAzureEnvironment(t *testing.T) {
 // What: When CIRCLECI=true is set, Detect should return EnvCircleCI.
 func TestDetect_CircleCI_ReturnsCircleCIEnvironment(t *testing.T) {
 	// Precondition: CIRCLECI environment variable is set to "true"
-	os.Setenv("CIRCLECI", "true")
-	defer os.Unsetenv("CIRCLECI")
+	_ = os.Setenv("CIRCLECI", "true")
+	defer func() { _ = os.Unsetenv("CIRCLECI") }()
 
 	// Action: Detect the CI environment
 	env := Detect()
@@ -201,8 +201,8 @@ func TestDetect_CircleCI_ReturnsCircleCIEnvironment(t *testing.T) {
 // What: When JENKINS_URL is set, Detect should return EnvJenkins.
 func TestDetect_Jenkins_ReturnsJenkinsEnvironment(t *testing.T) {
 	// Precondition: JENKINS_URL environment variable is set
-	os.Setenv("JENKINS_URL", "http://jenkins.example.com")
-	defer os.Unsetenv("JENKINS_URL")
+	_ = os.Setenv("JENKINS_URL", "http://jenkins.example.com")
+	defer func() { _ = os.Unsetenv("JENKINS_URL") }()
 
 	// Action: Detect the CI environment
 	env := Detect()
@@ -461,8 +461,8 @@ func TestShellFormatter_Write_WritesToProvidedWriter(t *testing.T) {
 // What: When GitHub env vars are unset, Write should output to the buffer.
 func TestGitHubFormatter_Write_NoEnvVars_WritesToProvidedWriter(t *testing.T) {
 	// Precondition: GitHub environment variables are not set
-	os.Unsetenv("GITHUB_OUTPUT")
-	os.Unsetenv("GITHUB_ENV")
+	_ = os.Unsetenv("GITHUB_OUTPUT")
+	_ = os.Unsetenv("GITHUB_ENV")
 
 	formatter := &GitHubFormatter{}
 	vars := map[string]string{"VERSION": "1.2.3"}
@@ -494,10 +494,10 @@ func TestGitHubFormatter_Write_WithEnvVars_WritesToGitHubFiles(t *testing.T) {
 	outputFile := tempDir + "/github_output"
 	envFile := tempDir + "/github_env"
 
-	os.Setenv("GITHUB_OUTPUT", outputFile)
-	os.Setenv("GITHUB_ENV", envFile)
-	defer os.Unsetenv("GITHUB_OUTPUT")
-	defer os.Unsetenv("GITHUB_ENV")
+	_ = os.Setenv("GITHUB_OUTPUT", outputFile)
+	_ = os.Setenv("GITHUB_ENV", envFile)
+	defer func() { _ = os.Unsetenv("GITHUB_OUTPUT") }()
+	defer func() { _ = os.Unsetenv("GITHUB_ENV") }()
 
 	formatter := &GitHubFormatter{}
 	vars := map[string]string{
@@ -544,7 +544,7 @@ func TestGitHubFormatter_Write_WithEnvVars_WritesToGitHubFiles(t *testing.T) {
 // What: When BASH_ENV is unset, Write should output to the buffer.
 func TestCircleCIFormatter_Write_NoEnvVars_WritesToProvidedWriter(t *testing.T) {
 	// Precondition: BASH_ENV is not set
-	os.Unsetenv("BASH_ENV")
+	_ = os.Unsetenv("BASH_ENV")
 
 	formatter := &CircleCIFormatter{}
 	vars := map[string]string{"VERSION": "1.2.3"}
@@ -574,8 +574,8 @@ func TestCircleCIFormatter_Write_WithBashEnv_WritesToBashEnvFile(t *testing.T) {
 	tempDir := t.TempDir()
 	bashEnvFile := tempDir + "/bash_env"
 
-	os.Setenv("BASH_ENV", bashEnvFile)
-	defer os.Unsetenv("BASH_ENV")
+	_ = os.Setenv("BASH_ENV", bashEnvFile)
+	defer func() { _ = os.Unsetenv("BASH_ENV") }()
 
 	formatter := &CircleCIFormatter{}
 	vars := map[string]string{"VERSION": "1.2.3"}
@@ -690,11 +690,11 @@ func TestJenkinsFormatter_Write_WritesToProvidedWriter(t *testing.T) {
 // What: With no CI environment variables set, Detect returns EnvNone.
 func TestDetect_NoCIEnvironment_ReturnsEnvNone(t *testing.T) {
 	// Precondition: All CI environment variables are unset
-	os.Unsetenv("GITHUB_ACTIONS")
-	os.Unsetenv("GITLAB_CI")
-	os.Unsetenv("TF_BUILD")
-	os.Unsetenv("CIRCLECI")
-	os.Unsetenv("JENKINS_URL")
+	_ = os.Unsetenv("GITHUB_ACTIONS")
+	_ = os.Unsetenv("GITLAB_CI")
+	_ = os.Unsetenv("TF_BUILD")
+	_ = os.Unsetenv("CIRCLECI")
+	_ = os.Unsetenv("JENKINS_URL")
 
 	// Action: Detect the CI environment
 	env := Detect()

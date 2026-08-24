@@ -9,8 +9,8 @@ const (
 
 // Log messages
 const (
-	LogBranchDetected     = "branch_detected"
-	LogMainBranchMatched  = "main_branch_matched"
-	LogBranchPrerelease   = "branch_prerelease_generated"
-	LogBranchNotEnabled   = "branch_versioning_not_enabled"
+	LogBranchDetected    = "branch_detected"
+	LogMainBranchMatched = "main_branch_matched"
+	LogBranchPrerelease  = "branch_prerelease_generated"
+	LogBranchNotEnabled  = "branch_versioning_not_enabled"
 )

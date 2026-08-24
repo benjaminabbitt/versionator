@@ -35,7 +35,7 @@ func runSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("version set but error reading back: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Version set to: %s\n", v.FullString())
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Version set to: %s\n", v.FullString())
 
 	if err := runConfiguredUpdates(cmd); err != nil {
 		return err
