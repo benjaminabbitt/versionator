@@ -51,7 +51,7 @@ func init() {
 	ciCmd.Flags().String("prefix", "", "Variable name prefix (e.g., 'MYAPP_' -> MYAPP_VERSION)")
 }
 
-func runCI(cmd *cobra.Command, args []string) error {
+func runCI(cmd *cobra.Command, args []string) (err error) {
 	// Get current version
 	v, err := version.Load()
 	if err != nil {
@@ -95,11 +95,17 @@ func runCI(cmd *cobra.Command, args []string) error {
 	var writer = cmd.OutOrStdout()
 
 	if outputFile != "" {
-		file, err := os.Create(outputFile)
-		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
+		file, createErr := os.Create(outputFile)
+		if createErr != nil {
+			return fmt.Errorf("failed to create output file: %w", createErr)
 		}
-		defer file.Close()
+		// The variables are not durable until Close succeeds; a deferred write
+		// failure surfaces there and nowhere else, so it must not be dropped.
+		defer func() {
+			if closeErr := file.Close(); closeErr != nil && err == nil {
+				err = fmt.Errorf("failed to close output file: %w", closeErr)
+			}
+		}()
 		writer = file
 	}
 

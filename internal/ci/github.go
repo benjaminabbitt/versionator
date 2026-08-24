@@ -57,33 +57,33 @@ func (f *GitHubFormatter) Write(vars map[string]string, w io.Writer) error {
 
 	// Write to GITHUB_OUTPUT (for step outputs)
 	if outputFile != "" {
-		file, err := os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open GITHUB_OUTPUT: %w", err)
-		}
-		defer file.Close()
-
-		for _, k := range keys {
-			// Convert to lowercase for output names (convention)
-			outputName := strings.ToLower(strings.ReplaceAll(k, "_", "-"))
-			if _, err := fmt.Fprintf(file, "%s=%s\n", outputName, vars[k]); err != nil {
-				return fmt.Errorf("failed to write to GITHUB_OUTPUT: %w", err)
+		err := appendToFile(outputFile, "GITHUB_OUTPUT", func(out io.Writer) error {
+			for _, k := range keys {
+				// Convert to lowercase for output names (convention)
+				outputName := strings.ToLower(strings.ReplaceAll(k, "_", "-"))
+				if _, err := fmt.Fprintf(out, "%s=%s\n", outputName, vars[k]); err != nil {
+					return fmt.Errorf("failed to write to GITHUB_OUTPUT: %w", err)
+				}
 			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 
 	// Write to GITHUB_ENV (for environment variables)
 	if envFile != "" {
-		file, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open GITHUB_ENV: %w", err)
-		}
-		defer file.Close()
-
-		for _, k := range keys {
-			if _, err := fmt.Fprintf(file, "%s=%s\n", k, vars[k]); err != nil {
-				return fmt.Errorf("failed to write to GITHUB_ENV: %w", err)
+		err := appendToFile(envFile, "GITHUB_ENV", func(out io.Writer) error {
+			for _, k := range keys {
+				if _, err := fmt.Fprintf(out, "%s=%s\n", k, vars[k]); err != nil {
+					return fmt.Errorf("failed to write to GITHUB_ENV: %w", err)
+				}
 			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 	}
 

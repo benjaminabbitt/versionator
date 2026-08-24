@@ -48,17 +48,16 @@ func (f *CircleCIFormatter) Write(vars map[string]string, w io.Writer) error {
 	}
 
 	// Append to BASH_ENV
-	file, err := os.OpenFile(bashEnv, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open BASH_ENV: %w", err)
-	}
-	defer file.Close()
-
-	if _, err := file.WriteString(f.Format(vars)); err != nil {
-		return fmt.Errorf("failed to write to BASH_ENV: %w", err)
+	if err := appendToFile(bashEnv, "BASH_ENV", func(out io.Writer) error {
+		if _, err := io.WriteString(out, f.Format(vars)); err != nil {
+			return fmt.Errorf("failed to write to BASH_ENV: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	// Also write summary to the provided writer
-	_, err = fmt.Fprintf(w, "Appended %d variables to BASH_ENV\n", len(vars))
+	_, err := fmt.Fprintf(w, "Appended %d variables to BASH_ENV\n", len(vars))
 	return err
 }
