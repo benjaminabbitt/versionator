@@ -1,0 +1,62 @@
+agents:
+    coordinator:
+        llm: claude-code
+        profiles:
+            - default
+        runtime: host
+    developer:
+        llm: claude-code
+        profiles:
+            - developer
+        runtime: host
+    distiller:
+        llm: claude-fast
+        profiles:
+            - distiller
+        runtime: host
+    finder:
+        llm: claude-fast
+        profiles:
+            - searcher
+        runtime: host
+    review-correctness:
+        llm: claude-fast
+        profiles:
+            - review-correctness
+        runtime: host
+    review-idioms:
+        llm: claude-fast
+        profiles:
+            - review-idioms
+        runtime: host
+    review-security:
+        llm: claude-fast
+        profiles:
+            - review-security
+        runtime: host
+    review-testing:
+        llm: claude-fast
+        profiles:
+            - review-testing
+        runtime: host
+    triage:
+        llm: claude-fast
+        profiles:
+            - triage
+        runtime: host
+config:
+    use_distilled: true
+default_agent: coordinator
+dirty_tree_handler: commit
+llm:
+    configs:
+        claude-code:
+            type: claude-code
+            model: claude-opus-4-8
+        claude-fast:
+            type: claude-code
+            model: claude-haiku-4-5-20251001
+    defaults:
+        primary: claude-code
+        fast: claude-fast
+version: 6

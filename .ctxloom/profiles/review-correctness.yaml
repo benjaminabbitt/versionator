@@ -1,0 +1,5 @@
+description: "Single-lens code reviewer: correctness. code-review base discipline + the correctness lens + Go practices."
+bundles:
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/code-review-base
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/code-review-correctness
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/go-ai-practices

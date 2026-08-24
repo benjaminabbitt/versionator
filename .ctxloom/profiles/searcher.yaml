@@ -1,0 +1,5 @@
+description: "Reader/searcher role: code navigation plus domain vocabulary for find-and-report agents. Deliberately excludes behavioral coding standards — a finder is not writing code."
+bundles:
+  - ctxloom+git://github.com/benjaminabbitt/ctxloom-personal//bundles/serena
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/versionator
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/agent-roles#fragments/finder

@@ -1,0 +1,26 @@
+description: "Local default coding profile: versionator's primary heavy-implementer context. Inherits the ai-developer baseline and composes the default-tagged set plus this project's Go/just/BDD stack content."
+tags:
+  - default
+# A LOCAL profile (owned and editable in this project's .ctxloom), not a bare
+# remote reference.
+parents:
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/ai-developer@branch:main#profiles/developer
+bundles:
+  # default-tagged set (curator-recommended baseline)
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/conduct
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/code-quality
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/sequential-thinking
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/versionator
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/ltk
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/taskloom
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/reprise
+  - ctxloom+git://github.com/benjaminabbitt/ctxloom-personal//bundles/serena
+  - ctxloom+git://github.com/benjaminabbitt/ctxloom-personal//bundles/developer-mindset
+  # project stack
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/go-ai-practices
+  - ctxloom+git://github.com/benjaminabbitt/ctxloom-personal//bundles/go-development
+  - ctxloom+git://github.com/benjaminabbitt/ctxloom-personal//bundles/just
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/bdd
+  # project/process
+  - ctxloom+git://github.com/benjaminabbitt/ctxloom-personal//bundles/containers
+  - ctxloom+git://github.com/benjaminabbitt/ctxloom-personal//bundles/core-practices

@@ -1,0 +1,5 @@
+description: "Single-lens code reviewer: testing. code-review base discipline + the testing lens + Go practices."
+bundles:
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/code-review-base
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/code-review-testing
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/go-ai-practices

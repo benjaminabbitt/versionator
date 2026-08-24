@@ -1,18 +1,12 @@
 {
   "mcpServers": {
-    "ctxloom": {
-      "command": "/home/babbitt/go/bin/ctxloom",
-      "args": [
-        "mcp"
-      ],
-      "cwd": "${CLAUDE_PROJECT_DIR}",
-      "_ctxloom": "ctxloom-auto"
-    },
+    "ctxloom": { "args": ["mcp", "serve"], "command": "/home/babbitt/go/bin/ctxloom", "cwd": "${CLAUDE_PROJECT_DIR}" },
     "scm": {
       "command": "./.scm/bin/scm",
       "args": [
         "mcp"
       ]
-    }
+    },
+    "taskloom": { "args": ["mcp"], "command": "taskloom" }
   }
 }

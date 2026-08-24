@@ -1,0 +1,3 @@
+description: "Distiller role: domain vocabulary so session/content summaries read in the project's own terms. Behavioral guidance deliberately excluded — it distorts a summarizer."
+bundles:
+  - ctxloom+git://github.com/ctxloom/ctxloom-default//bundles/versionator
