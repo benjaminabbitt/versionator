@@ -112,8 +112,11 @@ func runEnableCommand(cmd *cobra.Command, args []string, acc versionFieldAccesso
 	return nil
 }
 
-// runDisableCommand clears the field from the VERSION file.
-func runDisableCommand(cmd *cobra.Command, args []string, acc versionFieldAccessor) error {
+// clearVersionValue backs both `disable` and `clear`: each requires stable mode,
+// empties the field in the VERSION file and reports the resulting version. They
+// differ only in the remedy offered when the field is dynamic, and in the word
+// used to report success.
+func clearVersionValue(cmd *cobra.Command, acc versionFieldAccessor, remedy, pastTense string) error {
 	cfg, err := config.ReadConfig()
 	if err != nil {
 		return fmt.Errorf("error reading config: %w", err)
@@ -122,15 +125,14 @@ func runDisableCommand(cmd *cobra.Command, args []string, acc versionFieldAccess
 	if !acc.getStable(cfg) {
 		return fmt.Errorf("%s is configured as dynamic (stable: false)\n"+
 			"In dynamic mode, %s is not stored in VERSION file.\n"+
-			"To disable dynamic %s at output, use --%s=\"\" flag or clear the template",
-			acc.labelLower, acc.labelLower, acc.labelLower, acc.cmdName)
+			"%s", acc.labelLower, acc.labelLower, remedy)
 	}
 
 	if err := acc.setVersion(""); err != nil {
 		return fmt.Errorf("error clearing %s: %w", acc.labelLower, err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s disabled\n", acc.labelTitle)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", acc.labelTitle, pastTense)
 
 	vd, err := version.Load()
 	if err != nil {
@@ -139,6 +141,14 @@ func runDisableCommand(cmd *cobra.Command, args []string, acc versionFieldAccess
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
 	return nil
+}
+
+// runDisableCommand clears the field from the VERSION file.
+func runDisableCommand(cmd *cobra.Command, args []string, acc versionFieldAccessor) error {
+	return clearVersionValue(cmd, acc,
+		fmt.Sprintf("To disable dynamic %s at output, use --%s=\"\" flag or clear the template",
+			acc.labelLower, acc.cmdName),
+		"disabled")
 }
 
 // runStatusCommand reports the field's configuration and its effective value.
@@ -228,29 +238,7 @@ func runSetCommand(cmd *cobra.Command, args []string, acc versionFieldAccessor) 
 
 // runClearCommand removes the field's value from the VERSION file.
 func runClearCommand(cmd *cobra.Command, args []string, acc versionFieldAccessor) error {
-	cfg, err := config.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("error reading config: %w", err)
-	}
-
-	if !acc.getStable(cfg) {
-		return fmt.Errorf("%s is configured as dynamic (stable: false)\n"+
-			"In dynamic mode, %s is not stored in VERSION file.\n"+
-			"To clear the template, use: versionator config %s template \"\"",
-			acc.labelLower, acc.labelLower, acc.cmdName)
-	}
-
-	if err := acc.setVersion(""); err != nil {
-		return fmt.Errorf("error clearing %s: %w", acc.labelLower, err)
-	}
-
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s cleared\n", acc.labelTitle)
-
-	vd, err := version.Load()
-	if err != nil {
-		return fmt.Errorf("error getting version: %w", err)
-	}
-
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return clearVersionValue(cmd, acc,
+		fmt.Sprintf("To clear the template, use: versionator config %s template \"\"", acc.cmdName),
+		"cleared")
 }

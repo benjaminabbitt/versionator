@@ -43,30 +43,29 @@ Examples:
 	RunE: runBump,
 }
 
-// runLevelIncrement handles incrementing a version level
-func runLevelIncrement(cmd *cobra.Command, level version.VersionLevel, titleName string) error {
-	if err := version.Increment(level); err != nil {
+// runLevelChange applies apply to level, reports the resulting version using
+// verb, and runs any configured file updates. Increment and decrement differ
+// only in those two things.
+func runLevelChange(cmd *cobra.Command, level version.VersionLevel, titleName string, apply func(version.VersionLevel) error, verb string) error {
+	if err := apply(level); err != nil {
 		return err
 	}
 	ver, err := version.GetCurrentVersion()
 	if err != nil {
 		return fmt.Errorf("error reading updated version: %w", err)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s version incremented to: %s\n", titleName, ver)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s version %s to: %s\n", titleName, verb, ver)
 	return runConfiguredUpdates(cmd)
+}
+
+// runLevelIncrement handles incrementing a version level
+func runLevelIncrement(cmd *cobra.Command, level version.VersionLevel, titleName string) error {
+	return runLevelChange(cmd, level, titleName, version.Increment, "incremented")
 }
 
 // runLevelDecrement handles decrementing a version level
 func runLevelDecrement(cmd *cobra.Command, level version.VersionLevel, titleName string) error {
-	if err := version.Decrement(level); err != nil {
-		return err
-	}
-	ver, err := version.GetCurrentVersion()
-	if err != nil {
-		return fmt.Errorf("error reading updated version: %w", err)
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s version decremented to: %s\n", titleName, ver)
-	return runConfiguredUpdates(cmd)
+	return runLevelChange(cmd, level, titleName, version.Decrement, "decremented")
 }
 
 // makeLevelCmd creates a parent command for a version level with increment/decrement subcommands
