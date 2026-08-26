@@ -28,7 +28,31 @@ func TestCISuite(t *testing.T) {
 	suite.Run(t, new(CITestSuite))
 }
 
+// ciDetectionEnv is every variable the ci package inspects to decide which
+// provider it is running under, and where that provider expects variables to
+// be written.
+var ciDetectionEnv = []string{
+	"BASH_ENV",
+	"CIRCLECI",
+	"GITHUB_ACTIONS",
+	"GITHUB_ENV",
+	"GITHUB_OUTPUT",
+	"GITLAB_CI",
+	"JENKINS_URL",
+	"TF_BUILD",
+}
+
 func (suite *CITestSuite) SetupTest() {
+	// These tests assert on what the command writes to its OWN writer, which
+	// only happens when no CI provider is detected. On a real runner these are
+	// set, so the formatter writes to the provider's files and emits a summary
+	// line instead — the suite passed locally and failed in Actions. Clear them
+	// so the tests exercise the path they describe wherever they run; a test
+	// wanting provider behaviour sets the variable itself.
+	for _, key := range ciDetectionEnv {
+		suite.T().Setenv(key, "")
+	}
+
 	suite.tempDir = suite.T().TempDir()
 	var err error
 	suite.origDir, err = os.Getwd()
