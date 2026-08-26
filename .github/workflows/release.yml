@@ -1,7 +1,7 @@
 name: Release
 
 # Single release pipeline, triggered when auto-release.yml pushes a v* tag on a
-# merge to main. It merges the two former release flows:
+# merge to master. It merges the two former release flows:
 #
 #   - GoReleaser owns the binaries, archives, checksums, changelog, the GitHub
 #     Release, and the Homebrew cask (benjaminabbitt/homebrew-tap).

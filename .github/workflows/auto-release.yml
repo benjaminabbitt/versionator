@@ -1,6 +1,6 @@
 name: Auto Release
 
-# On a successful CI run for a push to main (i.e. a merged PR), tag the version
+# On a successful CI run for a push to master (i.e. a merged PR), tag the version
 # in the VERSION file and push that tag, which triggers release-completer.yml.
 #
 # This does NOT bump the version — the version is set deliberately in the PR via
@@ -16,7 +16,7 @@ on:
     workflows: ["CI"]
     types:
       - completed
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: write
@@ -30,10 +30,10 @@ jobs:
       github.event.workflow_run.event == 'push'
 
     steps:
-      - name: Checkout main
+      - name: Checkout master
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: master
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TAG_TOKEN }}
 

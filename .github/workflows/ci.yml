@@ -2,14 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  # Release gate: every change to main must carry a fresh, untagged VERSION.
+  # Release gate: every change to master must carry a fresh, untagged VERSION.
   # Fails the PR/push if the version already has a git tag, forcing a deliberate
   # `versionator set` bump (no auto-increment). On merge, auto-release.yml tags
   # this VERSION and triggers the release. The VERSION file holds the bare
