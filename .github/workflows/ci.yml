@@ -46,6 +46,13 @@ jobs:
 
       - uses: extractions/setup-just@v2
 
+      # The justfile's shebang recipes are zsh, matching the devcontainer
+      # (.devcontainer/Dockerfile installs zsh and makes it the login shell).
+      # Bare runners have no zsh, so provide it rather than rewriting recipes
+      # to a different shell than developers actually use.
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
       # Build the (static) binary, then run the full test suite. versionator's
       # own VERSION stamps the build; some acceptance tests want the binary on
       # disk, so build first.

@@ -65,6 +65,11 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
+      # justfile shebang recipes are zsh (see .devcontainer/Dockerfile); bare
+      # runners do not ship it.
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
       - name: Build all-platform static binaries
         run: just build-all
 
