@@ -1978,28 +1978,33 @@ func TestGitVCS_LinkedWorktree(t *testing.T) {
 func TestGitVCS_GetDirtyFiles_UnstagedModification_KeepsFullFilename(t *testing.T) {
 	h := NewTestHelper(t)
 	defer h.Cleanup()
-	h.CreateCommit("initial commit")
 
-	// Two unstaged modifications: the first exercises the trimmed-first-line bug.
-	for _, name := range []string{"VERSION", "other.txt"} {
-		if err := os.WriteFile(filepath.Join(h.dir, name), []byte("changed\n"), 0644); err != nil {
+	names := []string{"VERSION", "other.txt"}
+
+	wt, err := h.repo.Worktree()
+	if err != nil {
+		t.Fatalf("worktree: %v", err)
+	}
+	for _, name := range names {
+		if err := os.WriteFile(filepath.Join(h.dir, name), []byte("original\n"), 0644); err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}
-		if out, err := exec.Command("git", "-C", h.dir, "add", name).CombinedOutput(); err != nil {
-			t.Fatalf("git add %s: %v: %s", name, err, out)
+		if _, err := wt.Add(name); err != nil {
+			t.Fatalf("add %s: %v", name, err)
 		}
-		if out, err := exec.Command("git", "-C", h.dir, "commit", "-m", "add "+name).CombinedOutput(); err != nil {
-			t.Fatalf("git commit %s: %v: %s", name, err, out)
-		}
+	}
+	if _, err := wt.Commit("seed files", &git.CommitOptions{
+		Author: &object.Signature{Name: "Test Author", Email: "test@example.com", When: time.Now()},
+	}); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	// Leave both modified but unstaged, so porcelain reports " M <name>".
+	for _, name := range names {
 		if err := os.WriteFile(filepath.Join(h.dir, name), []byte("modified\n"), 0644); err != nil {
 			t.Fatalf("modify %s: %v", name, err)
 		}
 	}
-
-	if err := os.Chdir(h.dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	defer func() { _ = os.Chdir(h.origDir) }()
 
 	got, err := NewGitVCSDefault().GetDirtyFiles()
 	if err != nil {
