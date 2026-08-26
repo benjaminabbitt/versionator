@@ -4,7 +4,7 @@ default:
 
 # Fix Go module cache permissions (try different approaches)
 fix-perms:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
 
     echo "Fixing Go module permissions..."
@@ -39,13 +39,13 @@ fix-perms:
 
 # Clean Go module cache and fix permissions
 clean-cache: fix-perms
-    #!/usr/bin/env bash
+    #!/bin/zsh
     echo "Cleaning Go module cache..."
     GO111MODULE=on go clean -modcache || true
 
 # Download dependencies with permission fix
 deps: fix-perms
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Fixing permissions before downloading dependencies..."
     echo "Downloading Go modules..."
@@ -56,7 +56,7 @@ deps: fix-perms
 
 # Build the application (static binary)
 build: fix-git-dubious-ownership-warning
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     just fix-perms
     mkdir -p bin/
@@ -67,7 +67,7 @@ build: fix-git-dubious-ownership-warning
 
 # Build with verbose output for debugging (static binary)
 build-verbose: fix-git-dubious-ownership-warning
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     just fix-perms
     mkdir -p bin/
@@ -114,7 +114,7 @@ fmt:
 
 # Run linter (if golangci-lint is available)
 lint:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     if command -v golangci-lint >/dev/null 2>&1; then
         GO111MODULE=on golangci-lint run
     else
@@ -124,7 +124,7 @@ lint:
 
 # Initialize project (run once after cloning)
 init:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Initializing versionator project..."
     echo "Step 1: Cleaning cache and fixing permissions..."
@@ -137,7 +137,7 @@ init:
 
 # Development setup
 dev-setup:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Setting up development environment..."
     just init
@@ -147,7 +147,7 @@ dev-setup:
 
 # Build for all platforms with static linking and UPX compression
 build-all: fix-perms fix-git-dubious-ownership-warning
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     VERSION=$(cat VERSION 2>/dev/null || echo "dev")
     LDFLAGS="-s -w -X github.com/benjaminabbitt/versionator/internal/buildinfo.Version=$VERSION"
@@ -220,7 +220,7 @@ status:
 
 # Force rebuild everything
 rebuild:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Rebuilding everything..."
     just clean
@@ -238,7 +238,7 @@ claude:
 
 # Run acceptance tests locally (requires versionator in PATH or bin/)
 acceptance-test: build
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Running acceptance tests locally..."
     # Tests look for $VERSIONATOR_PROJECT_ROOT/versionator
@@ -247,14 +247,14 @@ acceptance-test: build
 
 # Build acceptance test container image
 acceptance-test-build:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Building acceptance test container..."
     docker build -f tests/acceptance/Dockerfile -t versionator-acceptance:latest .
 
 # Run acceptance tests in container (fast tests only)
 acceptance-test-container: acceptance-test-build
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Running acceptance tests in container..."
     docker run --rm \
@@ -265,7 +265,7 @@ acceptance-test-container: acceptance-test-build
 
 # Run ALL acceptance tests in container (including slow)
 acceptance-test-container-all: acceptance-test-build
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Running ALL acceptance tests in container (including slow)..."
     docker run --rm \
@@ -276,7 +276,7 @@ acceptance-test-container-all: acceptance-test-build
 
 # Run acceptance tests via docker-compose
 acceptance-test-compose:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Running acceptance tests via docker-compose..."
     docker compose -f tests/acceptance/docker-compose.yml up --build --abort-on-container-exit
@@ -284,7 +284,7 @@ acceptance-test-compose:
 
 # Run slow acceptance tests via docker-compose
 acceptance-test-compose-slow:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Running slow acceptance tests via docker-compose..."
     docker compose -f tests/acceptance/docker-compose.yml run --build acceptance-tests-slow
@@ -294,7 +294,7 @@ acceptance-test-compose-slow:
 
 # Generate railroad diagram HTML from parser grammar
 grammar-railroad:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     echo "Generating railroad diagram..."
     go run ./docs/grammar/railroad > docs/grammar/railroad.html
@@ -302,7 +302,7 @@ grammar-railroad:
 
 # Output EBNF grammar to stdout
 grammar-ebnf:
-    #!/usr/bin/env bash
+    #!/bin/zsh
     go run ./docs/grammar/railroad 2>/dev/null | grep -A 1000 "<!-- EBNF Grammar -->" | grep -B 1000 "^-->" | head -n -1 | tail -n +3
 
 # Start documentation dev server
@@ -315,7 +315,7 @@ docs-build:
 
 # Generate command reference docs from schema
 docs-generate: build
-    #!/usr/bin/env bash
+    #!/bin/zsh
     set -e
     export PATH="$(pwd)/bin:$PATH"
     node docs/scripts/generate-command-docs.js
