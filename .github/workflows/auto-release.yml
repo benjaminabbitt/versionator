@@ -1,15 +1,16 @@
 name: Auto Release
 
 # On a successful CI run for a push to master (i.e. a merged PR), tag the version
-# in the VERSION file and push that tag, which triggers release-completer.yml.
+# in the VERSION file, push that tag, and dispatch release.yml.
 #
 # This does NOT bump the version — the version is set deliberately in the PR via
 # versionator, and ci.yml's version-guard ensures it is fresh. If the tag
 # already exists this job FAILS rather than silently skipping.
 #
-# The tag is pushed with RELEASE_TAG_TOKEN (a PAT with contents:write on this
-# repo), NOT the default GITHUB_TOKEN: tags pushed by GITHUB_TOKEN do not start
-# other workflows, so release-completer would never fire.
+# A tag pushed with the default GITHUB_TOKEN does NOT start other workflows, so
+# release.yml would never fire off the tag alone. Rather than require a PAT,
+# this job dispatches release.yml explicitly after tagging — the same approach
+# build.yml used when this repository last auto-released.
 
 on:
   workflow_run:
@@ -19,7 +20,8 @@ on:
     branches: [master]
 
 permissions:
-  contents: write
+  contents: write # push the tag
+  actions: write # dispatch release.yml
 
 jobs:
   tag-release:
@@ -35,7 +37,6 @@ jobs:
         with:
           ref: master
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_TAG_TOKEN }}
 
       - name: Configure git
         run: |
@@ -43,6 +44,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Tag VERSION (fail if it already exists)
+        id: tag
         run: |
           V="$(tr -d '[:space:]' < VERSION)"
           if [ -z "$V" ]; then
@@ -55,4 +57,13 @@ jobs:
           fi
           git tag "$TAG"
           git push origin "$TAG"
-          echo "Tagged and pushed $TAG — release-completer will build and publish the release."
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tagged and pushed $TAG."
+
+      - name: Trigger release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh workflow run release.yml -f tag="$TAG"
+          echo "::notice::Dispatched release.yml for $TAG"
