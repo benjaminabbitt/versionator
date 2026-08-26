@@ -36,8 +36,18 @@ Feature: Git Release Creation
     Then a git tag "v1.0.0" should exist
     And the tag "v1.0.0" should have message "Release version 1.0.0"
 
-  Scenario: Prevent duplicate tag
+  # Re-running release with the tag already at HEAD is the documented
+  # "release then push" flow and must succeed rather than demand --force.
+  Scenario: Re-releasing the same commit is idempotent
     When I run "versionator release"
+    And I run "versionator release"
+    Then the exit code should be 0
+
+  # A tag that exists at a DIFFERENT commit is still refused: silently moving
+  # a published tag is what --force is for.
+  Scenario: Prevent retagging a different commit
+    When I run "versionator release"
+    And I create a commit with message "chore: another commit"
     And I run "versionator release"
     Then the exit code should not be 0
     And the output should contain "already exists"

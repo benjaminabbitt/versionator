@@ -59,8 +59,15 @@ jobs:
       - name: just build
         run: just build
 
+      # Point the acceptance harness at the binary just built. Without this it
+      # searches ancestor directories for any file named `versionator`; that
+      # file is gitignored, so it exists locally and never on a runner, and the
+      # harness silently falls through to a `go run` that cannot work from a
+      # temp dir — leaving every bump scenario green but inert.
       - name: just test
         run: just test
+        env:
+          VERSIONATOR_PROJECT_ROOT: ${{ github.workspace }}/bin
 
   # Diff-only mutation testing on PR and push (the whole-codebase run is too slow
   # for every change — it runs weekly, see mutation-weekly.yml).

@@ -1968,3 +1968,55 @@ func TestGitVCS_LinkedWorktree(t *testing.T) {
 		t.Fatalf("GetCommitDate inside worktree: %v", err)
 	}
 }
+
+// git status --porcelain writes an unstaged modification as " M path" — the
+// status field is two columns, and an empty index column is a SPACE. Trimming
+// the whole output before splitting eats that leading space on the FIRST line
+// only, shifting the filename slice by one and yielding "ERSION" for "VERSION".
+// Callers that decide which files may legitimately be dirty then see a name
+// that matches nothing and refuse to proceed.
+func TestGitVCS_GetDirtyFiles_UnstagedModification_KeepsFullFilename(t *testing.T) {
+	h := NewTestHelper(t)
+	defer h.Cleanup()
+	h.CreateCommit("initial commit")
+
+	// Two unstaged modifications: the first exercises the trimmed-first-line bug.
+	for _, name := range []string{"VERSION", "other.txt"} {
+		if err := os.WriteFile(filepath.Join(h.dir, name), []byte("changed\n"), 0644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+		if out, err := exec.Command("git", "-C", h.dir, "add", name).CombinedOutput(); err != nil {
+			t.Fatalf("git add %s: %v: %s", name, err, out)
+		}
+		if out, err := exec.Command("git", "-C", h.dir, "commit", "-m", "add "+name).CombinedOutput(); err != nil {
+			t.Fatalf("git commit %s: %v: %s", name, err, out)
+		}
+		if err := os.WriteFile(filepath.Join(h.dir, name), []byte("modified\n"), 0644); err != nil {
+			t.Fatalf("modify %s: %v", name, err)
+		}
+	}
+
+	if err := os.Chdir(h.dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer func() { _ = os.Chdir(h.origDir) }()
+
+	got, err := NewGitVCSDefault().GetDirtyFiles()
+	if err != nil {
+		t.Fatalf("GetDirtyFiles: %v", err)
+	}
+
+	want := map[string]bool{"VERSION": false, "other.txt": false}
+	for _, f := range got {
+		if _, ok := want[f]; !ok {
+			t.Errorf("unexpected dirty file %q (filename corrupted?); full list: %v", f, got)
+			continue
+		}
+		want[f] = true
+	}
+	for name, seen := range want {
+		if !seen {
+			t.Errorf("dirty file %q missing from %v", name, got)
+		}
+	}
+}

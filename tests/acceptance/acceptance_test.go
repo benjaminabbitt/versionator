@@ -121,8 +121,31 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the file "([^"]*)" should contain '([^']*)'$`, theFileShouldContain) // Single-quoted variant
 }
 
+// ciProviderEnv is every variable versionator inspects to decide it is running
+// inside a CI provider. The scenarios describe the plain-terminal behaviour —
+// variables printed to stdout — but on a real runner these are set, so the
+// command writes to the provider's files and prints only a summary instead.
+// The binary runs as a subprocess and inherits this process's environment, so
+// clearing them here is what makes the suite behave the same everywhere.
+var ciProviderEnv = []string{
+	"BASH_ENV",
+	"CIRCLECI",
+	"GITHUB_ACTIONS",
+	"GITHUB_ENV",
+	"GITHUB_OUTPUT",
+	"GITLAB_CI",
+	"JENKINS_URL",
+	"TF_BUILD",
+}
+
 func setupTestContext(c context.Context) (context.Context, error) {
 	ctx = &testContext{}
+
+	for _, key := range ciProviderEnv {
+		if err := os.Unsetenv(key); err != nil {
+			return c, fmt.Errorf("failed to clear %s: %w", key, err)
+		}
+	}
 
 	// Save original directory
 	var err error
@@ -179,12 +202,19 @@ func findVersionatorBinary() string {
 	// Try to find project root by going up from current directory
 	// This works when running tests from the project directory
 	if wd, err := os.Getwd(); err == nil {
-		// Look for versionator binary in parent directories
 		dir := wd
 		for i := 0; i < 5; i++ { // Limit depth
-			binary := filepath.Join(dir, "versionator")
-			if _, err := os.Stat(binary); err == nil {
-				return binary
+			// bin/ is where `just build` puts the binary, so it is checked
+			// FIRST: a stale executable left at the repo root is gitignored and
+			// therefore invisible to CI, so preferring it means local runs
+			// exercise a different binary than the one just built.
+			for _, candidate := range []string{
+				filepath.Join(dir, "bin", "versionator"),
+				filepath.Join(dir, "versionator"),
+			} {
+				if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+					return candidate
+				}
 			}
 			parent := filepath.Dir(dir)
 			if parent == dir {

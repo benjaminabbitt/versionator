@@ -529,7 +529,11 @@ func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
 	}
 
 	var files []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	// Trim only the trailing newline: porcelain's status field is two columns
+	// and an empty column is a SPACE, so " M path" legitimately begins with one.
+	// Trimming the whole output would eat that space on the first line alone and
+	// shift the filename slice by one character.
+	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
 		if line == "" {
 			continue
 		}
