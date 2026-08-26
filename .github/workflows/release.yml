@@ -55,7 +55,14 @@ jobs:
 
   containers:
     name: Container images (ghcr.io) + VirusTotal
-    needs: goreleaser # the Release must exist before we append VT notes to it
+    # needs: only ORDERS this after goreleaser, so the Release exists before the
+    # VirusTotal notes are appended. It must not GATE it: image publication is
+    # independent of the binaries, and letting a GoReleaser failure skip this
+    # job meant one broken publishing target silently dropped another — v0.2.2
+    # shipped no ghcr images because the Homebrew cask push returned 401. The
+    # VirusTotal step is already best-effort and tolerates a missing release.
+    needs: goreleaser
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # append the VirusTotal section to the release notes
