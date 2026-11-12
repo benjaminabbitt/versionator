@@ -268,7 +268,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&logOutput, "log-format", "quiet", "Log output format (quiet, console, json, development)")
 
 	// Tracked-only dirtiness for {{Dirty}}, {{UncommittedChanges}}, {{DateTimeDirty}} and ci DIRTY
-	rootCmd.PersistentFlags().BoolVar(&ignoreUntracked, "ignore-untracked", false, "Untracked files do not make the tree dirty (overrides dirty.ignoreUntracked)")
+	rootCmd.PersistentFlags().BoolVar(&ignoreUntracked, "ignore-untracked", false, "Untracked files do not make the tree dirty, for the dirty template variables and release's clean-tree check (overrides dirty.ignoreUntracked)")
 
 	// Add template flag to version command
 	versionCmd.Flags().StringVarP(&versionTemplate, "template", "t", "", "Template string for version output (Mustache syntax)")

@@ -144,7 +144,8 @@ type DirtyConfig struct {
 	// IgnoreUntracked leaves untracked files out, so a tree is dirty only for
 	// staged or unstaged changes to tracked files (as `git describe --dirty`).
 	// Default: false (untracked files count). The --ignore-untracked flag
-	// overrides it. It does not relax the release command's clean-tree check.
+	// overrides it. The release command's clean-tree check follows it too:
+	// untracked-only trees can release, tracked changes still refuse.
 	IgnoreUntracked bool `yaml:"ignoreUntracked"`
 }
 
@@ -530,7 +531,7 @@ dirty:
   # true: only staged or unstaged changes to tracked files count (the meaning of
   # git describe --dirty); untracked files do not. Default false: they count.
   # The --ignore-untracked flag overrides this. The release command's
-  # clean-tree check is not affected.
+  # clean-tree check follows it too.
   ignoreUntracked: false
 
 # File updates: keep manifest versions in sync with VERSION. Applied by every

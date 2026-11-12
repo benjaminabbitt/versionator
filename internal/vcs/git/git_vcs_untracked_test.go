@@ -110,12 +110,25 @@ func TestSetIgnoreUntracked_False_RestoresDefault(t *testing.T) {
 	}
 }
 
-// The release guard decides which dirty files block a release from
-// GetDirtyFiles. The dirtiness setting is for the template variables only, so
-// GetDirtyFiles keeps listing untracked files in either mode.
-func TestGetDirtyFiles_IgnoreUntracked_StillListsUntracked(t *testing.T) {
+// The release guard reads IsWorkingDirectoryClean and GetDirtyFiles; both
+// follow the setting, so an untracked-only tree can release under it.
+func TestGetDirtyFiles_IgnoreUntracked_LeavesOutUntracked(t *testing.T) {
 	h, v := newTrackedRepo(t)
 	v.SetIgnoreUntracked(true)
+	writeFile(t, filepath.Join(h.dir, "scratch.txt"), "untracked")
+	writeFile(t, filepath.Join(h.dir, "test.txt"), "modified")
+
+	files, err := v.GetDirtyFiles()
+	if err != nil {
+		t.Fatalf("GetDirtyFiles: %v", err)
+	}
+	if len(files) != 1 || files[0] != "test.txt" {
+		t.Errorf("expected [test.txt], got %v", files)
+	}
+}
+
+func TestGetDirtyFiles_Default_ListsUntracked(t *testing.T) {
+	h, v := newTrackedRepo(t)
 	writeFile(t, filepath.Join(h.dir, "scratch.txt"), "untracked")
 
 	files, err := v.GetDirtyFiles()
@@ -124,5 +137,18 @@ func TestGetDirtyFiles_IgnoreUntracked_StillListsUntracked(t *testing.T) {
 	}
 	if len(files) != 1 || files[0] != "scratch.txt" {
 		t.Errorf("expected [scratch.txt], got %v", files)
+	}
+}
+
+func TestIsWorkingDirectoryClean_IgnoreUntracked_UntrackedOnlyIsClean(t *testing.T) {
+	h, v := newTrackedRepo(t)
+	writeFile(t, filepath.Join(h.dir, "scratch.txt"), "untracked")
+
+	if clean, err := v.IsWorkingDirectoryClean(); err != nil || clean {
+		t.Fatalf("default mode: expected dirty, got clean=%v err=%v", clean, err)
+	}
+	v.SetIgnoreUntracked(true)
+	if clean, err := v.IsWorkingDirectoryClean(); err != nil || !clean {
+		t.Errorf("tracked-only mode: expected clean, got clean=%v err=%v", clean, err)
 	}
 }

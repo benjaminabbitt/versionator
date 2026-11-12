@@ -13,7 +13,8 @@ Create a git tag and release branch for the current version.
 This command will:
 1. Check that you're in a git repository
 2. If only the VERSION file is dirty, commit it automatically
-3. Verify there are no other uncommitted changes
+3. Verify there are no other uncommitted changes (untracked files do not
+   count under dirty.ignoreUntracked: true or --ignore-untracked)
 4. Get the current version
 5. Create a git tag from the release tag template (default: 'v1.2.3')
 6. Create a release branch (e.g., 'release/v1.2.3') if enabled

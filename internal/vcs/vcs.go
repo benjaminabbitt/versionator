@@ -93,9 +93,9 @@ type VersionControlSystem interface {
 }
 
 // UntrackedFilter is implemented by a VCS that can leave untracked files out of
-// GetUncommittedChanges, so that dirty means what `git describe --dirty` means:
-// staged or unstaged changes to tracked files. It does not change
-// GetDirtyFiles or IsWorkingDirectoryClean, which the release guard reads.
+// GetUncommittedChanges, GetDirtyFiles and IsWorkingDirectoryClean, so that
+// dirty means what `git describe --dirty` means: staged or unstaged changes to
+// tracked files. The template variables and the release guard both follow it.
 type UntrackedFilter interface {
 	SetIgnoreUntracked(ignore bool)
 }

@@ -398,8 +398,9 @@ func (g *GitVersionControlSystem) GetCommitsSinceTag() (int, error) {
 }
 
 // SetIgnoreUntracked chooses whether untracked files count in
-// GetUncommittedChanges. With true, the count is of staged or unstaged changes
-// to tracked files only, as `git describe --dirty` judges a tree.
+// GetUncommittedChanges, GetDirtyFiles and IsWorkingDirectoryClean. With true,
+// only staged or unstaged changes to tracked files count, as
+// `git describe --dirty` judges a tree.
 func (g *GitVersionControlSystem) SetIgnoreUntracked(ignore bool) {
 	g.ignoreUntracked = ignore
 }
@@ -408,7 +409,7 @@ func (g *GitVersionControlSystem) SetIgnoreUntracked(ignore bool) {
 // unstaged + untracked, or without untracked under SetIgnoreUntracked(true)).
 // Files matching gitignore patterns are excluded from the count.
 func (g *GitVersionControlSystem) GetUncommittedChanges() (int, error) {
-	files, err := g.statusFiles(g.ignoreUntracked)
+	files, err := g.GetDirtyFiles()
 	if err != nil {
 		return 0, err
 	}
@@ -525,21 +526,17 @@ func (g *GitVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) 
 // Uses git CLI which natively respects .gitignore and skips ignored directories
 // during the walk, avoiding performance issues with large ignored trees
 // (e.g., .cargo-container/) and permission errors on unreadable files.
-// Untracked files are always listed: this is what the release guard reads.
+// Untracked files are left out under SetIgnoreUntracked(true)
+// (--untracked-files=no), so the release guard follows dirty.ignoreUntracked /
+// --ignore-untracked.
 func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
-	return g.statusFiles(false)
-}
-
-// statusFiles lists the paths `git status --porcelain` reports, leaving out
-// untracked files when ignoreUntracked is set (--untracked-files=no).
-func (g *GitVersionControlSystem) statusFiles(ignoreUntracked bool) ([]string, error) {
 	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return nil, err
 	}
 
 	args := []string{"status", "--porcelain"}
-	if ignoreUntracked {
+	if g.ignoreUntracked {
 		args = append(args, "--untracked-files=no")
 	}
 	cmd := exec.Command("git", args...)

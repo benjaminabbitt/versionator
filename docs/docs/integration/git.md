@@ -39,6 +39,9 @@ versionator release            # Auto-commits VERSION, creates tag and branch
 ```
 
 If other files are dirty, the command will fail with a list of dirty files.
+Untracked files count as dirty unless `dirty.ignoreUntracked: true` is set in
+`.versionator.yaml` (or `--ignore-untracked` is given); then only staged or
+unstaged changes to tracked files block the release.
 
 ### Tag Naming
 

@@ -239,7 +239,8 @@ dirty:
 With `ignoreUntracked: true` a tree is dirty exactly when `git describe --dirty`
 would say so. The global flag `--ignore-untracked` (or `--ignore-untracked=false`)
 overrides the config for one command. The `release` command's clean-tree check
-is not affected: untracked files still block a release.
+follows it too: with it on, a tree whose only changes are untracked files can
+release, while a staged or unstaged change to a tracked file still blocks it.
 
 ### updates
 

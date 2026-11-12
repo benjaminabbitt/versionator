@@ -67,7 +67,8 @@ variable read one count, so they always agree. By default untracked files
 count. With `dirty.ignoreUntracked: true` in `.versionator.yaml` (or the global
 `--ignore-untracked` flag, which overrides it) only staged or unstaged changes
 to tracked files count, as `git describe --dirty` judges a tree: a checkout
-whose only change is an untracked file is clean.
+whose only change is an untracked file is clean. The `release` command's
+clean-tree check follows the same setting.
 | `{{VersionSourceHash}}` | Hash of commit that last tag points to | `def5678` |
 
 ## Commit Information

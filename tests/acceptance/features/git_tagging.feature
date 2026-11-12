@@ -144,3 +144,34 @@ Feature: Git Release Creation
     When I run "versionator release"
     Then the exit code should not be 0
     And the output should contain "working directory is not clean"
+
+  # release follows dirty.ignoreUntracked / --ignore-untracked
+  Scenario: By default an untracked file blocks a release
+    Given a file "scratch.txt" with content "untracked"
+    When I run "versionator release"
+    Then the exit code should not be 0
+
+  Scenario: dirty.ignoreUntracked lets an untracked-only tree release
+    Given a config file with:
+      """
+      prefix: v
+      dirty:
+        ignoreUntracked: true
+      """
+    And I run "git add .versionator.yaml"
+    And I run "git commit -q -m config"
+    And a file "scratch.txt" with content "untracked"
+    When I run "versionator release"
+    Then the exit code should be 0
+    And a git tag "v1.0.0" should exist
+
+  Scenario: --ignore-untracked lets an untracked-only tree release
+    Given a file "scratch.txt" with content "untracked"
+    When I run "versionator --ignore-untracked release"
+    Then the exit code should be 0
+    And a git tag "v1.0.0" should exist
+
+  Scenario: A modified tracked file still blocks a release under --ignore-untracked
+    Given a file "README.md" with content "# changed"
+    When I run "versionator --ignore-untracked release"
+    Then the exit code should not be 0
