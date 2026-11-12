@@ -59,17 +59,11 @@ Version control information.
 | `{{CommitsSinceTag}}` | Commits since last tag | `42` |
 | `{{BuildNumber}}` | Alias for CommitsSinceTag | `42` |
 | `{{BuildNumberPadded}}` | Padded to 4 digits | `0042` |
-| `{{UncommittedChanges}}` | Count of uncommitted files | `3` |
-| `{{Dirty}}` | 'dirty' if uncommitted changes exist | `dirty` |
-
-`{{UncommittedChanges}}`, `{{Dirty}}`, `{{DateTimeDirty}}` and the `ci` `DIRTY`
-variable read one count, so they always agree. By default untracked files
-count. With `dirty.ignoreUntracked: true` in `.versionator.yaml` (or the global
-`--ignore-untracked` flag, which overrides it) only staged or unstaged changes
-to tracked files count, as `git describe --dirty` judges a tree: a checkout
-whose only change is an untracked file is clean. The `release` command's
-clean-tree check follows the same setting.
+| `{{UncommittedChanges}}` | Count of uncommitted files (untracked files left out under dirty.ignoreUntracked / --ignore-untracked) | `3` |
+| `{{Dirty}}` | 'dirty' if uncommitted changes exist (tracked files only under dirty.ignoreUntracked / --ignore-untracked) | `dirty` |
 | `{{VersionSourceHash}}` | Hash of commit that last tag points to | `def5678` |
+
+`{{UncommittedChanges}}`, `{{Dirty}}`, `{{DateTimeDirty}}` and the `ci` `DIRTY` variable read one count, so they always agree. By default untracked files count. With `dirty.ignoreUntracked: true` in `.versionator.yaml` (or the global `--ignore-untracked` flag, which overrides it) only staged or unstaged changes to tracked files count, as `git describe --dirty` judges a tree: a checkout whose only change is an untracked file is clean. The `release` command's clean-tree check follows the same setting.
 
 ## Commit Information
 
@@ -94,7 +88,7 @@ Timestamps at build time.
 |----------|-------------|--------|
 | `{{BuildDateTimeUTC}}` | ISO 8601 build time | `2024-01-15T10:30:00Z` |
 | `{{BuildDateTimeCompact}}` | Compact build time | `20240115103045` |
-| `{{DateTimeDirty}}` | '.{BuildDateTimeCompact}' if uncommitted, empty otherwise | `.20240115103045` |
+| `{{DateTimeDirty}}` | '.{BuildDateTimeCompact}' if uncommitted, empty otherwise (honours dirty.ignoreUntracked / --ignore-untracked) | `.20240115103045` |
 | `{{BuildDateUTC}}` | Build date only | `2024-01-15` |
 | `{{BuildYear}}` | Build year | `2024` |
 | `{{BuildMonth}}` | Build month (zero-padded) | `01` |
@@ -106,8 +100,8 @@ Available to the release tag, branch and message templates (`release.tagTemplate
 
 | Variable | Description | Example |
 |----------|-------------|--------|
-| `{{ModulePath}}` | VERSION file's directory relative to the repository root, with a trailing slash; empty at the root | `internal/tools/` |
-| `{{ModuleName}}` | That directory's bare name; empty at the root | `tools` |
+| `{{ModulePath}}` | VERSION file's directory relative to the repository root, with a trailing slash; empty at the root (release and updates templates) | `internal/tools/` |
+| `{{ModuleName}}` | That directory's bare name; empty at the root (release and updates templates) | `tools` |
 | `{{Tag}}` | The rendered tag name; branch and message templates only | `v1.2.3` |
-| `{{BranchPrefix}}` | The release.branchPrefix setting | `release/` |
+| `{{BranchPrefix}}` | The release.branchPrefix setting (release and updates templates) | `release/` |
 

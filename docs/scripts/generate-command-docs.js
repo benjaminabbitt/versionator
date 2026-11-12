@@ -206,10 +206,26 @@ function generateVariablesDoc(templateVars) {
     { key: 'versionComponents', title: 'Version Components', description: 'Core version numbers and formatting' },
     { key: 'preRelease', title: 'Pre-release', description: 'Pre-release identifier variables' },
     { key: 'metadata', title: 'Build Metadata', description: 'Build metadata variables' },
-    { key: 'vcs', title: 'VCS / Git Information', description: 'Version control information' },
+    {
+      key: 'vcs', title: 'VCS / Git Information', description: 'Version control information',
+      notes: '`{{UncommittedChanges}}`, `{{Dirty}}`, `{{DateTimeDirty}}` and the `ci` `DIRTY` ' +
+        'variable read one count, so they always agree. By default untracked files count. ' +
+        'With `dirty.ignoreUntracked: true` in `.versionator.yaml` (or the global ' +
+        '`--ignore-untracked` flag, which overrides it) only staged or unstaged changes to ' +
+        'tracked files count, as `git describe --dirty` judges a tree: a checkout whose only ' +
+        "change is an untracked file is clean. The `release` command's clean-tree check " +
+        'follows the same setting.',
+    },
     { key: 'commitInfo', title: 'Commit Information', description: 'Details about the current commit' },
     { key: 'buildTimestamps', title: 'Build Timestamps', description: 'Timestamps at build time' },
-    { key: 'release', title: 'Release Templates', description: 'Available only to the release tag, branch and message templates (`release.tagTemplate`, `release.branchTemplate`, `release.messageTemplate`)' },
+    {
+      key: 'release', title: 'Release Templates',
+      description: 'Available to the release tag, branch and message templates ' +
+        '(`release.tagTemplate`, `release.branchTemplate`, `release.messageTemplate`) and to the ' +
+        '`updates:` templates of every version change (`{{Tag}}` excepted, which exists only once ' +
+        'release has rendered the tag). In all of them `{{Prefix}}` is the effective prefix: the ' +
+        "VERSION file's, else `v`, as the default tag has it (release's `--prefix` flag replaces it there)",
+    },
   ];
 
   for (const cat of categories) {
@@ -225,13 +241,16 @@ function generateVariablesDoc(templateVars) {
       md += `| \`{{${v.name}}}\` | ${v.description} | ${example} |\n`;
     }
     md += '\n';
+    if (cat.notes) {
+      md += `${cat.notes}\n\n`;
+    }
   }
 
   return md;
 }
 
 // Generate commands index page
-function generateCommandsIndex(commands) {
+function generateCommandsIndex(commands, globalFlags) {
   let md = frontmatter(
     'Commands Reference',
     'Complete reference of all versionator commands',
@@ -253,7 +272,10 @@ function generateCommandsIndex(commands) {
   md += 'These flags are available on all commands:\n\n';
   md += '| Flag | Description |\n';
   md += '|------|-------------|\n';
-  md += '| `--log-format` | Log output format (console, json, development) |\n';
+  // From the schema, so a new global flag is listed without editing this file.
+  for (const flag of globalFlags || []) {
+    md += `| \`--${flag.name}\` | ${flag.description} |\n`;
+  }
   md += '| `-h, --help` | Help for any command |\n';
 
   return md;
@@ -273,7 +295,7 @@ function main() {
   fs.mkdirSync(TEMPLATES_DIR, { recursive: true });
 
   // Generate commands index
-  const indexContent = generateCommandsIndex(schema.commands);
+  const indexContent = generateCommandsIndex(schema.commands, schema.globalFlags);
   const indexPath = path.join(COMMANDS_DIR, 'index.md');
   fs.writeFileSync(indexPath, indexContent);
   console.log(`Generated: ${indexPath}`);

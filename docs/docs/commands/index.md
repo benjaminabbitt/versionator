@@ -26,5 +26,6 @@ These flags are available on all commands:
 
 | Flag | Description |
 |------|-------------|
-| `--log-format` | Log output format (console, json, development) |
+| `--ignore-untracked` | Untracked files do not make the tree dirty, for the dirty template variables and release's clean-tree check (overrides dirty.ignoreUntracked) |
+| `--log-format` | Log output format (quiet, console, json, development) |
 | `-h, --help` | Help for any command |

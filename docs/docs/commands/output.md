@@ -122,6 +122,8 @@ TEMPLATE VARIABLES (Mustache syntax):
     {{BuildNumberPadded}}    - Padded to 4 digits (e.g., "0042")
     {{UncommittedChanges}}   - Count of dirty files (e.g., "3")
     {{Dirty}}                - "dirty" if uncommitted changes > 0, empty otherwise
+                               (untracked files count unless --ignore-untracked
+                               or dirty.ignoreUntracked: true)
     {{VersionSourceHash}}    - Hash of commit the last tag points to
 
   Commit Author:
@@ -243,6 +245,8 @@ TEMPLATE VARIABLES:
     {{BuildDateTimeCompact}} - Compact: 20241211103045
     {{BuildDateUTC}}         - Date only: 2024-12-11
     {{DateTimeDirty}}        - ".{BuildDateTimeCompact}" if uncommitted, empty otherwise
+                               (untracked files count unless --ignore-untracked
+                               or dirty.ignoreUntracked: true)
 
   Custom Variables:
     Use --set key=value to inject custom variables
