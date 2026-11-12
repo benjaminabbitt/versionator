@@ -1,7 +1,6 @@
 package update
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -196,24 +195,6 @@ func (p *DaselFileParser) marshal(data any, format Format) ([]byte, error) {
 	}
 }
 
-// UpdateTOMLValue does a targeted value replacement in a TOML file,
-// preserving comments, ordering, and formatting: only the string at path
-// changes (see setTOMLString).
-func (p *DaselFileParser) UpdateTOMLValue(filePath string, path string, newValue string) error {
-	raw, err := readExisting(filePath)
-	if err != nil {
-		return err
-	}
-	result, err := p.setTOMLString(raw, path, newValue)
-	if err != nil {
-		return fmt.Errorf("%s: %w", filePath, err)
-	}
-	if bytes.Equal(result, raw) {
-		return nil
-	}
-	return os.WriteFile(filePath, result, FilePermission)
-}
-
 // readExisting reads a file that an update edits, naming it when missing.
 func readExisting(filePath string) ([]byte, error) {
 	raw, err := os.ReadFile(filePath)
@@ -224,24 +205,6 @@ func readExisting(filePath string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read %s: %w", filePath, err)
 	}
 	return raw, nil
-}
-
-// UpdateJSONValue does a targeted value replacement in a JSON file, preserving
-// key order and formatting. It edits only the scalar at the given path in the
-// raw bytes, leaving the rest of the document byte-for-byte intact — unlike a
-// parse-then-marshal round-trip, which loses key order (Go marshals maps with
-// keys sorted alphabetically). The path uses gjson/sjson dot syntax, e.g.
-// "version" or "packages.dependencies.foo".
-func (p *DaselFileParser) UpdateJSONValue(filePath string, path string, newValue string) error {
-	raw, err := readExisting(filePath)
-	if err != nil {
-		return err
-	}
-	result, err := setJSONString(raw, path, newValue)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filePath, result, FilePermission)
 }
 
 // setJSONString returns raw with the scalar at path (gjson/sjson dot syntax)

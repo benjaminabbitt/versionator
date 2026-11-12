@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/benjaminabbitt/versionator/internal/logging"
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	gitVCS "github.com/benjaminabbitt/versionator/internal/vcs/git"
 )
@@ -150,4 +151,38 @@ func TestCIDirty_ConfigIgnoreUntracked_UntrackedOnlyIsFalse(t *testing.T) {
 	if !bytes.Contains(buf.Bytes(), []byte(`DIRTY="false"`)) {
 		t.Errorf("ci DIRTY must follow dirty.ignoreUntracked, got:\n%s", buf.String())
 	}
+}
+
+// The pre-run reads the config once for both logging and dirtiness.
+func TestRootPreRun_ConfigLoggingOutput_IsUsed(t *testing.T) {
+	newUntrackedOnlyRepo(t, "prefix: \"\"\nlogging:\n  output: development\n")
+	saved := logOutput
+	t.Cleanup(func() {
+		logOutput = saved
+		_ = logging.InitLogger("quiet")
+	})
+
+	runDirtyProbe(t)
+
+	if logOutput != "development" {
+		t.Errorf("logging.output from config was not used, got %q", logOutput)
+	}
+}
+
+// A config that does not parse leaves the defaults in place (no panic).
+func TestRootPreRun_UnreadableConfig_KeepsDefaults(t *testing.T) {
+	newUntrackedOnlyRepo(t, "")
+	_ = os.WriteFile(".versionator.yaml", []byte("prefix: [unclosed\n"), 0644)
+	t.Cleanup(func() {
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
+	})
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs([]string{"output", "version", "-t", dirtyProbe})
+
+	// The command's own config read may fail; the pre-run must not panic.
+	_ = rootCmd.Execute()
 }

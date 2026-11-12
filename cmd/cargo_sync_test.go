@@ -186,3 +186,34 @@ func TestUpdateTemplateData_PreReleaseAndMetadataSources(t *testing.T) {
 		})
 	}
 }
+
+// A refused update fails the command that changed VERSION, for each writer.
+func TestCargoSync_PrereleaseSet_RefusedUpdateFailsCommand(t *testing.T) {
+	cargoSyncDir(t, "0.7.0")
+	_ = os.WriteFile("Cargo.toml", []byte("[workspace]\nmembers = []\n"), 0644)
+
+	if err := runVersionator(t, "config", "prerelease", "set", "rc.1"); err == nil {
+		t.Fatal("expected the missing workspace.package.version to fail the command")
+	}
+}
+
+func TestCargoSync_PrereleaseTemplateStable_RefusedUpdateFailsCommand(t *testing.T) {
+	cargoSyncDir(t, "0.7.0")
+	_ = os.WriteFile("Cargo.toml", []byte("[workspace]\nmembers = []\n"), 0644)
+
+	if err := runVersionator(t, "config", "prerelease", "template", "rc"); err == nil {
+		t.Fatal("expected the missing workspace.package.version to fail the command")
+	}
+}
+
+func TestCargoSync_PrereleaseTemplateStable_UpdatesWorkspaceVersion(t *testing.T) {
+	cargoSyncDir(t, "0.7.0")
+
+	if err := runVersionator(t, "config", "prerelease", "template", "rc"); err != nil {
+		t.Fatalf("config prerelease template: %v", err)
+	}
+
+	if got := cargoVersionLine(t); got != `version = "0.7.0-rc" # kept in sync by versionator` {
+		t.Errorf("got %q", got)
+	}
+}
