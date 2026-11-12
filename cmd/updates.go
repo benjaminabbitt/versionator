@@ -43,6 +43,41 @@ func runConfiguredUpdates(cmd *cobra.Command) error {
 	return nil
 }
 
+// withConfigRollback runs change, which writes the config and then the VERSION
+// file; when change fails (a version change the update check refused), the
+// config is put back as it was, byte for byte.
+func withConfigRollback(change func() error) error {
+	restore, err := config.Snapshot()
+	if err != nil {
+		return err
+	}
+	if err := change(); err != nil {
+		if restoreErr := restore(); restoreErr != nil {
+			return fmt.Errorf("%w (restoring .versionator.yaml also failed: %v)", err, restoreErr)
+		}
+		return err
+	}
+	return nil
+}
+
+// checkConfiguredUpdates is the version change check (version.SetChangeCheck)
+// the root command sets: before VERSION is written with next, every configured
+// update is rendered for next and applied in memory. A refusal refuses the
+// version change, so neither VERSION nor any configured file changes.
+func checkConfiguredUpdates(next *version.Version) error {
+	cfg, err := config.ReadConfig()
+	if err != nil || cfg == nil || len(cfg.Updates) == 0 {
+		return nil
+	}
+
+	logger, _ := zap.NewProduction()
+	updater := update.NewUpdater(cfg.Updates, update.NewDaselFileParser(), logger)
+	if err := updater.Check(updateTemplateData(next, cfg)); err != nil {
+		return fmt.Errorf("error updating files: %w", err)
+	}
+	return nil
+}
+
 // updateTemplateData is the template data an update renders: the version with
 // its pre-release and metadata as the version's output has them. A field stored
 // in the VERSION file (stable, or left there) is that value; a dynamic field

@@ -320,6 +320,26 @@ func WriteConfig(config *Config) error {
 	return os.WriteFile(configFile, []byte(content), FilePermission)
 }
 
+// Snapshot records the config file's exact bytes (or that there is none) and
+// returns a function that puts them back. A command that writes the config
+// before a version change that may be refused restores it with this, so the
+// refusal leaves the config as it was, byte for byte.
+func Snapshot() (func() error, error) {
+	data, err := os.ReadFile(configFile)
+	if os.IsNotExist(err) {
+		return func() error {
+			if err := os.Remove(configFile); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			return nil
+		}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+	return func() error { return os.WriteFile(configFile, data, FilePermission) }, nil
+}
+
 // SetCustom sets a custom key-value pair in the config
 func SetCustom(key, value string) error {
 	if key == "" {
@@ -516,7 +536,8 @@ dirty:
 # File updates: keep manifest versions in sync with VERSION. Applied by every
 # command that changes VERSION (set, bump, config prerelease/metadata/prefix,
 # release). Only the value at path is rewritten; the rest of the file is kept
-# byte for byte. A Cargo.toml version must be SemVer 2.0.0 (no "v" prefix, no
+# byte for byte. All updates are checked before VERSION is written, so a refused
+# one changes nothing. A Cargo.toml version must be SemVer 2.0.0 (no "v" prefix, no
 # 4th component): such a value is refused, not stripped.
 # updates:
 #   - file: Cargo.toml

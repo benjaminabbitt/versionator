@@ -134,6 +134,52 @@ func TestCargoSync_SetFourPart_IsRefused(t *testing.T) {
 	if got := cargoVersionLine(t); got != `version = "0.6.2" # kept in sync by versionator` {
 		t.Errorf("Cargo.toml must be left as it was, got %q", got)
 	}
+	assertVersionFile(t, "0.6.2\n")
+}
+
+func assertVersionFile(t *testing.T, want string) {
+	t.Helper()
+	b, _ := os.ReadFile("VERSION")
+	if string(b) != want {
+		t.Errorf("VERSION must be left as it was (%q), got %q", want, b)
+	}
+}
+
+// Every command that changes VERSION checks the updates first: a refusal
+// changes neither VERSION nor any configured file.
+func TestCargoSync_RefusedUpdate_LeavesVersionUnchanged(t *testing.T) {
+	for name, args := range map[string][]string{
+		"bump":               {"bump", "patch", "increment"},
+		"bump decrement":     {"bump", "patch", "decrement"},
+		"prerelease set":     {"config", "prerelease", "set", "rc.1"},
+		"prerelease enable":  {"config", "prerelease", "enable"},
+		"prerelease clear":   {"config", "prerelease", "clear"},
+		"metadata set":       {"config", "metadata", "set", "b.1"},
+		"prerelease templ.":  {"config", "prerelease", "template", "rc"},
+		"prefix set":         {"config", "prefix", "set", "v"},
+		"prefix enable":      {"config", "prefix", "enable"},
+		"set":                {"set", "0.9.0"},
+		"set four-part":      {"set", "0.9.0.1"},
+		"prerelease stable0": {"config", "prerelease", "stable", "false"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cargoSyncDir(t, "0.6.2-rc.0")
+			broken := "[workspace]\nmembers = []\n"
+			_ = os.WriteFile("Cargo.toml", []byte(broken), 0644)
+
+			if err := runVersionator(t, args...); err == nil {
+				t.Fatal("expected the missing workspace.package.version to refuse the command")
+			}
+
+			assertVersionFile(t, "0.6.2-rc.0\n")
+			if b, _ := os.ReadFile("Cargo.toml"); string(b) != broken {
+				t.Errorf("Cargo.toml changed: %q", b)
+			}
+			if b, _ := os.ReadFile(".versionator.yaml"); string(b) != cargoSyncConfig {
+				t.Errorf(".versionator.yaml changed:\n%s", b)
+			}
+		})
+	}
 }
 
 func TestCargoSync_PrefixSet_RunsUpdates(t *testing.T) {
@@ -214,6 +260,18 @@ func TestCargoSync_PrereleaseTemplateStable_UpdatesWorkspaceVersion(t *testing.T
 	}
 
 	if got := cargoVersionLine(t); got != `version = "0.7.0-rc" # kept in sync by versionator` {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestCargoSync_PrereleaseStableFalse_UpdatesWorkspaceVersion(t *testing.T) {
+	cargoSyncDir(t, "0.7.0-rc.1")
+
+	if err := runVersionator(t, "config", "prerelease", "stable", "false"); err != nil {
+		t.Fatalf("config prerelease stable false: %v", err)
+	}
+
+	if got := cargoVersionLine(t); got != `version = "0.7.0" # kept in sync by versionator` {
 		t.Errorf("got %q", got)
 	}
 }

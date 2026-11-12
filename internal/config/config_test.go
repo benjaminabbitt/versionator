@@ -1665,3 +1665,89 @@ func TestReadConfig_DirtyIgnoreUntracked_FromFile(t *testing.T) {
 		t.Error("dirty.ignoreUntracked: true was not read")
 	}
 }
+
+func TestSnapshot_Restore_PutsBackTheExactBytes(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+	original := "# hand written\nprefix:   v   # spaced\n"
+	_ = os.WriteFile(".versionator.yaml", []byte(original), 0644)
+
+	restore, err := Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	_ = WriteConfig(&Config{Prefix: "V"})
+	if err := restore(); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+
+	if b, _ := os.ReadFile(".versionator.yaml"); string(b) != original {
+		t.Errorf("got %q, want %q", b, original)
+	}
+}
+
+func TestSnapshot_NoConfig_RestoreRemovesTheWrittenOne(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+
+	restore, err := Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	_ = WriteConfig(&Config{Prefix: "V"})
+	if err := restore(); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+
+	if _, err := os.Stat(".versionator.yaml"); !os.IsNotExist(err) {
+		t.Errorf("expected no config file after restore, stat err = %v", err)
+	}
+}
+
+func TestSnapshot_UnreadableConfig_IsAnError(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+	_ = os.Mkdir(".versionator.yaml", 0755) // a directory cannot be read as a file
+
+	if _, err := Snapshot(); err == nil {
+		t.Error("expected an error")
+	}
+}
+
+func TestSnapshot_NoConfig_RestoreWithNothingWritten_IsFine(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+
+	restore, err := Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	if err := restore(); err != nil {
+		t.Errorf("restore with no file to remove: %v", err)
+	}
+}
+
+func TestSnapshot_NoConfig_RestoreThatCannotRemove_IsAnError(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+
+	restore, err := Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	// A non-empty directory in its place cannot be removed.
+	_ = os.MkdirAll(".versionator.yaml/x", 0755)
+	if err := restore(); err == nil {
+		t.Error("expected the failed removal to be reported")
+	}
+}

@@ -106,46 +106,50 @@ func showTemplate(cmd *cobra.Command, cfg *config.Config, acc versionFieldAccess
 	return nil
 }
 
-// setTemplate sets a new template value
+// setTemplate sets a new template value: the config, then (stable) the
+// rendered value in the VERSION file. A refused VERSION change puts the config
+// back, so nothing is changed.
 func setTemplate(cmd *cobra.Command, cfg *config.Config, template string, acc versionFieldAccessor) error {
 	acc.setTemplate(cfg, template)
-	if err := config.WriteConfig(cfg); err != nil {
-		return fmt.Errorf("error writing config: %w", err)
-	}
 
-	cmd.Printf("%s template set to: %s\n", acc.labelTitle, template)
-
-	// If stable, also render and write to VERSION file
-	if acc.getStable(cfg) {
+	var result string
+	if err := withConfigRollback(func() error {
+		if err := config.WriteConfig(cfg); err != nil {
+			return fmt.Errorf("error writing config: %w", err)
+		}
+		if !acc.getStable(cfg) {
+			return nil
+		}
 		vd, err := version.Load()
 		if err != nil {
 			return fmt.Errorf("error loading version: %w", err)
 		}
-
 		templateData := emit.BuildTemplateDataFromVersion(vd)
-		result, err := emit.RenderTemplateWithData(template, templateData)
-		if err != nil {
+		if result, err = emit.RenderTemplateWithData(template, templateData); err != nil {
 			return fmt.Errorf("error rendering template: %w", err)
 		}
-
 		if err := acc.setVersion(result); err != nil {
 			return fmt.Errorf("error setting %s: %w", acc.labelLower, err)
 		}
-
-		cmd.Printf("%s set to: %s\n", acc.labelTitle, result)
-
-		// Show updated version
-		vd, err = version.Load()
-		if err != nil {
-			return fmt.Errorf("error loading version: %w", err)
-		}
-		cmd.Printf("Current version: %s\n", vd.FullString())
-		if err := runConfiguredUpdates(cmd); err != nil {
-			return err
-		}
-	} else {
-		cmd.Println("(Template will be rendered at output time, not stored in VERSION file)")
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	return nil
+	cmd.Printf("%s template set to: %s\n", acc.labelTitle, template)
+
+	if !acc.getStable(cfg) {
+		cmd.Println("(Template will be rendered at output time, not stored in VERSION file)")
+		return nil
+	}
+
+	cmd.Printf("%s set to: %s\n", acc.labelTitle, result)
+
+	// Show updated version
+	vd, err := version.Load()
+	if err != nil {
+		return fmt.Errorf("error loading version: %w", err)
+	}
+	cmd.Printf("Current version: %s\n", vd.FullString())
+	return runConfiguredUpdates(cmd)
 }

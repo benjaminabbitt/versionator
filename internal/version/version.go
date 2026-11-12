@@ -196,7 +196,8 @@ func Load() (*Version, error) {
 		logger.Info(LogVersionCreated,
 			zap.String("path", path),
 			zap.String("version", v.String()))
-		if saveErr := Save(v); saveErr != nil {
+		// Not a change a command asked for, so the change check is not run.
+		if saveErr := write(v); saveErr != nil {
 			return nil, fmt.Errorf("failed to create VERSION: %w", saveErr)
 		}
 		return v, nil
@@ -206,16 +207,51 @@ func Load() (*Version, error) {
 	return nil, fmt.Errorf("failed to read VERSION: %w", err)
 }
 
-// Save writes the version to the VERSION file.
-// Validates the version by round-tripping through the parser before writing.
-func Save(v *Version) error {
-	logger := logging.GetLogger()
+// ChangeCheck judges the version a command is about to write. A non-nil error
+// refuses the change, and the VERSION file is left as it was.
+type ChangeCheck func(next *Version) error
 
-	// Validate by building through the parser (round-trip validation)
+var changeCheck ChangeCheck
+
+// SetChangeCheck sets the check every version change runs before VERSION is
+// written (nil for none). The command line sets it to check the configured
+// file updates, so a refused update refuses the version change too.
+func SetChangeCheck(check ChangeCheck) {
+	changeCheck = check
+}
+
+// Save writes the version to the VERSION file.
+// Validates the version by round-tripping through the parser, then runs the
+// change check (SetChangeCheck), before writing.
+func Save(v *Version) error {
+	if _, err := validate(v); err != nil {
+		return err
+	}
+	if changeCheck != nil {
+		if err := changeCheck(v); err != nil {
+			return err
+		}
+	}
+	return write(v)
+}
+
+// validate round-trips v through the parser.
+func validate(v *Version) (*parser.Version, error) {
 	validated, err := v.toBuilder().Build()
 	if err != nil {
-		logger.Error(LogVersionParseError, zap.String("version", v.String()), zap.Error(err))
-		return fmt.Errorf("invalid version: %w", err)
+		logging.GetLogger().Error(LogVersionParseError, zap.String("version", v.String()), zap.Error(err))
+		return nil, fmt.Errorf("invalid version: %w", err)
+	}
+	return validated, nil
+}
+
+// write validates v and writes it to the VERSION file, without the change check.
+func write(v *Version) error {
+	logger := logging.GetLogger()
+
+	validated, err := validate(v)
+	if err != nil {
+		return err
 	}
 
 	path, err := getVersionPath()

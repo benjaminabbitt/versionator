@@ -193,8 +193,9 @@ Feature: Structured File Updates
           template: "{{MajorMinorPatch}}"
       """
     When I run "versionator set 1.2.3.4"
-    # The refusal is said on stderr (unit-tested); stdout reports the VERSION write.
     Then the exit code should not be 0
+    And the output should contain "not a valid Cargo version"
+    And the VERSION should have version "1.0.0"
     And the file "Cargo.toml" should contain 'version = "1.0.0"'
 
   Scenario: A Cargo.toml without the configured version key is an error
@@ -213,4 +214,5 @@ Feature: Structured File Updates
       """
     When I run "versionator set 1.2.3"
     Then the exit code should not be 0
-    And the file "Cargo.toml" should contain 'name = "app"'
+    And the output should contain "path not found in file: package.version"
+    And the VERSION should have version "1.0.0"

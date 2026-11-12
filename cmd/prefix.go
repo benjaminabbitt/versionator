@@ -108,13 +108,17 @@ func runPrefixSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error reading config: %w", err)
 	}
 	cfg.Prefix = prefix
-	if err := config.WriteConfig(cfg); err != nil {
-		return fmt.Errorf("error writing config: %w", err)
-	}
-
-	// Update VERSION file
-	if err := version.SetPrefix(prefix); err != nil {
-		return fmt.Errorf("error setting prefix: %w", err)
+	// Config, then VERSION; a refused VERSION change puts the config back.
+	if err := withConfigRollback(func() error {
+		if err := config.WriteConfig(cfg); err != nil {
+			return fmt.Errorf("error writing config: %w", err)
+		}
+		if err := version.SetPrefix(prefix); err != nil {
+			return fmt.Errorf("error setting prefix: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	if prefix == "" {

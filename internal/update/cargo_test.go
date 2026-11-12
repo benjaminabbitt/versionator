@@ -425,3 +425,18 @@ func TestCargoSync_NonStringInsideInlineTable_IsAnError(t *testing.T) {
 	_, err := NewDaselFileParser().setTOMLString([]byte("[workspace]\npackage = { version = 1 }\n"), "workspace.package.version", "2.0.0")
 	assert.ErrorContains(t, err, ErrValueNotString)
 }
+
+// Check runs every update in memory and writes nothing, success or refusal.
+func TestUpdater_Check_WritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	p := writeTemp(t, dir, "Cargo.toml", workspaceManifest)
+	u := NewUpdater([]config.UpdateConfig{cargoUpdate(p, "workspace.package.version")}, NewDaselFileParser(), newTestLogger(t))
+
+	require.NoError(t, u.Check(emit.TemplateData{MajorMinorPatch: "0.7.0"}))
+	assert.Equal(t, workspaceManifest, readFile(t, p))
+
+	err := u.Check(emit.TemplateData{MajorMinorPatch: "0.7.0.1"})
+	assert.ErrorContains(t, err, ErrCargoVersionInvalid)
+	assert.Equal(t, workspaceManifest, readFile(t, p))
+	assert.Empty(t, u.GetFilesToCommit())
+}

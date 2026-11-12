@@ -51,6 +51,10 @@ func runRootPersistentPreRun(cmd *cobra.Command, args []string) error {
 	}
 	vcs.SetIgnoreUntracked(ignore)
 
+	// Every version change checks the configured file updates before VERSION
+	// is written.
+	version.SetChangeCheck(checkConfiguredUpdates)
+
 	// Initialize logger with the specified output format
 	if err := logging.InitLogger(logOutput); err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)

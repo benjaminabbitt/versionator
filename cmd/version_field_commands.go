@@ -45,18 +45,26 @@ func runStableCommand(cmd *cobra.Command, args []string, acc versionFieldAccesso
 		return fmt.Errorf("invalid value '%s': use 'true' or 'false'", args[0])
 	}
 
-	if err := config.WriteConfig(cfg); err != nil {
-		return fmt.Errorf("error writing config: %w", err)
+	// Switching to dynamic mode leaves a stale literal behind in the VERSION
+	// file, which would then win over the template at output time, so it is
+	// cleared; a refused VERSION change puts the config back.
+	if err := withConfigRollback(func() error {
+		if err := config.WriteConfig(cfg); err != nil {
+			return fmt.Errorf("error writing config: %w", err)
+		}
+		if !acc.getStable(cfg) {
+			if err := acc.setVersion(""); err != nil {
+				return fmt.Errorf("error clearing %s from VERSION: %w", acc.labelLower, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s stable set to: %t\n", acc.labelTitle, acc.getStable(cfg))
 
-	// Switching to dynamic mode leaves a stale literal behind in the VERSION
-	// file, which would then win over the template at output time.
 	if !acc.getStable(cfg) {
-		if err := acc.setVersion(""); err != nil {
-			return fmt.Errorf("error clearing %s from VERSION: %w", acc.labelLower, err)
-		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s cleared from VERSION file (will be generated at output time)\n", acc.labelTitle)
 		return runConfiguredUpdates(cmd)
 	}
@@ -210,17 +218,24 @@ func runSetCommand(cmd *cobra.Command, args []string, acc versionFieldAccessor) 
 			acc.labelLower, acc.labelLower, acc.cmdName)
 	}
 
-	// Update template in config
+	// Update template in config, then (stable) the VERSION file; a refused
+	// VERSION change puts the config back.
 	acc.setTemplate(cfg, value)
-	if err := config.WriteConfig(cfg); err != nil {
-		return fmt.Errorf("error writing config: %w", err)
+	if err := withConfigRollback(func() error {
+		if err := config.WriteConfig(cfg); err != nil {
+			return fmt.Errorf("error writing config: %w", err)
+		}
+		if acc.getStable(cfg) {
+			if err := acc.setVersion(value); err != nil {
+				return fmt.Errorf("error setting %s: %w", acc.labelLower, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	if acc.getStable(cfg) {
-		// Write to VERSION file
-		if err := acc.setVersion(value); err != nil {
-			return fmt.Errorf("error setting %s: %w", acc.labelLower, err)
-		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s set to: %s\n", acc.labelTitle, value)
 
 		vd, err := version.Load()

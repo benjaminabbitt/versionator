@@ -276,9 +276,12 @@ VERSION file, else (in dynamic mode) the rendered config template.
 - **Cargo versions**: for `package.version` and `workspace.package.version` of a
   `Cargo.toml`, the rendered value must be SemVer 2.0.0 (`0.7.0`,
   `0.7.0-pre1`, `1.0.0-rc.1+build.5`). A 4-part `Major.Minor.Patch.Revision`
-  and a `v` prefix are **refused**, not stripped. Note the VERSION file is written
-  before the updates, so after a refused `set 1.2.3.4` VERSION holds `1.2.3.4`
-  and Cargo.toml its old version; set a valid version to bring them together.
+  and a `v` prefix are **refused**, not stripped.
+- **Checked before VERSION is written**: every command that changes the version
+  renders and checks all configured updates for the new version first. A
+  refusal (for example `set 1.2.3.4` with a Cargo.toml update) exits non-zero
+  and changes nothing: not VERSION, not `.versionator.yaml`, not any updated
+  file.
 
 ## Config File Discovery
 

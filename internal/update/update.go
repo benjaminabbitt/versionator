@@ -14,6 +14,8 @@ import (
 type FileUpdater interface {
 	// UpdateFiles applies all configured updates using the given template data
 	UpdateFiles(data emit.TemplateData) error
+	// Check applies every update in memory and writes nothing
+	Check(data emit.TemplateData) error
 	// ValidateConfig checks all update configurations are valid
 	ValidateConfig() error
 	// GetFilesToCommit returns list of files that were modified
@@ -50,39 +52,24 @@ func NewUpdaterDefault(configs []config.UpdateConfig) (*Updater, error) { //noli
 
 // UpdateFiles applies all configured updates using the given template data.
 //
-// Every update is rendered, checked and applied in memory first; only when all
-// of them succeed are the files written. So a refused update (a missing path, a
-// value Cargo would refuse) leaves every configured file as it was. Several
-// updates of one file apply in order to the same content.
+// Every update is rendered, checked and applied in memory first (Check); only
+// when all of them succeed are the files written. So a refused update (a
+// missing path, a value Cargo would refuse) leaves every configured file as it
+// was. Several updates of one file apply in order to the same content.
 func (u *Updater) UpdateFiles(data emit.TemplateData) error {
 	u.updatedFiles = make([]string, 0)
 
-	contents := make(map[string][]byte)
-	original := make(map[string][]byte)
-	var order []string
-	for i, cfg := range u.configs {
-		raw, seen := contents[cfg.File]
-		if !seen {
-			var err error
-			if raw, err = readExisting(cfg.File); err != nil {
-				return fmt.Errorf("updates[%d] (%s): %w", i, cfg.File, err)
-			}
-			original[cfg.File] = raw
-			order = append(order, cfg.File)
-		}
-		updated, err := u.planSingleFile(cfg, raw, data)
-		if err != nil {
-			return fmt.Errorf("updates[%d] (%s): %w", i, cfg.File, err)
-		}
-		contents[cfg.File] = updated
+	planned, err := u.plan(data)
+	if err != nil {
+		return err
 	}
 
-	for _, file := range order {
-		if bytes.Equal(contents[file], original[file]) {
+	for _, f := range planned {
+		if bytes.Equal(f.content, f.original) {
 			continue // already at this version: the file is not rewritten
 		}
-		if err := os.WriteFile(file, contents[file], FilePermission); err != nil {
-			return fmt.Errorf("%s: %s: %w", ErrFileWriteFailed, file, err)
+		if err := os.WriteFile(f.file, f.content, FilePermission); err != nil {
+			return fmt.Errorf("%s: %s: %w", ErrFileWriteFailed, f.file, err)
 		}
 	}
 
@@ -96,6 +83,44 @@ func (u *Updater) UpdateFiles(data emit.TemplateData) error {
 
 	u.logger.Info(LogUpdatesApplied, zap.Int("count", len(u.configs)))
 	return nil
+}
+
+// Check renders and applies every update in memory and writes nothing: the
+// error UpdateFiles would give, or nil. A version change runs it before the
+// VERSION file is written.
+func (u *Updater) Check(data emit.TemplateData) error {
+	_, err := u.plan(data)
+	return err
+}
+
+// plannedFile is one configured file's content before and after the updates.
+type plannedFile struct {
+	file              string
+	original, content []byte
+}
+
+// plan applies every update in memory, in order, and returns each file once.
+func (u *Updater) plan(data emit.TemplateData) ([]*plannedFile, error) {
+	byFile := make(map[string]*plannedFile)
+	var planned []*plannedFile
+	for i, cfg := range u.configs {
+		f, seen := byFile[cfg.File]
+		if !seen {
+			raw, err := readExisting(cfg.File)
+			if err != nil {
+				return nil, fmt.Errorf("updates[%d] (%s): %w", i, cfg.File, err)
+			}
+			f = &plannedFile{file: cfg.File, original: raw, content: raw}
+			byFile[cfg.File] = f
+			planned = append(planned, f)
+		}
+		updated, err := u.planSingleFile(cfg, f.content, data)
+		if err != nil {
+			return nil, fmt.Errorf("updates[%d] (%s): %w", i, cfg.File, err)
+		}
+		f.content = updated
+	}
+	return planned, nil
 }
 
 // planSingleFile returns raw with one update applied.
