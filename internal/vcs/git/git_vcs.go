@@ -32,6 +32,9 @@ type GitVersionControlSystem struct {
 	repoOpener RepositoryOpener // injected repository opener
 	tagInfo    *TagInfo         // cached tag information
 	tagInfoErr error            // cached error from tag info fetch
+	// ignoreUntracked leaves untracked files out of GetUncommittedChanges
+	// (dirty.ignoreUntracked / --ignore-untracked).
+	ignoreUntracked bool
 }
 
 // TagInfo holds pre-computed tag-related information from a single walk
@@ -394,11 +397,18 @@ func (g *GitVersionControlSystem) GetCommitsSinceTag() (int, error) {
 	return info.CommitsSinceTag, nil
 }
 
-// GetUncommittedChanges returns the count of uncommitted changes (staged + unstaged + untracked)
-// Files matching gitignore patterns are excluded from the count
+// SetIgnoreUntracked chooses whether untracked files count in
+// GetUncommittedChanges. With true, the count is of staged or unstaged changes
+// to tracked files only, as `git describe --dirty` judges a tree.
+func (g *GitVersionControlSystem) SetIgnoreUntracked(ignore bool) {
+	g.ignoreUntracked = ignore
+}
+
+// GetUncommittedChanges returns the count of uncommitted changes (staged +
+// unstaged + untracked, or without untracked under SetIgnoreUntracked(true)).
+// Files matching gitignore patterns are excluded from the count.
 func (g *GitVersionControlSystem) GetUncommittedChanges() (int, error) {
-	// Reuse GetDirtyFiles which already handles gitignore filtering
-	files, err := g.GetDirtyFiles()
+	files, err := g.statusFiles(g.ignoreUntracked)
 	if err != nil {
 		return 0, err
 	}
@@ -515,13 +525,24 @@ func (g *GitVersionControlSystem) GetCommitMessagesSinceTag() ([]string, error) 
 // Uses git CLI which natively respects .gitignore and skips ignored directories
 // during the walk, avoiding performance issues with large ignored trees
 // (e.g., .cargo-container/) and permission errors on unreadable files.
+// Untracked files are always listed: this is what the release guard reads.
 func (g *GitVersionControlSystem) GetDirtyFiles() ([]string, error) {
+	return g.statusFiles(false)
+}
+
+// statusFiles lists the paths `git status --porcelain` reports, leaving out
+// untracked files when ignoreUntracked is set (--untracked-files=no).
+func (g *GitVersionControlSystem) statusFiles(ignoreUntracked bool) ([]string, error) {
 	root, err := g.GetRepositoryRoot()
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command("git", "status", "--porcelain")
+	args := []string{"status", "--porcelain"}
+	if ignoreUntracked {
+		args = append(args, "--untracked-files=no")
+	}
+	cmd := exec.Command("git", args...)
 	cmd.Dir = root
 	out, err := cmd.Output()
 	if err != nil {

@@ -41,6 +41,19 @@ func (r *VCSRegistry) GetActiveVCS() VersionControlSystem {
 	return nil
 }
 
+// SetIgnoreUntracked tells every registered VCS that is an UntrackedFilter
+// whether untracked files count as uncommitted changes. A VCS without the
+// capability is passed over.
+func (r *VCSRegistry) SetIgnoreUntracked(ignore bool) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	for _, system := range r.systems {
+		if f, ok := system.(UntrackedFilter); ok {
+			f.SetIgnoreUntracked(ignore)
+		}
+	}
+}
+
 // GetVCS returns a specific VCS by name
 func (r *VCSRegistry) GetVCS(name string) VersionControlSystem {
 	r.mutex.RLock()
@@ -71,6 +84,10 @@ func UnregisterVCS(name string) {
 
 func GetActiveVCS() VersionControlSystem {
 	return registry.GetActiveVCS()
+}
+
+func SetIgnoreUntracked(ignore bool) {
+	registry.SetIgnoreUntracked(ignore)
 }
 
 func GetVCS(name string) VersionControlSystem {

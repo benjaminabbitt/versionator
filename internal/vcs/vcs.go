@@ -50,7 +50,9 @@ type VersionControlSystem interface {
 	// Returns 0 if on a tagged commit, -1 if no tags exist
 	GetCommitsSinceTag() (int, error)
 
-	// GetUncommittedChanges returns the count of uncommitted changes (staged + unstaged + untracked)
+	// GetUncommittedChanges returns the count of uncommitted changes (staged +
+	// unstaged + untracked; untracked are left out when an UntrackedFilter was
+	// told to ignore them). Every dirty-derived template variable reads it.
 	GetUncommittedChanges() (int, error)
 
 	// GetLastTag returns the most recent semver tag
@@ -88,4 +90,12 @@ type VersionControlSystem interface {
 
 	// PushBranch pushes a branch to the remote repository
 	PushBranch(branchName string) error
+}
+
+// UntrackedFilter is implemented by a VCS that can leave untracked files out of
+// GetUncommittedChanges, so that dirty means what `git describe --dirty` means:
+// staged or unstaged changes to tracked files. It does not change
+// GetDirtyFiles or IsWorkingDirectoryClean, which the release guard reads.
+type UntrackedFilter interface {
+	SetIgnoreUntracked(ignore bool)
 }

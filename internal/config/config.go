@@ -19,6 +19,7 @@ type Config struct {
 	Release          ReleaseConfig          `yaml:"release"`
 	BranchVersioning BranchVersioningConfig `yaml:"branchVersioning"`
 	Logging          LoggingConfig          `yaml:"logging"`
+	Dirty            DirtyConfig            `yaml:"dirty,omitempty"`
 	Custom           map[string]string      `yaml:"custom,omitempty"`
 	Updates          []UpdateConfig         `yaml:"updates,omitempty"`
 }
@@ -134,6 +135,17 @@ type MetadataConfig struct {
 // GitConfig holds git-specific configuration
 type GitConfig struct {
 	HashLength int `yaml:"hashLength"`
+}
+
+// DirtyConfig holds what counts as a dirty working tree for the dirty-derived
+// template variables ({{Dirty}}, {{UncommittedChanges}}, {{DateTimeDirty}}) and
+// the ci DIRTY variable.
+type DirtyConfig struct {
+	// IgnoreUntracked leaves untracked files out, so a tree is dirty only for
+	// staged or unstaged changes to tracked files (as `git describe --dirty`).
+	// Default: false (untracked files count). The --ignore-untracked flag
+	// overrides it. It does not relax the release command's clean-tree check.
+	IgnoreUntracked bool `yaml:"ignoreUntracked"`
 }
 
 // LoggingConfig holds logging-specific configuration
@@ -492,6 +504,15 @@ logging:
   # Output format: console, json, development
   output: "console"
 
+# What makes the working tree dirty for {{Dirty}}, {{UncommittedChanges}},
+# {{DateTimeDirty}} and the ci DIRTY variable
+dirty:
+  # true: only staged or unstaged changes to tracked files count (the meaning of
+  # git describe --dirty); untracked files do not. Default false: they count.
+  # The --ignore-untracked flag overrides this. The release command's
+  # clean-tree check is not affected.
+  ignoreUntracked: false
+
 # =============================================================================
 # AVAILABLE TEMPLATE VARIABLES
 # =============================================================================
@@ -530,8 +551,8 @@ logging:
 #   {{CommitsSinceTag}}              - Commits since last tag
 #   {{BuildNumber}}                  - Alias for CommitsSinceTag
 #   {{BuildNumberPadded}}            - Padded to 4 digits (0042)
-#   {{UncommittedChanges}}           - Count of dirty files
-#   {{Dirty}}                        - "dirty" if uncommitted changes
+#   {{UncommittedChanges}}           - Count of dirty files (see dirty:)
+#   {{Dirty}}                        - "dirty" if uncommitted changes (see dirty:)
 #   {{VersionSourceHash}}            - Hash of last tag's commit
 #
 # Commit Author:

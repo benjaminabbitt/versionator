@@ -7,6 +7,7 @@ import (
 	"github.com/benjaminabbitt/versionator/internal/config"
 	"github.com/benjaminabbitt/versionator/internal/emit"
 	"github.com/benjaminabbitt/versionator/internal/logging"
+	"github.com/benjaminabbitt/versionator/internal/vcs"
 	"github.com/benjaminabbitt/versionator/internal/version"
 	"github.com/benjaminabbitt/versionator/internal/versionator"
 
@@ -19,6 +20,7 @@ var prereleaseTemplate string
 var metadataTemplate string
 var prefixOverride string
 var setVars []string
+var ignoreUntracked bool
 
 // Marker for "flag provided without value" - use defaults
 const useDefaultMarker = "\x00DEFAULT\x00"
@@ -33,12 +35,21 @@ stored in a VERSION file in the current directory.`,
 }
 
 func runRootPersistentPreRun(cmd *cobra.Command, args []string) error {
+	cfg, cfgErr := config.ReadConfig()
+
 	// If log format wasn't explicitly set via flag, use config default
-	if !cmd.PersistentFlags().Changed("log-format") {
-		if cfg, err := config.ReadConfig(); err == nil {
-			logOutput = cfg.Logging.Output
-		}
+	if !cmd.PersistentFlags().Changed("log-format") && cfgErr == nil {
+		logOutput = cfg.Logging.Output
 	}
+
+	// Untracked files count as dirty unless the flag or dirty.ignoreUntracked
+	// says otherwise; the flag, when given, wins over the config. cmd.Flags()
+	// holds the root's persistent flags once a subcommand has parsed them.
+	ignore := ignoreUntracked
+	if !cmd.Flags().Changed("ignore-untracked") {
+		ignore = cfgErr == nil && cfg.Dirty.IgnoreUntracked
+	}
+	vcs.SetIgnoreUntracked(ignore)
 
 	// Initialize logger with the specified output format
 	if err := logging.InitLogger(logOutput); err != nil {
@@ -110,6 +121,8 @@ TEMPLATE VARIABLES:
     {{BuildDateTimeCompact}} - Compact: 20241211103045
     {{BuildDateUTC}}         - Date only: 2024-12-11
     {{DateTimeDirty}}        - ".{BuildDateTimeCompact}" if uncommitted, empty otherwise
+                               (untracked files count unless --ignore-untracked
+                               or dirty.ignoreUntracked: true)
 
   Custom Variables:
     Use --set key=value to inject custom variables
@@ -249,6 +262,9 @@ func runVersion(cmd *cobra.Command, args []string) error {
 func init() {
 	// Add persistent flag for log output format (default: quiet for CLI usage)
 	rootCmd.PersistentFlags().StringVar(&logOutput, "log-format", "quiet", "Log output format (quiet, console, json, development)")
+
+	// Tracked-only dirtiness for {{Dirty}}, {{UncommittedChanges}}, {{DateTimeDirty}} and ci DIRTY
+	rootCmd.PersistentFlags().BoolVar(&ignoreUntracked, "ignore-untracked", false, "Untracked files do not make the tree dirty (overrides dirty.ignoreUntracked)")
 
 	// Add template flag to version command
 	versionCmd.Flags().StringVarP(&versionTemplate, "template", "t", "", "Template string for version output (Mustache syntax)")

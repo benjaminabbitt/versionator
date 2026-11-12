@@ -13,6 +13,7 @@ A semantic version management CLI tool that manages versions in a plain text `VE
 - **Code embedding**: Generate version constants for 10+ languages
 - **CI/CD integration**: Output version variables for GitHub Actions, GitLab CI, etc.
 - **Git integration**: Create tags and release branches
+- **Tracked-only dirtiness**: `dirty.ignoreUntracked: true` (or `--ignore-untracked`) makes `{{Dirty}}` mean what `git describe --dirty` means
 
 ## Language Support
 

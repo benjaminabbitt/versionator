@@ -53,6 +53,10 @@ release:
 custom:
   AppName: "MyApp"
   Environment: "production"
+
+# Untracked files do not make the tree dirty
+dirty:
+  ignoreUntracked: true
 ```
 
 ## Options Reference
@@ -214,6 +218,22 @@ versionator config custom get AppName
 versionator config custom list
 versionator config custom delete AppName
 ```
+
+### dirty
+
+What makes the working tree dirty for `{{Dirty}}`, `{{UncommittedChanges}}`,
+`{{DateTimeDirty}}` and the `ci` `DIRTY` variable.
+
+```yaml
+dirty:
+  ignoreUntracked: false   # default: untracked files count as dirty
+  ignoreUntracked: true    # only staged/unstaged changes to tracked files count
+```
+
+With `ignoreUntracked: true` a tree is dirty exactly when `git describe --dirty`
+would say so. The global flag `--ignore-untracked` (or `--ignore-untracked=false`)
+overrides the config for one command. The `release` command's clean-tree check
+is not affected: untracked files still block a release.
 
 ## Config File Discovery
 

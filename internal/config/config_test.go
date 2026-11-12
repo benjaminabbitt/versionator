@@ -1632,3 +1632,36 @@ func TestValidate_EmptyTagTemplate_ReturnsError(t *testing.T) {
 		t.Error("Expected error for blank tag template, got nil")
 	}
 }
+
+// TestReadConfig_DirtyIgnoreUntracked_DefaultFalse: with no `dirty` section,
+// untracked files keep counting as dirty (the behaviour before the key).
+func TestReadConfig_DirtyIgnoreUntracked_DefaultFalse(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+
+	cfg, err := ReadConfig()
+	if err != nil {
+		t.Fatalf("ReadConfig: %v", err)
+	}
+	if cfg.Dirty.IgnoreUntracked {
+		t.Error("dirty.ignoreUntracked must default to false")
+	}
+}
+
+func TestReadConfig_DirtyIgnoreUntracked_FromFile(t *testing.T) {
+	tempDir := t.TempDir()
+	originalDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(originalDir) }()
+	_ = os.Chdir(tempDir)
+	_ = os.WriteFile(".versionator.yaml", []byte("dirty:\n  ignoreUntracked: true\n"), 0644)
+
+	cfg, err := ReadConfig()
+	if err != nil {
+		t.Fatalf("ReadConfig: %v", err)
+	}
+	if !cfg.Dirty.IgnoreUntracked {
+		t.Error("dirty.ignoreUntracked: true was not read")
+	}
+}

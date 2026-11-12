@@ -72,6 +72,8 @@ TEMPLATE VARIABLES (Mustache syntax):
     {{BuildNumberPadded}}    - Padded to 4 digits (e.g., "0042")
     {{UncommittedChanges}}   - Count of dirty files (e.g., "3")
     {{Dirty}}                - "dirty" if uncommitted changes > 0, empty otherwise
+                               (untracked files count unless --ignore-untracked
+                               or dirty.ignoreUntracked: true)
     {{VersionSourceHash}}    - Hash of commit the last tag points to
 
   Commit Author:
