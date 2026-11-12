@@ -57,6 +57,12 @@ custom:
 # Untracked files do not make the tree dirty
 dirty:
   ignoreUntracked: true
+
+# Keep manifest versions in sync with VERSION
+updates:
+  - file: Cargo.toml
+    path: workspace.package.version
+    template: "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
 ```
 
 ## Options Reference
@@ -234,6 +240,45 @@ With `ignoreUntracked: true` a tree is dirty exactly when `git describe --dirty`
 would say so. The global flag `--ignore-untracked` (or `--ignore-untracked=false`)
 overrides the config for one command. The `release` command's clean-tree check
 is not affected: untracked files still block a release.
+
+### updates
+
+Files whose version is kept in sync with VERSION. Each entry names a `file`, a
+`path` to the value, and a Mustache `template` for it (`format` is optional;
+`json`, `yaml` or `toml`, detected from the extension otherwise).
+
+```yaml
+updates:
+  # A Cargo workspace: [workspace.package] version
+  - file: Cargo.toml
+    path: workspace.package.version
+    template: "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+  # A single crate: [package] version
+  - file: crates/app/Cargo.toml
+    path: package.version
+    template: "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+```
+
+Updates are applied by every command that changes VERSION: `set`, `bump`,
+`config prerelease|metadata` (set, clear, enable, disable, stable false,
+template in stable mode), `config prefix` (enable, disable, set) and
+`release`. The pre-release and metadata a template sees are the ones in the
+VERSION file, else (in dynamic mode) the rendered config template.
+
+- **TOML and JSON** are edited in place: only the value at `path` changes, and
+  every other byte (comments, ordering, spacing, quote style) is kept. A TOML
+  path of dotted keys (`workspace.package.version`) names that value only, never
+  a lookalike such as a dependency pinned to the same version. `Cargo.lock` is
+  never touched.
+- **Errors, not skips**: a missing file, a `path` that names nothing, or a path
+  whose value is not a string (a member crate's `version.workspace = true`) is an
+  error. Every update is checked first, so a refused one writes no file.
+- **Cargo versions**: for `package.version` and `workspace.package.version` of a
+  `Cargo.toml`, the rendered value must be SemVer 2.0.0 (`0.7.0`,
+  `0.7.0-pre1`, `1.0.0-rc.1+build.5`). A 4-part `Major.Minor.Patch.Revision`
+  and a `v` prefix are **refused**, not stripped. Note the VERSION file is written
+  before the updates, so after a refused `set 1.2.3.4` VERSION holds `1.2.3.4`
+  and Cargo.toml its old version; set a valid version to bring them together.
 
 ## Config File Discovery
 

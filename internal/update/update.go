@@ -1,7 +1,9 @@
 package update
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 
 	"github.com/benjaminabbitt/versionator/internal/config"
 	"github.com/benjaminabbitt/versionator/internal/emit"
@@ -46,14 +48,45 @@ func NewUpdaterDefault(configs []config.UpdateConfig) (*Updater, error) { //noli
 	return NewUpdater(configs, NewDaselFileParser(), logger), nil
 }
 
-// UpdateFiles applies all configured updates using the given template data
+// UpdateFiles applies all configured updates using the given template data.
+//
+// Every update is rendered, checked and applied in memory first; only when all
+// of them succeed are the files written. So a refused update (a missing path, a
+// value Cargo would refuse) leaves every configured file as it was. Several
+// updates of one file apply in order to the same content.
 func (u *Updater) UpdateFiles(data emit.TemplateData) error {
 	u.updatedFiles = make([]string, 0)
 
+	contents := make(map[string][]byte)
+	original := make(map[string][]byte)
+	var order []string
 	for i, cfg := range u.configs {
-		if err := u.updateSingleFile(cfg, data); err != nil {
+		raw, seen := contents[cfg.File]
+		if !seen {
+			var err error
+			if raw, err = readExisting(cfg.File); err != nil {
+				return fmt.Errorf("updates[%d] (%s): %w", i, cfg.File, err)
+			}
+			original[cfg.File] = raw
+			order = append(order, cfg.File)
+		}
+		updated, err := u.planSingleFile(cfg, raw, data)
+		if err != nil {
 			return fmt.Errorf("updates[%d] (%s): %w", i, cfg.File, err)
 		}
+		contents[cfg.File] = updated
+	}
+
+	for _, file := range order {
+		if bytes.Equal(contents[file], original[file]) {
+			continue // already at this version: the file is not rewritten
+		}
+		if err := os.WriteFile(file, contents[file], FilePermission); err != nil {
+			return fmt.Errorf("%s: %s: %w", ErrFileWriteFailed, file, err)
+		}
+	}
+
+	for _, cfg := range u.configs {
 		u.updatedFiles = append(u.updatedFiles, cfg.File)
 		u.logger.Info(LogFileUpdated,
 			zap.String("file", cfg.File),
@@ -65,62 +98,48 @@ func (u *Updater) UpdateFiles(data emit.TemplateData) error {
 	return nil
 }
 
-// updateSingleFile applies a single update configuration
-func (u *Updater) updateSingleFile(cfg config.UpdateConfig, data emit.TemplateData) error {
+// planSingleFile returns raw with one update applied.
+func (u *Updater) planSingleFile(cfg config.UpdateConfig, raw []byte, data emit.TemplateData) ([]byte, error) {
 	// Render the template to get the new value
 	newValue, err := emit.RenderTemplateWithData(cfg.Template, data)
 	if err != nil {
-		return fmt.Errorf("%s: %w", ErrTemplateRender, err)
+		return nil, fmt.Errorf("%s: %w", ErrTemplateRender, err)
 	}
 
-	// Detect format
-	var format Format
-	if cfg.Format != "" {
-		format, err = u.parser.detectFormat(cfg.File, cfg.Format)
-	} else {
-		format, err = u.parser.detectFormat(cfg.File, "")
-	}
+	format, err := u.parser.detectFormat(cfg.File, cfg.Format)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// TOML: use targeted text replacement to preserve comments and ordering
-	if format == FormatTOML {
-		return u.parser.UpdateTOMLValue(cfg.File, cfg.Path, newValue)
-	}
-
-	// JSON: surgical value replacement preserves key order and formatting. A
-	// parse-modify-serialize round-trip would reorder keys (Go marshals maps
-	// alphabetically), mangling hand-ordered manifests like package.json.
-	if format == FormatJSON {
-		return u.parser.UpdateJSONValue(cfg.File, cfg.Path, newValue)
+	switch format {
+	case FormatTOML:
+		// Cargo refuses a 4-part version and a "v" prefix; they are refused
+		// here, not stripped, so what Cargo gets is what the template said.
+		if isCargoVersionKey(cfg.File, cfg.Path) && !cargoVersionValid(newValue) {
+			return nil, fmt.Errorf("%s = %q: %s", cfg.Path, newValue, ErrCargoVersionInvalid)
+		}
+		// Targeted text replacement preserves comments and ordering.
+		return u.parser.setTOMLString(raw, cfg.Path, newValue)
+	case FormatJSON:
+		// Surgical value replacement preserves key order and formatting. A
+		// parse-modify-serialize round-trip would reorder keys (Go marshals maps
+		// alphabetically), mangling hand-ordered manifests like package.json.
+		return setJSONString(raw, cfg.Path, newValue)
 	}
 
 	// YAML: parse-modify-serialize.
-	var fileData any
-	if cfg.Format != "" {
-		fileData, format, err = u.parser.ReadWithFormat(cfg.File, cfg.Format)
-	} else {
-		fileData, format, err = u.parser.Read(cfg.File)
-	}
+	parsed, err := u.parser.unmarshal(raw, format)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("%s: %s: %w", ErrFileParseFailed, cfg.File, err)
 	}
-
-	dataMap, ok := fileData.(map[string]any)
-	if !ok {
-		return fmt.Errorf("file content is not a map structure")
+	if err := u.parser.Put(&parsed, cfg.Path, newValue); err != nil {
+		return nil, err
 	}
-
-	if err := u.parser.Put(&dataMap, cfg.Path, newValue); err != nil {
-		return err
+	out, err := u.parser.marshal(parsed, format)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", ErrFileWriteFailed, err)
 	}
-
-	if err := u.parser.Write(cfg.File, dataMap, format); err != nil {
-		return err
-	}
-
-	return nil
+	return out, nil
 }
 
 // ValidateConfig checks all update configurations are valid

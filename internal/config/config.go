@@ -513,6 +513,16 @@ dirty:
   # clean-tree check is not affected.
   ignoreUntracked: false
 
+# File updates: keep manifest versions in sync with VERSION. Applied by every
+# command that changes VERSION (set, bump, config prerelease/metadata/prefix,
+# release). Only the value at path is rewritten; the rest of the file is kept
+# byte for byte. A Cargo.toml version must be SemVer 2.0.0 (no "v" prefix, no
+# 4th component): such a value is refused, not stripped.
+# updates:
+#   - file: Cargo.toml
+#     path: workspace.package.version   # or package.version for one crate
+#     template: "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+
 # =============================================================================
 # AVAILABLE TEMPLATE VARIABLES
 # =============================================================================

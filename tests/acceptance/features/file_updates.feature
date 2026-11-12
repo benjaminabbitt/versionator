@@ -132,3 +132,85 @@ Feature: Structured File Updates
     When I run "versionator release"
     Then the exit code should not be 0
     And the output should contain "file not found"
+
+  Scenario: set keeps a Cargo workspace version in sync, byte for byte
+    Given a file "Cargo.toml" with content:
+      """
+      [workspace]
+      members = ["crates/*"]
+
+      [workspace.dependencies]
+      core-lib = { path = "crates/core-lib", version = "1.0.0" }
+
+      [workspace.package]
+      version = "1.0.0" # stamped
+      """
+    And a config file with:
+      """
+      prefix: v
+      updates:
+        - file: Cargo.toml
+          path: workspace.package.version
+          template: "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+      """
+    When I run "versionator set 0.7.0-pre1"
+    Then the exit code should be 0
+    And the file "Cargo.toml" should contain 'version = "0.7.0-pre1" # stamped'
+    And the file "Cargo.toml" should contain 'core-lib = { path = "crates/core-lib", version = "1.0.0" }'
+
+  Scenario: bump keeps a crate's package version in sync
+    Given a file "Cargo.toml" with content:
+      """
+      [package]
+      name = "app"
+      version = "1.0.0"
+      """
+    And a config file with:
+      """
+      prefix: v
+      updates:
+        - file: Cargo.toml
+          path: package.version
+          template: "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+      """
+    When I run "versionator bump minor increment"
+    Then the exit code should be 0
+    And the file "Cargo.toml" should contain 'version = "1.1.0"'
+
+  Scenario: A four-part version is refused for Cargo.toml
+    Given a file "Cargo.toml" with content:
+      """
+      [package]
+      name = "app"
+      version = "1.0.0"
+      """
+    And a config file with:
+      """
+      prefix: v
+      updates:
+        - file: Cargo.toml
+          path: package.version
+          template: "{{MajorMinorPatch}}"
+      """
+    When I run "versionator set 1.2.3.4"
+    # The refusal is said on stderr (unit-tested); stdout reports the VERSION write.
+    Then the exit code should not be 0
+    And the file "Cargo.toml" should contain 'version = "1.0.0"'
+
+  Scenario: A Cargo.toml without the configured version key is an error
+    Given a file "Cargo.toml" with content:
+      """
+      [package]
+      name = "app"
+      """
+    And a config file with:
+      """
+      prefix: v
+      updates:
+        - file: Cargo.toml
+          path: package.version
+          template: "{{MajorMinorPatch}}"
+      """
+    When I run "versionator set 1.2.3"
+    Then the exit code should not be 0
+    And the file "Cargo.toml" should contain 'name = "app"'

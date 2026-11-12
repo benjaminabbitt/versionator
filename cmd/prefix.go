@@ -52,7 +52,7 @@ func runPrefixEnable(cmd *cobra.Command, args []string) error {
 	}
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return runConfiguredUpdates(cmd)
 }
 
 var prefixDisableCmd = &cobra.Command{
@@ -76,7 +76,7 @@ func runPrefixDisable(cmd *cobra.Command, args []string) error {
 	}
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", v)
-	return nil
+	return runConfiguredUpdates(cmd)
 }
 
 var prefixSetCmd = &cobra.Command{
@@ -130,7 +130,7 @@ func runPrefixSet(cmd *cobra.Command, args []string) error {
 	}
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return runConfiguredUpdates(cmd)
 }
 
 var prefixStatusCmd = &cobra.Command{

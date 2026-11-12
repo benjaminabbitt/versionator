@@ -197,7 +197,7 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 
 	// Build the template data once and reuse it for the tag, branch, message
 	// and any configured file updates.
-	templateData := emit.BuildCompleteTemplateData(vd, cfg.PreRelease.Template, cfg.Metadata.Template)
+	templateData := updateTemplateData(vd, cfg)
 	modulePath, err := version.ModulePath()
 	if err != nil {
 		return nil, fmt.Errorf("error resolving module path: %w", err)

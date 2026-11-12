@@ -1,0 +1,188 @@
+package cmd
+
+import (
+	"bytes"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/benjaminabbitt/versionator/internal/config"
+	"github.com/benjaminabbitt/versionator/internal/version"
+)
+
+// =============================================================================
+// CARGO.TOML SYNC ON EVERY VERSION CHANGE
+// An `updates:` entry for Cargo.toml is applied by each command that writes the
+// VERSION file, not only by release.
+// =============================================================================
+
+const cargoSyncConfig = `prefix: ""
+prerelease:
+  stable: true
+metadata:
+  stable: true
+updates:
+  - file: Cargo.toml
+    path: workspace.package.version
+    template: "{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+`
+
+const cargoSyncManifest = `[workspace]
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.6.2" # kept in sync by versionator
+`
+
+func cargoSyncDir(t *testing.T, version string) {
+	t.Helper()
+	dir := t.TempDir()
+	orig, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	_ = os.WriteFile("VERSION", []byte(version+"\n"), 0644)
+	_ = os.WriteFile(".versionator.yaml", []byte(cargoSyncConfig), 0644)
+	_ = os.WriteFile("Cargo.toml", []byte(cargoSyncManifest), 0644)
+}
+
+func runVersionator(t *testing.T, args ...string) error {
+	t.Helper()
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs(args)
+	t.Cleanup(func() {
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
+	})
+	return rootCmd.Execute()
+}
+
+func cargoVersionLine(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile("Cargo.toml")
+	if err != nil {
+		t.Fatalf("read Cargo.toml: %v", err)
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(line, "version") {
+			return line
+		}
+	}
+	return ""
+}
+
+func TestCargoSync_Set_UpdatesWorkspaceVersion(t *testing.T) {
+	cargoSyncDir(t, "0.6.2")
+
+	if err := runVersionator(t, "set", "0.7.0-pre1"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+
+	if got := cargoVersionLine(t); got != `version = "0.7.0-pre1" # kept in sync by versionator` {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestCargoSync_BumpPatch_UpdatesWorkspaceVersion(t *testing.T) {
+	cargoSyncDir(t, "0.6.2")
+
+	if err := runVersionator(t, "bump", "patch", "increment"); err != nil {
+		t.Fatalf("bump: %v", err)
+	}
+
+	if got := cargoVersionLine(t); got != `version = "0.6.3" # kept in sync by versionator` {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestCargoSync_PrereleaseSet_UpdatesWorkspaceVersion(t *testing.T) {
+	cargoSyncDir(t, "0.7.0")
+
+	if err := runVersionator(t, "config", "prerelease", "set", "rc.1"); err != nil {
+		t.Fatalf("config prerelease set: %v", err)
+	}
+
+	if got := cargoVersionLine(t); got != `version = "0.7.0-rc.1" # kept in sync by versionator` {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestCargoSync_PrereleaseClear_UpdatesWorkspaceVersion(t *testing.T) {
+	cargoSyncDir(t, "0.7.0-rc.1")
+
+	if err := runVersionator(t, "config", "prerelease", "clear"); err != nil {
+		t.Fatalf("config prerelease clear: %v", err)
+	}
+
+	if got := cargoVersionLine(t); got != `version = "0.7.0" # kept in sync by versionator` {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestCargoSync_SetFourPart_IsRefused(t *testing.T) {
+	cargoSyncDir(t, "0.6.2")
+
+	err := runVersionator(t, "set", "0.7.0.1")
+
+	if err == nil || !strings.Contains(err.Error(), "not a valid Cargo version") {
+		t.Fatalf("expected the Cargo refusal, got %v", err)
+	}
+	if got := cargoVersionLine(t); got != `version = "0.6.2" # kept in sync by versionator` {
+		t.Errorf("Cargo.toml must be left as it was, got %q", got)
+	}
+}
+
+func TestCargoSync_PrefixSet_RunsUpdates(t *testing.T) {
+	cargoSyncDir(t, "1.0.0")
+	_ = os.WriteFile(".versionator.yaml", []byte(`prefix: ""
+updates:
+  - file: tag.json
+    path: tag
+    template: "{{Prefix}}{{MajorMinorPatch}}"
+`), 0644)
+	_ = os.WriteFile("tag.json", []byte(`{"tag": "1.0.0"}`), 0644)
+
+	if err := runVersionator(t, "config", "prefix", "set", "v"); err != nil {
+		t.Fatalf("config prefix set: %v", err)
+	}
+
+	b, _ := os.ReadFile("tag.json")
+	if string(b) != `{"tag": "v1.0.0"}` {
+		t.Errorf("got %s", b)
+	}
+}
+
+func TestUpdateTemplateData_PreReleaseAndMetadataSources(t *testing.T) {
+	cases := []struct {
+		name               string
+		stored             string // VERSION file pre-release
+		stable             bool
+		template, wantDash string
+	}{
+		{"stored value wins over a dynamic template", "rc.1", false, "alpha", "-rc.1"},
+		{"dynamic template renders when nothing is stored", "", false, "alpha", "-alpha"},
+		{"stable with nothing stored has no pre-release", "", true, "alpha", ""},
+		{"stable stored value", "beta", true, "alpha", "-beta"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			v := &version.Version{Major: 1, PreRelease: c.stored, BuildMetadata: c.stored}
+			cfg := &config.Config{
+				PreRelease: config.PreReleaseConfig{Template: c.template, Stable: c.stable},
+				Metadata:   config.MetadataConfig{Template: c.template, Stable: c.stable},
+			}
+			data := updateTemplateData(v, cfg)
+			if data.PreReleaseWithDash != c.wantDash {
+				t.Errorf("PreReleaseWithDash = %q, want %q", data.PreReleaseWithDash, c.wantDash)
+			}
+			wantPlus := strings.Replace(c.wantDash, "-", "+", 1)
+			if data.MetadataWithPlus != wantPlus {
+				t.Errorf("MetadataWithPlus = %q, want %q", data.MetadataWithPlus, wantPlus)
+			}
+		})
+	}
+}

@@ -13,7 +13,9 @@ import (
 )
 
 // runConfiguredUpdates applies file updates from .versionator.yaml config.
-// Called after any version change (set, bump, release) to keep manifest files in sync.
+// Called after every command that changes the VERSION file (set, bump, the
+// config prerelease/metadata/prefix writers; release applies them itself) to
+// keep manifest files such as Cargo.toml in sync.
 func runConfiguredUpdates(cmd *cobra.Command) error {
 	cfg, err := config.ReadConfig()
 	if err != nil || cfg == nil || len(cfg.Updates) == 0 {
@@ -28,7 +30,7 @@ func runConfiguredUpdates(cmd *cobra.Command) error {
 	logger, _ := zap.NewProduction()
 	updater := update.NewUpdater(cfg.Updates, update.NewDaselFileParser(), logger)
 
-	templateData := emit.BuildCompleteTemplateData(v, cfg.PreRelease.Template, cfg.Metadata.Template)
+	templateData := updateTemplateData(v, cfg)
 
 	if err := updater.UpdateFiles(templateData); err != nil {
 		return fmt.Errorf("error updating files: %w", err)
@@ -39,4 +41,29 @@ func runConfiguredUpdates(cmd *cobra.Command) error {
 	}
 
 	return nil
+}
+
+// updateTemplateData is the template data an update renders: the version with
+// its pre-release and metadata as the version's output has them. A field stored
+// in the VERSION file (stable, or left there) is that value; a dynamic field
+// with nothing stored is its template, rendered.
+func updateTemplateData(v *version.Version, cfg *config.Config) emit.TemplateData {
+	preTemplate, metaTemplate := cfg.PreRelease.Template, cfg.Metadata.Template
+	if cfg.PreRelease.Stable || v.PreRelease != "" {
+		preTemplate = ""
+	}
+	if cfg.Metadata.Stable || v.BuildMetadata != "" {
+		metaTemplate = ""
+	}
+
+	data := emit.BuildCompleteTemplateData(v, preTemplate, metaTemplate)
+	if v.PreRelease != "" {
+		data.PreRelease = v.PreRelease
+		data.PreReleaseWithDash = "-" + v.PreRelease
+	}
+	if v.BuildMetadata != "" {
+		data.Metadata = v.BuildMetadata
+		data.MetadataWithPlus = "+" + v.BuildMetadata
+	}
+	return data
 }

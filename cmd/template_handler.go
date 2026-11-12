@@ -140,6 +140,9 @@ func setTemplate(cmd *cobra.Command, cfg *config.Config, template string, acc ve
 			return fmt.Errorf("error loading version: %w", err)
 		}
 		cmd.Printf("Current version: %s\n", vd.FullString())
+		if err := runConfiguredUpdates(cmd); err != nil {
+			return err
+		}
 	} else {
 		cmd.Println("(Template will be rendered at output time, not stored in VERSION file)")
 	}

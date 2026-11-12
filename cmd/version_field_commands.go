@@ -58,6 +58,7 @@ func runStableCommand(cmd *cobra.Command, args []string, acc versionFieldAccesso
 			return fmt.Errorf("error clearing %s from VERSION: %w", acc.labelLower, err)
 		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s cleared from VERSION file (will be generated at output time)\n", acc.labelTitle)
+		return runConfiguredUpdates(cmd)
 	}
 
 	return nil
@@ -109,7 +110,7 @@ func runEnableCommand(cmd *cobra.Command, args []string, acc versionFieldAccesso
 	}
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return runConfiguredUpdates(cmd)
 }
 
 // clearVersionValue backs both `disable` and `clear`: each requires stable mode,
@@ -140,7 +141,7 @@ func clearVersionValue(cmd *cobra.Command, acc versionFieldAccessor, remedy, pas
 	}
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
-	return nil
+	return runConfiguredUpdates(cmd)
 }
 
 // runDisableCommand clears the field from the VERSION file.
@@ -227,6 +228,9 @@ func runSetCommand(cmd *cobra.Command, args []string, acc versionFieldAccessor) 
 			return fmt.Errorf("error getting version: %w", err)
 		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", vd.FullString())
+		if err := runConfiguredUpdates(cmd); err != nil {
+			return err
+		}
 	} else {
 		// --force was used: set template to literal, don't write to VERSION
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s template set to literal: %s\n", acc.labelTitle, value)

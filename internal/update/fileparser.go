@@ -197,46 +197,33 @@ func (p *DaselFileParser) marshal(data any, format Format) ([]byte, error) {
 }
 
 // UpdateTOMLValue does a targeted value replacement in a TOML file,
-// preserving comments, ordering, and formatting.
-// Parses to find the old value at the path, then replaces it in the raw bytes.
+// preserving comments, ordering, and formatting: only the string at path
+// changes (see setTOMLString).
 func (p *DaselFileParser) UpdateTOMLValue(filePath string, path string, newValue string) error {
-	raw, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", filePath, err)
-	}
-
-	// Parse to navigate to the value at the path
-	var data map[string]any
-	if err := toml.Unmarshal(raw, &data); err != nil {
-		return fmt.Errorf("%s: %s: %w", ErrFileParseFailed, filePath, err)
-	}
-
-	oldValue, err := p.Select(data, path)
+	raw, err := readExisting(filePath)
 	if err != nil {
 		return err
 	}
-
-	oldStr := fmt.Sprintf("%v", oldValue)
-	if oldStr == newValue {
+	result, err := p.setTOMLString(raw, path, newValue)
+	if err != nil {
+		return fmt.Errorf("%s: %w", filePath, err)
+	}
+	if bytes.Equal(result, raw) {
 		return nil
 	}
-
-	// Replace the quoted old value with the quoted new value in the raw bytes
-	oldQuoted := []byte(`"` + oldStr + `"`)
-	newQuoted := []byte(`"` + newValue + `"`)
-
-	result := bytes.Replace(raw, oldQuoted, newQuoted, 1)
-	if bytes.Equal(result, raw) {
-		// Try single quotes
-		oldQuoted = []byte(`'` + oldStr + `'`)
-		result = bytes.Replace(raw, oldQuoted, newQuoted, 1)
-	}
-
-	if bytes.Equal(result, raw) {
-		return fmt.Errorf("could not find value %q to replace in %s", oldStr, filePath)
-	}
-
 	return os.WriteFile(filePath, result, FilePermission)
+}
+
+// readExisting reads a file that an update edits, naming it when missing.
+func readExisting(filePath string) ([]byte, error) {
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("%s: %s", ErrFileNotFound, filePath)
+		}
+		return nil, fmt.Errorf("failed to read %s: %w", filePath, err)
+	}
+	return raw, nil
 }
 
 // UpdateJSONValue does a targeted value replacement in a JSON file, preserving
@@ -246,22 +233,26 @@ func (p *DaselFileParser) UpdateTOMLValue(filePath string, path string, newValue
 // keys sorted alphabetically). The path uses gjson/sjson dot syntax, e.g.
 // "version" or "packages.dependencies.foo".
 func (p *DaselFileParser) UpdateJSONValue(filePath string, path string, newValue string) error {
-	raw, err := os.ReadFile(filePath)
+	raw, err := readExisting(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("%s: %s", ErrFileNotFound, filePath)
-		}
-		return fmt.Errorf("failed to read %s: %w", filePath, err)
+		return err
 	}
+	result, err := setJSONString(raw, path, newValue)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filePath, result, FilePermission)
+}
 
+// setJSONString returns raw with the scalar at path (gjson/sjson dot syntax)
+// set to newValue, the rest of the document byte-for-byte intact.
+func setJSONString(raw []byte, path, newValue string) ([]byte, error) {
 	if !gjson.GetBytes(raw, path).Exists() {
-		return fmt.Errorf("%s: %s", ErrPathNotFound, path)
+		return nil, fmt.Errorf("%s: %s", ErrPathNotFound, path)
 	}
-
 	result, err := sjson.SetBytes(raw, path, newValue)
 	if err != nil {
-		return fmt.Errorf("%s: %s: %w", ErrInvalidSelector, path, err)
+		return nil, fmt.Errorf("%s: %s: %w", ErrInvalidSelector, path, err)
 	}
-
-	return os.WriteFile(filePath, result, FilePermission)
+	return result, nil
 }
