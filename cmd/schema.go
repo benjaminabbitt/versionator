@@ -223,10 +223,10 @@ func buildTemplateVarsSchema() TemplateVarsSchema {
 			{Name: "BuildDay", Description: "Build day (zero-padded)", Example: "15"},
 		},
 		Release: []TemplateVarSchema{
-			{Name: "ModulePath", Description: "VERSION file's directory relative to the repository root, with a trailing slash; empty at the root", Example: "internal/tools/"},
-			{Name: "ModuleName", Description: "That directory's bare name; empty at the root", Example: "tools"},
+			{Name: "ModulePath", Description: "VERSION file's directory relative to the repository root, with a trailing slash; empty at the root (release and updates templates)", Example: "internal/tools/"},
+			{Name: "ModuleName", Description: "That directory's bare name; empty at the root (release and updates templates)", Example: "tools"},
 			{Name: "Tag", Description: "The rendered tag name; branch and message templates only", Example: "v1.2.3"},
-			{Name: "BranchPrefix", Description: "The release.branchPrefix setting", Example: "release/"},
+			{Name: "BranchPrefix", Description: "The release.branchPrefix setting (release and updates templates)", Example: "release/"},
 		},
 	}
 }

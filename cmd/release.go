@@ -188,32 +188,19 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 	// The flag is consulted only when actually supplied: it declares "v" as its
 	// default, so reading its value unconditionally would discard the VERSION
 	// file's prefix on every run and make `config prefix disable` a no-op here.
-	prefix := vd.Prefix
+	// With no prefix configured anywhere, the default is "v".
+	prefix := effectivePrefix(vd.Prefix)
 	if cmd.Flags().Changed("prefix") {
 		prefix, _ = cmd.Flags().GetString("prefix")
-	} else if prefix == "" {
-		// No prefix configured anywhere, default to "v"
-		prefix = "v"
 	}
 
-	// Build the template data once and reuse it for the tag, branch, message
+	// Build the template data once, with the one builder the file updates and
+	// their pre-save check also use, and reuse it for the tag, branch, message
 	// and any configured file updates.
-	templateData := updateTemplateData(vd, cfg)
-	modulePath, err := version.ModulePath()
+	templateData, err := buildTemplateData(vd, cfg, prefix)
 	if err != nil {
-		return nil, fmt.Errorf("error resolving module path: %w", err)
+		return nil, err
 	}
-	moduleName, err := version.ModuleName()
-	if err != nil {
-		return nil, fmt.Errorf("error resolving module name: %w", err)
-	}
-	emit.MergeCustomVars(&templateData, map[string]string{
-		// The effective prefix, which the flag may have overridden.
-		"Prefix":       prefix,
-		"ModulePath":   modulePath,
-		"ModuleName":   moduleName,
-		"BranchPrefix": cfg.Release.BranchPrefix,
-	})
 
 	tagName, err := renderReleaseTemplate("tag", cfg.Release.TagTemplate, config.DefaultTagTemplate, templateData)
 	if err != nil {

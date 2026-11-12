@@ -102,7 +102,7 @@ Timestamps at build time.
 
 ## Release Templates
 
-Available only to the release tag, branch and message templates (`release.tagTemplate`, `release.branchTemplate`, `release.messageTemplate`).
+Available to the release tag, branch and message templates (`release.tagTemplate`, `release.branchTemplate`, `release.messageTemplate`) and to the `updates:` templates of every version change (`{{Tag}}` excepted, which exists only once release has rendered the tag). In all of them `{{Prefix}}` is the effective prefix: the VERSION file's, else `v`, as the default tag has it (release's `--prefix` flag replaces it there).
 
 | Variable | Description | Example |
 |----------|-------------|--------|

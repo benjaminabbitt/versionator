@@ -30,9 +30,12 @@ func runConfiguredUpdates(cmd *cobra.Command) error {
 	logger, _ := zap.NewProduction()
 	updater := update.NewUpdater(cfg.Updates, update.NewDaselFileParser(), logger)
 
-	templateData := updateTemplateData(v, cfg)
+	data, err := buildTemplateData(v, cfg, effectivePrefix(v.Prefix))
+	if err != nil {
+		return err
+	}
 
-	if err := updater.UpdateFiles(templateData); err != nil {
+	if err := updater.UpdateFiles(data); err != nil {
 		return fmt.Errorf("error updating files: %w", err)
 	}
 
@@ -72,17 +75,37 @@ func checkConfiguredUpdates(next *version.Version) error {
 
 	logger, _ := zap.NewProduction()
 	updater := update.NewUpdater(cfg.Updates, update.NewDaselFileParser(), logger)
-	if err := updater.Check(updateTemplateData(next, cfg)); err != nil {
+	data, err := buildTemplateData(next, cfg, effectivePrefix(next.Prefix))
+	if err != nil {
+		return err
+	}
+	if err := updater.Check(data); err != nil {
 		return fmt.Errorf("error updating files: %w", err)
 	}
 	return nil
 }
 
-// updateTemplateData is the template data an update renders: the version with
-// its pre-release and metadata as the version's output has them. A field stored
-// in the VERSION file (stable, or left there) is that value; a dynamic field
-// with nothing stored is its template, rendered.
-func updateTemplateData(v *version.Version, cfg *config.Config) emit.TemplateData {
+// effectivePrefix is the {{Prefix}} release and the file updates render: the
+// VERSION file's prefix, else "v" (release tags "v1.2.3" when no prefix is
+// configured anywhere). release's --prefix flag replaces it.
+func effectivePrefix(versionPrefix string) string {
+	if versionPrefix == "" {
+		return "v"
+	}
+	return versionPrefix
+}
+
+// buildTemplateData is the ONE builder of the template data a version renders
+// with: every version change's file updates, the pre-save check of those
+// updates, and release's tag, branch, message and file updates. So the check
+// validates exactly what release will write.
+//
+// Pre-release and metadata are the version's output values: a field stored in
+// the VERSION file (stable, or left there) is that value; a dynamic field with
+// nothing stored is its template, rendered. On top are the release variables:
+// {{Prefix}} (the given prefix), {{ModulePath}}, {{ModuleName}} and
+// {{BranchPrefix}}.
+func buildTemplateData(v *version.Version, cfg *config.Config, prefix string) (emit.TemplateData, error) {
 	preTemplate, metaTemplate := cfg.PreRelease.Template, cfg.Metadata.Template
 	if cfg.PreRelease.Stable || v.PreRelease != "" {
 		preTemplate = ""
@@ -100,5 +123,20 @@ func updateTemplateData(v *version.Version, cfg *config.Config) emit.TemplateDat
 		data.Metadata = v.BuildMetadata
 		data.MetadataWithPlus = "+" + v.BuildMetadata
 	}
-	return data
+
+	modulePath, err := version.ModulePath()
+	if err != nil {
+		return data, fmt.Errorf("error resolving module path: %w", err)
+	}
+	moduleName, err := version.ModuleName()
+	if err != nil {
+		return data, fmt.Errorf("error resolving module name: %w", err)
+	}
+	emit.MergeCustomVars(&data, map[string]string{
+		"Prefix":       prefix,
+		"ModulePath":   modulePath,
+		"ModuleName":   moduleName,
+		"BranchPrefix": cfg.Release.BranchPrefix,
+	})
+	return data, nil
 }

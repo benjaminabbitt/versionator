@@ -202,7 +202,7 @@ updates:
 	}
 }
 
-func TestUpdateTemplateData_PreReleaseAndMetadataSources(t *testing.T) {
+func TestBuildTemplateData_PreReleaseAndMetadataSources(t *testing.T) {
 	cases := []struct {
 		name               string
 		stored             string // VERSION file pre-release
@@ -221,7 +221,10 @@ func TestUpdateTemplateData_PreReleaseAndMetadataSources(t *testing.T) {
 				PreRelease: config.PreReleaseConfig{Template: c.template, Stable: c.stable},
 				Metadata:   config.MetadataConfig{Template: c.template, Stable: c.stable},
 			}
-			data := updateTemplateData(v, cfg)
+			data, err := buildTemplateData(v, cfg, "")
+			if err != nil {
+				t.Fatalf("buildTemplateData: %v", err)
+			}
 			if data.PreReleaseWithDash != c.wantDash {
 				t.Errorf("PreReleaseWithDash = %q, want %q", data.PreReleaseWithDash, c.wantDash)
 			}
@@ -273,5 +276,14 @@ func TestCargoSync_PrereleaseStableFalse_UpdatesWorkspaceVersion(t *testing.T) {
 
 	if got := cargoVersionLine(t); got != `version = "0.7.0" # kept in sync by versionator` {
 		t.Errorf("got %q", got)
+	}
+}
+
+func TestEffectivePrefix(t *testing.T) {
+	if got := effectivePrefix(""); got != "v" {
+		t.Errorf(`effectivePrefix("") = %q, want "v"`, got)
+	}
+	if got := effectivePrefix("V"); got != "V" {
+		t.Errorf(`effectivePrefix("V") = %q, want "V"`, got)
 	}
 }

@@ -264,7 +264,11 @@ Updates are applied by every command that changes VERSION: `set`, `bump`,
 `config prerelease|metadata` (set, clear, enable, disable, stable false,
 template in stable mode), `config prefix` (enable, disable, set) and
 `release`. The pre-release and metadata a template sees are the ones in the
-VERSION file, else (in dynamic mode) the rendered config template.
+VERSION file, else (in dynamic mode) the rendered config template. An update
+template renders with the same data as release's templates (one builder):
+`{{ModulePath}}`, `{{ModuleName}}` and `{{BranchPrefix}}` are available, and
+`{{Prefix}}` is the effective prefix, the VERSION file's or else `v`. So the
+check made before VERSION is written validates exactly what release writes.
 
 - **TOML and JSON** are edited in place: only the value at `path` changes, and
   every other byte (comments, ordering, spacing, quote style) is kept. A TOML
