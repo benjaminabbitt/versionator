@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/benjaminabbitt/versionator/internal/vcs"
 	gitVCS "github.com/benjaminabbitt/versionator/internal/vcs/git"
 	"github.com/benjaminabbitt/versionator/internal/vcs/mock"
 	"github.com/golang/mock/gomock"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -79,18 +83,19 @@ func (suite *ReleaseTestSuite) resetReleaseCommand() {
 	rootCmd.SetArgs(nil)
 
 	// Reset release command flags to their default values
-	_ = releaseCmd.Flags().Set("message", "")
-	_ = releaseCmd.Flags().Set("prefix", "v")
-	_ = releaseCmd.Flags().Set("force", "false")
-	_ = releaseCmd.Flags().Set("verbose", "false")
-	_ = releaseCmd.Flags().Set("no-branch", "false")
+	resetFlags(releaseCmd)
+	resetFlags(releasePushCmd)
+}
 
-	// Reset release push command flags
-	_ = releasePushCmd.Flags().Set("message", "")
-	_ = releasePushCmd.Flags().Set("prefix", "v")
-	_ = releasePushCmd.Flags().Set("force", "false")
-	_ = releasePushCmd.Flags().Set("verbose", "false")
-	_ = releasePushCmd.Flags().Set("no-branch", "false")
+// resetFlags restores a command's flags to their declared defaults and clears
+// the "changed" bit. Clearing it matters: release distinguishes an unset
+// --prefix (VERSION file wins) from an explicit one (flag wins), and
+// pflag.Set() alone would leave every flag looking explicitly set.
+func resetFlags(cmd *cobra.Command) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_ = f.Value.Set(f.DefValue)
+		f.Changed = false
+	})
 }
 
 // createTestFiles creates the standard test files needed for most tests
@@ -120,6 +125,38 @@ logging:
 	suite.Require().NoError(err, "Failed to create config file")
 }
 
+// testHeadSHA is the commit the mock VCS reports as HEAD. The idempotency
+// tests compare a tag's or branch's commit against it, so it lives here rather
+// than in each test: the helper must answer GetVCSIdentifier(40) for every
+// release (rendering the tag probes the VCS), and a per-test expectation would
+// never be reached.
+const testHeadSHA = "abc1234def5678901234567890abcdef12345678"
+
+// newMockVCS builds a mock VCS with the calls every release makes already
+// stubbed. Release renders its tag, branch and message from templates, and
+// building the template data probes the VCS for commit, branch and author
+// facts; every test would otherwise have to restate those expectations.
+// Test-specific expectations are layered on the returned mock.
+func (suite *ReleaseTestSuite) newMockVCS() *mock.MockVersionControlSystem {
+	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
+	mockVCS.EXPECT().Name().Return("git").AnyTimes()
+	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+
+	// Template data inputs: each is optional to the renderer, which falls back
+	// to an empty value when the VCS cannot answer.
+	mockVCS.EXPECT().GetVCSIdentifier(40).Return(testHeadSHA, nil).AnyTimes()
+	mockVCS.EXPECT().GetBranchName().Return("main", nil).AnyTimes()
+	mockVCS.EXPECT().GetCommitDate().Return(time.Date(2024, 1, 15, 10, 30, 45, 0, time.UTC), nil).AnyTimes()
+	mockVCS.EXPECT().GetCommitsSinceTag().Return(5, nil).AnyTimes()
+	mockVCS.EXPECT().GetLastTagCommit().Return("fedcba9876543210fedcba9876543210fedcba98", nil).AnyTimes()
+	mockVCS.EXPECT().GetUncommittedChanges().Return(0, nil).AnyTimes()
+	mockVCS.EXPECT().GetCommitAuthor().Return("Test Author", nil).AnyTimes()
+	mockVCS.EXPECT().GetCommitAuthorEmail().Return("test@example.com", nil).AnyTimes()
+
+	return mockVCS
+}
+
 // =============================================================================
 // CORE FUNCTIONALITY
 // Tests demonstrating the primary purpose of the release command: creating
@@ -138,10 +175,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_Success() {
 	suite.createTestFiles("1.2.3")
 
 	// Precondition: VCS reports clean working directory, no existing tag/branch
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.2.3").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.2.3", "Release 1.2.3").Return(nil)
@@ -184,10 +218,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_CustomPrefix() {
 	suite.createTestFiles("2.0.0")
 
 	// Precondition: VCS is clean, no existing tag/branch with custom prefix
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("release-2.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("release-2.0.0", "Release 2.0.0").Return(nil)
@@ -220,10 +251,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_CustomMessage() {
 	suite.createTestFiles("1.5.0")
 
 	// Precondition: VCS is clean, expects custom message in CreateTag call
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.5.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.5.0", "Custom release message").Return(nil)
@@ -256,10 +284,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_NoBranchFlag() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: VCS should NOT receive BranchExists or CreateBranch calls
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
@@ -292,10 +317,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchDisabledInConfig() {
 	suite.createTestFilesWithRelease("1.0.0", false)
 
 	// Precondition: VCS should NOT receive BranchExists or CreateBranch calls
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
@@ -328,10 +350,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_AutoCommitVersionFile() {
 	suite.createTestFiles("1.2.3")
 
 	// Precondition: VCS reports dirty but only VERSION file is modified
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
 	mockVCS.EXPECT().GetDirtyFiles().Return([]string{"VERSION"}, nil)
 	mockVCS.EXPECT().CommitFiles([]string{"VERSION"}, "Release 1.2.3").Return(nil)
@@ -397,13 +416,9 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_NoForce() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: tag exists at a different commit than HEAD
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
-	mockVCS.EXPECT().GetVCSIdentifier(40).Return("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil)
 	mockVCS.EXPECT().GetTagCommit("v1.0.0").Return("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", nil)
 
 	vcs.RegisterVCS(mockVCS)
@@ -429,14 +444,10 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_NoForce() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_TagAlreadyAtHead() {
 	suite.createTestFiles("1.0.0")
 
-	headSHA := "cccccccccccccccccccccccccccccccccccccccc"
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	headSHA := testHeadSHA
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
-	mockVCS.EXPECT().GetVCSIdentifier(40).Return(headSHA, nil)
 	mockVCS.EXPECT().GetTagCommit("v1.0.0").Return(headSHA, nil)
 	// CreateTag should NOT be called — tag is already where we'd put it.
 	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(false, nil)
@@ -466,9 +477,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_DirtyWithOtherFiles() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: VCS reports multiple dirty files
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
 	mockVCS.EXPECT().GetDirtyFiles().Return([]string{"VERSION", "other.txt"}, nil)
 
@@ -501,13 +510,9 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_TagExists_WithForce() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: tag exists at a different commit; --force lets it pass.
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(true, nil)
-	mockVCS.EXPECT().GetVCSIdentifier(40).Return("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil)
 	mockVCS.EXPECT().GetTagCommit("v1.0.0").Return("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
 	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(false, nil)
@@ -551,10 +556,7 @@ logging:
 	suite.Require().NoError(err, "Failed to create config file")
 
 	// Precondition: VCS expects default version 0.0.1
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v0.0.1").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v0.0.1", "Release 0.0.1").Return(nil)
@@ -587,15 +589,11 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyExists() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: branch exists at a DIFFERENT commit; should warn and skip.
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
 	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(true, nil)
-	mockVCS.EXPECT().GetVCSIdentifier(40).Return("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil)
 	mockVCS.EXPECT().GetBranchCommit("release/v1.0.0").Return("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", nil)
 	// CreateBranch should NOT be called since branch exists elsewhere
 
@@ -621,16 +619,12 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyExists() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyAtHead() {
 	suite.createTestFiles("1.0.0")
 
-	headSHA := "dddddddddddddddddddddddddddddddddddddddd"
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	headSHA := testHeadSHA
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
 	mockVCS.EXPECT().BranchExists("release/v1.0.0").Return(true, nil)
-	mockVCS.EXPECT().GetVCSIdentifier(40).Return(headSHA, nil)
 	mockVCS.EXPECT().GetBranchCommit("release/v1.0.0").Return(headSHA, nil)
 	// CreateBranch should NOT be called — branch is already at HEAD.
 
@@ -664,10 +658,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchAlreadyAtHead() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_IsWorkingDirectoryCleanError() {
 	// Precondition: VERSION file and mock VCS that errors on status check
 	suite.createTestFiles("1.0.0")
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, fmt.Errorf("repository corrupted"))
 	vcs.RegisterVCS(mockVCS)
 
@@ -696,10 +687,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_IsWorkingDirectoryCleanError()
 func (suite *ReleaseTestSuite) TestReleaseCommand_GetDirtyFilesError() {
 	// Precondition: VERSION file and mock VCS that reports dirty but fails on GetDirtyFiles
 	suite.createTestFiles("1.0.0")
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
 	mockVCS.EXPECT().GetDirtyFiles().Return(nil, fmt.Errorf("cannot enumerate files"))
 	vcs.RegisterVCS(mockVCS)
@@ -729,10 +717,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_GetDirtyFilesError() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_CommitFilesError() {
 	// Precondition: VERSION file and mock VCS that fails on commit
 	suite.createTestFiles("1.0.0")
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(false, nil)
 	mockVCS.EXPECT().GetDirtyFiles().Return([]string{"VERSION"}, nil)
 	mockVCS.EXPECT().CommitFiles([]string{"VERSION"}, gomock.Any()).Return(fmt.Errorf("pre-commit hook failed"))
@@ -763,10 +748,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_CommitFilesError() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_TagExistsError() {
 	// Precondition: VERSION file and mock VCS that errors on TagExists
 	suite.createTestFiles("1.0.0")
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, fmt.Errorf("tags unavailable"))
 	vcs.RegisterVCS(mockVCS)
@@ -796,10 +778,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_TagExistsError() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_CreateTagError() {
 	// Precondition: VERSION file and mock VCS that errors on CreateTag
 	suite.createTestFiles("1.0.0")
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", gomock.Any()).Return(fmt.Errorf("GPG signing failed"))
@@ -830,10 +809,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_CreateTagError() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_BranchExistsError() {
 	// Precondition: VERSION file with branch creation enabled
 	suite.createTestFilesWithRelease("1.0.0", true)
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", gomock.Any()).Return(nil)
@@ -865,10 +841,7 @@ func (suite *ReleaseTestSuite) TestReleaseCommand_BranchExistsError() {
 func (suite *ReleaseTestSuite) TestReleaseCommand_CreateBranchError() {
 	// Precondition: VERSION file with branch creation enabled
 	suite.createTestFilesWithRelease("1.0.0", true)
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", gomock.Any()).Return(nil)
@@ -904,10 +877,7 @@ func (suite *ReleaseTestSuite) TestReleasePushCommand_Success() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: VCS is clean and all operations succeed
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
@@ -943,10 +913,7 @@ func (suite *ReleaseTestSuite) TestReleasePushCommand_PushTagError() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: VCS operations succeed until PushTag fails
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
@@ -979,10 +946,7 @@ func (suite *ReleaseTestSuite) TestReleasePushCommand_PushBranchError() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: VCS operations succeed until PushBranch fails
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
@@ -1016,10 +980,7 @@ func (suite *ReleaseTestSuite) TestReleasePushCommand_NoBranch() {
 	suite.createTestFiles("1.0.0")
 
 	// Precondition: VCS is clean and all operations succeed (no branch operations)
-	mockVCS := mock.NewMockVersionControlSystem(suite.ctrl)
-	mockVCS.EXPECT().Name().Return("git").AnyTimes()
-	mockVCS.EXPECT().IsRepository().Return(true).AnyTimes()
-	mockVCS.EXPECT().GetRepositoryRoot().Return(suite.tempDir, nil).AnyTimes()
+	mockVCS := suite.newMockVCS()
 	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
 	mockVCS.EXPECT().TagExists("v1.0.0").Return(false, nil)
 	mockVCS.EXPECT().CreateTag("v1.0.0", "Release 1.0.0").Return(nil)
@@ -1050,4 +1011,300 @@ func (suite *ReleaseTestSuite) TestReleasePushCommand_NoBranch() {
 // TestReleaseTestSuite runs the release test suite
 func TestReleaseTestSuite(t *testing.T) {
 	suite.Run(t, new(ReleaseTestSuite))
+}
+
+// =============================================================================
+// TAG TEMPLATES
+// The tag, branch and release message are rendered from Mustache templates, so
+// tag shapes beyond "<prefix><version>" are expressible -- notably Go's
+// submodule form, "internal/tools/v1.2.3", where the path segment is mandatory.
+// =============================================================================
+
+// writeTemplateConfig writes a config exercising the release template fields.
+// Empty values are omitted so the documented defaults apply.
+func (suite *ReleaseTestSuite) writeTemplateConfig(tag, branch, message string) {
+	content := "prefix: \"\"\nmetadata:\n  template: \"\"\nrelease:\n  createBranch: true\n  branchPrefix: \"release/\"\n"
+	if tag != "" {
+		content += fmt.Sprintf("  tagTemplate: %q\n", tag)
+	}
+	if branch != "" {
+		content += fmt.Sprintf("  branchTemplate: %q\n", branch)
+	}
+	if message != "" {
+		content += fmt.Sprintf("  messageTemplate: %q\n", message)
+	}
+	content += "logging:\n  output: \"console\"\n"
+	suite.Require().NoError(os.WriteFile(".versionator.yaml", []byte(content), 0644))
+}
+
+// TestReleaseCommand_ModulePathTemplate_TagsGoSubmoduleForm validates that a
+// VERSION file in a subdirectory produces a Go-resolvable submodule tag.
+//
+// Why: Go requires a submodule's tag to be the module directory path relative
+// to the repository root, followed by the version. Without the path segment the
+// tag is not a resolvable module version, and two packages released at the same
+// version collide on one tag.
+//
+// What: Given VERSION=1.2.3 in internal/tools and a tag template using
+// {{ModulePath}}, release creates tag "internal/tools/v1.2.3".
+func (suite *ReleaseTestSuite) TestReleaseCommand_ModulePathTemplate_TagsGoSubmoduleForm() {
+	// Precondition: VERSION and config live in a module subdirectory
+	moduleDir := filepath.Join(suite.tempDir, "internal", "tools")
+	suite.Require().NoError(os.MkdirAll(moduleDir, 0755))
+	suite.Require().NoError(os.Chdir(moduleDir))
+	suite.Require().NoError(os.WriteFile("VERSION", []byte("1.2.3"), 0644))
+	suite.writeTemplateConfig("{{ModulePath}}{{Prefix}}{{MajorMinorPatch}}", "", "")
+
+	// Precondition: Clean repository rooted above the module directory
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("internal/tools/v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("internal/tools/v1.2.3", "Release 1.2.3").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/internal/tools/v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/internal/tools/v1.2.3").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release from within the module directory
+	err := rootCmd.Execute()
+
+	// Expected: Tag carries the repo-relative module path
+	suite.Require().NoError(err, "release command should succeed")
+	suite.Contains(buf.String(), "Successfully created tag 'internal/tools/v1.2.3'")
+}
+
+// TestReleaseCommand_LiteralPathTemplate_TagsConfiguredPath validates that a
+// path typed literally into the template is honored verbatim.
+//
+// Why: Component-style tags outside the Go ecosystem ("tools-v1.2.3") and
+// hand-pinned paths must remain expressible without a derived variable.
+func (suite *ReleaseTestSuite) TestReleaseCommand_LiteralPathTemplate_TagsConfiguredPath() {
+	// Precondition: Tag template spells the component prefix literally
+	suite.Require().NoError(os.WriteFile("VERSION", []byte("1.2.3"), 0644))
+	suite.writeTemplateConfig("tools-{{Prefix}}{{MajorMinorPatch}}", "", "")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("tools-v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("tools-v1.2.3", "Release 1.2.3").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/tools-v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/tools-v1.2.3").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release
+	err := rootCmd.Execute()
+
+	// Expected: Literal prefix preserved
+	suite.Require().NoError(err, "release command should succeed")
+	suite.Contains(buf.String(), "Successfully created tag 'tools-v1.2.3'")
+}
+
+// TestReleaseCommand_VersionWithBuildMetadata_TagOmitsMetadata validates that
+// build metadata is excluded from the default tag.
+//
+// Why: Go module versions reject SemVer build metadata, so a tag carrying "+"
+// is unusable as a module version. The tag message still records it.
+func (suite *ReleaseTestSuite) TestReleaseCommand_VersionWithBuildMetadata_TagOmitsMetadata() {
+	// Precondition: VERSION carries build metadata
+	suite.createTestFiles("1.2.3+build.5")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v1.2.3", "Release 1.2.3+build.5").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/v1.2.3").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release
+	err := rootCmd.Execute()
+
+	// Expected: Tag without metadata
+	suite.Require().NoError(err, "release command should succeed")
+	suite.Contains(buf.String(), "Successfully created tag 'v1.2.3'")
+}
+
+// TestReleaseCommand_VersionWithPreRelease_TagRetainsPreRelease validates that a
+// pre-release stored in the VERSION file survives into the tag.
+//
+// Why: Pre-release is part of the version's identity and is legal in a Go
+// module version, unlike build metadata. Dropping it would silently tag a
+// pre-release as the final release.
+func (suite *ReleaseTestSuite) TestReleaseCommand_VersionWithPreRelease_TagRetainsPreRelease() {
+	// Precondition: VERSION carries a pre-release and no template configures one
+	suite.createTestFiles("1.2.3-alpha.1")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v1.2.3-alpha.1").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v1.2.3-alpha.1", "Release 1.2.3-alpha.1").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/v1.2.3-alpha.1").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/v1.2.3-alpha.1").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release
+	err := rootCmd.Execute()
+
+	// Expected: Pre-release preserved in the tag
+	suite.Require().NoError(err, "release command should succeed")
+	suite.Contains(buf.String(), "Successfully created tag 'v1.2.3-alpha.1'")
+}
+
+// TestReleaseCommand_BranchTemplate_OverridesBranchPrefix validates that a
+// configured branch template takes full control of the branch name.
+//
+// Why: A slashed Go submodule tag makes "branchPrefix + tag" produce deeply
+// nested branches; projects need to reshape the branch independently.
+func (suite *ReleaseTestSuite) TestReleaseCommand_BranchTemplate_OverridesBranchPrefix() {
+	// Precondition: Branch template ignores branchPrefix and uses the module name
+	suite.Require().NoError(os.WriteFile("VERSION", []byte("1.2.3"), 0644))
+	suite.writeTemplateConfig("", "releases/{{MajorMinor}}", "")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v1.2.3", "Release 1.2.3").Return(nil)
+	mockVCS.EXPECT().BranchExists("releases/1.2").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("releases/1.2").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release
+	err := rootCmd.Execute()
+
+	// Expected: Branch follows its own template
+	suite.Require().NoError(err, "release command should succeed")
+	suite.Contains(buf.String(), "Successfully created branch 'releases/1.2'")
+}
+
+// TestReleaseCommand_MessageTemplate_RendersConfiguredMessage validates that the
+// annotated tag message is templated.
+//
+// Why: Release messages carry project conventions (changelog markers, commit
+// prefixes) that a fixed "Release <version>" cannot express.
+func (suite *ReleaseTestSuite) TestReleaseCommand_MessageTemplate_RendersConfiguredMessage() {
+	// Precondition: Message template configured
+	suite.Require().NoError(os.WriteFile("VERSION", []byte("1.2.3"), 0644))
+	suite.writeTemplateConfig("", "", "chore(release): {{MajorMinorPatch}} on {{BranchName}}")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v1.2.3", "chore(release): 1.2.3 on main").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/v1.2.3").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release
+	err := rootCmd.Execute()
+
+	// Expected: Rendered message reaches the tag
+	suite.Require().NoError(err, "release command should succeed")
+}
+
+// TestReleaseCommand_MessageFlag_OverridesMessageTemplate validates that -m
+// still wins over a configured message template.
+//
+// Why: The flag is the per-invocation escape hatch and predates the template;
+// silently ignoring it would break existing scripts.
+func (suite *ReleaseTestSuite) TestReleaseCommand_MessageFlag_OverridesMessageTemplate() {
+	// Precondition: Message template configured, flag also supplied
+	suite.Require().NoError(os.WriteFile("VERSION", []byte("1.2.3"), 0644))
+	suite.writeTemplateConfig("", "", "chore(release): {{MajorMinorPatch}}")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("v1.2.3", "hand written").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/v1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/v1.2.3").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetArgs([]string{"release", "-m", "hand written"})
+
+	// Action: Release with an explicit message
+	err := rootCmd.Execute()
+
+	// Expected: Flag wins
+	suite.Require().NoError(err, "release command should succeed")
+}
+
+// TestReleaseCommand_VersionFilePrefix_UsedWhenFlagUnset validates that the
+// VERSION file's own prefix reaches the tag.
+//
+// Why: The --prefix flag declared "v" as its default, so GetString always
+// returned a value and the VERSION file's prefix was silently discarded --
+// `config prefix disable` had no effect on the tag. The flag must win only when
+// actually supplied.
+func (suite *ReleaseTestSuite) TestReleaseCommand_VersionFilePrefix_UsedWhenFlagUnset() {
+	// Precondition: VERSION file carries an uppercase prefix
+	suite.createTestFiles("V1.2.3")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil)
+	mockVCS.EXPECT().TagExists("V1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateTag("V1.2.3", "Release 1.2.3").Return(nil)
+	mockVCS.EXPECT().BranchExists("release/V1.2.3").Return(false, nil)
+	mockVCS.EXPECT().CreateBranch("release/V1.2.3").Return(nil)
+	vcs.RegisterVCS(mockVCS)
+
+	var buf bytes.Buffer
+	rootCmd.SetOut(&buf)
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release without --prefix
+	err := rootCmd.Execute()
+
+	// Expected: VERSION file prefix honored
+	suite.Require().NoError(err, "release command should succeed")
+	suite.Contains(buf.String(), "Successfully created tag 'V1.2.3'")
+}
+
+// TestReleaseCommand_TagTemplateRendersInvalidRef_ReturnsError validates that a
+// tag name git cannot accept is rejected before the repository is touched.
+//
+// Why: Release mutates the repository (committing VERSION, creating a branch)
+// before tagging; discovering an unusable tag name at that point leaves a
+// half-finished release.
+func (suite *ReleaseTestSuite) TestReleaseCommand_TagTemplateRendersInvalidRef_ReturnsError() {
+	// Precondition: Template renders a name containing a space
+	suite.Require().NoError(os.WriteFile("VERSION", []byte("1.2.3"), 0644))
+	suite.writeTemplateConfig("release {{MajorMinorPatch}}", "", "")
+
+	mockVCS := suite.newMockVCS()
+	mockVCS.EXPECT().IsWorkingDirectoryClean().Return(true, nil).AnyTimes()
+	vcs.RegisterVCS(mockVCS)
+
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+	rootCmd.SetArgs([]string{"release"})
+
+	// Action: Release
+	err := rootCmd.Execute()
+
+	// Expected: Rejected, no tag attempted
+	suite.Require().Error(err, "release should reject an invalid tag name")
+	suite.Contains(err.Error(), "invalid tag name")
 }

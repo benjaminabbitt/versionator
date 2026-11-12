@@ -30,19 +30,38 @@ This command will:
 2. If only the VERSION file is dirty, commit it automatically
 3. Verify there are no other uncommitted changes
 4. Get the current version
-5. Create a git tag with the version (prefixed with 'v')
+5. Create a git tag from the release tag template (default: 'v1.2.3')
 6. Create a release branch (e.g., 'release/v1.2.3') if enabled
 
 This is the recommended workflow after bumping a version:
   versionator patch increment
   versionator release
 
-Release branch creation is enabled by default. Configure in .versionator.yaml:
+The tag, release branch and tag message are Mustache templates, so tag shapes
+other than "<prefix><version>" are expressible. Configure in .versionator.yaml:
   release:
     createBranch: true    # set to false to disable
     branchPrefix: "release/"
+    tagTemplate: "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+    branchTemplate: "{{BranchPrefix}}{{Tag}}"
+    messageTemplate: "Release {{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}"
 
-Use --no-branch to skip branch creation for a single invocation.
+Every template variable is available, plus three specific to release:
+  {{ModulePath}}    VERSION file's directory relative to the repository root,
+                    with a trailing slash; empty at the root
+  {{ModuleName}}    that directory's bare name; empty at the root
+  {{Tag}}           the rendered tag, for branch and message templates only
+
+Go requires a submodule's tag to be the module's directory path followed by the
+version, which {{ModulePath}} produces:
+  tagTemplate: "{{ModulePath}}{{Prefix}}{{MajorMinorPatch}}"
+    -> internal/tools/v1.2.3 in internal/tools, v1.2.3 at the repository root
+
+Build metadata is absent from the default tag because Go module versions reject
+it; add {{MetadataWithPlus}} to the tag template if your project wants it.
+
+Use --no-branch to skip branch creation for a single invocation, and --message
+to override the message template.
 
 The command will fail if there are uncommitted changes (other than VERSION)
 or if the tag already exists.`,
@@ -164,17 +183,47 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 		return nil, fmt.Errorf("error getting current version: %w", err)
 	}
 
-	// Use VERSION file prefix by default, or command-line override
+	// Use VERSION file prefix by default, or command-line override.
+	// The flag is consulted only when actually supplied: it declares "v" as its
+	// default, so reading its value unconditionally would discard the VERSION
+	// file's prefix on every run and make `config prefix disable` a no-op here.
 	prefix := vd.Prefix
-	if cmdPrefix, _ := cmd.Flags().GetString("prefix"); cmdPrefix != "" {
-		prefix = cmdPrefix
-	}
-	// If no prefix configured anywhere, default to "v"
-	if prefix == "" {
+	if cmd.Flags().Changed("prefix") {
+		prefix, _ = cmd.Flags().GetString("prefix")
+	} else if prefix == "" {
+		// No prefix configured anywhere, default to "v"
 		prefix = "v"
 	}
 
-	tagName := prefix + vd.String()
+	// Build the template data once and reuse it for the tag, branch, message
+	// and any configured file updates.
+	templateData := emit.BuildCompleteTemplateData(vd, cfg.PreRelease.Template, cfg.Metadata.Template)
+	modulePath, err := version.ModulePath()
+	if err != nil {
+		return nil, fmt.Errorf("error resolving module path: %w", err)
+	}
+	moduleName, err := version.ModuleName()
+	if err != nil {
+		return nil, fmt.Errorf("error resolving module name: %w", err)
+	}
+	emit.MergeCustomVars(&templateData, map[string]string{
+		// The effective prefix, which the flag may have overridden.
+		"Prefix":       prefix,
+		"ModulePath":   modulePath,
+		"ModuleName":   moduleName,
+		"BranchPrefix": cfg.Release.BranchPrefix,
+	})
+
+	tagName, err := renderReleaseTemplate("tag", cfg.Release.TagTemplate, config.DefaultTagTemplate, templateData)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateTagName(tagName); err != nil {
+		return nil, err
+	}
+
+	// {{Tag}} lets the branch and message templates build on the rendered tag.
+	emit.MergeCustomVars(&templateData, map[string]string{"Tag": tagName})
 
 	// Tag idempotency: if the tag already exists AND points to the commit
 	// we'd be tagging anyway, skip creation and proceed (this is what makes
@@ -207,10 +256,13 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 		}
 	}
 
-	// Get custom message or use default
+	// Get custom message or render the configured template
 	message, _ := cmd.Flags().GetString("message")
 	if message == "" {
-		message = fmt.Sprintf("Release %s", vd.String())
+		message, err = renderReleaseTemplate("message", cfg.Release.MessageTemplate, config.DefaultMessageTemplate, templateData)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Apply file updates if configured
@@ -218,9 +270,6 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 	if len(cfg.Updates) > 0 {
 		logger, _ := zap.NewProduction()
 		updater := update.NewUpdater(cfg.Updates, update.NewDaselFileParser(), logger)
-
-		// Build template data for rendering update templates
-		templateData := emit.BuildCompleteTemplateData(vd, cfg.PreRelease.Template, cfg.Metadata.Template)
 
 		if err := updater.UpdateFiles(templateData); err != nil {
 			return nil, fmt.Errorf("error updating files: %w", err)
@@ -265,7 +314,10 @@ func runRelease(cmd *cobra.Command) (*releaseResult, error) {
 	createBranch := cfg.Release.CreateBranch && !noBranch
 
 	if createBranch {
-		branchName := cfg.Release.BranchPrefix + tagName
+		branchName, err := renderReleaseTemplate("branch", cfg.Release.BranchTemplate, config.DefaultBranchTemplate, templateData)
+		if err != nil {
+			return nil, err
+		}
 
 		// Same idempotency rule as tags: if the branch already points to HEAD,
 		// treat as success and queue it for push. If it points elsewhere,

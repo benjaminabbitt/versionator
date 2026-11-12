@@ -79,11 +79,62 @@ versionator patch increment
 
 ### Release Individual Packages
 
+By default every package tags as `v<version>`, which collides when two packages
+share a version. Give each package's tag a distinguishing prefix with a release
+tag template:
+
+```yaml
+# packages/core/.versionator.yaml
+release:
+  tagTemplate: "{{ModuleName}}-{{Prefix}}{{MajorMinorPatch}}"
+```
+
 ```bash
 cd packages/core
 versionator release
-# Creates tag: core-v3.1.0 and branch release/core-v3.1.0 (if prefix configured)
+# Creates tag: core-v3.1.0 and branch release/core-v3.1.0
 ```
+
+`{{ModuleName}}` is the VERSION file's directory name, so the same config works
+for every package. See [Template Variables](/templates/variables) for the full
+list.
+
+### Go Submodules
+
+Go does not treat the tag prefix as a convention. A module in a subdirectory is
+resolvable only when its tag is the module's directory path relative to the
+repository root, followed by the version — `internal/tools/v1.2.3`, with a
+slash, not a dash. `{{ModulePath}}` produces exactly that, and is empty at the
+repository root, so one template serves a root module and a submodule alike:
+
+```yaml
+release:
+  tagTemplate: "{{ModulePath}}{{Prefix}}{{MajorMinorPatch}}"
+```
+
+```bash
+cd internal/tools
+versionator release
+# Creates tag: internal/tools/v1.2.3
+
+cd $(git rev-parse --show-toplevel)
+versionator release
+# Creates tag: v1.2.3
+```
+
+A literal path works equally well when the layout is fixed:
+
+```yaml
+release:
+  tagTemplate: "internal/tools/{{Prefix}}{{MajorMinorPatch}}"
+```
+
+:::note Build metadata and Go
+Go module versions reject SemVer build metadata, so a tag like
+`v1.2.3+build.5` cannot be resolved as a module version. The default tag
+template omits metadata for this reason; the annotated tag message still
+records it.
+:::
 
 ## Configuration Inheritance
 
@@ -96,7 +147,10 @@ prerelease:
   template: "alpha-{{CommitsSinceTag}}"
 ```
 
-The nearest config file is used for that directory.
+Configuration is read from `.versionator.yaml` in the current working
+directory. Unlike VERSION file discovery, config is not searched for up the
+directory tree, so a package that needs its own settings needs its own config
+file.
 
 ## Common Patterns
 

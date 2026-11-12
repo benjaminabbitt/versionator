@@ -88,6 +88,7 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^a template file "([^"]*)" with content "([^"]*)"$`, aFileWithContent) // Same implementation
 	sc.Step(`^a config file with prerelease enabled and template "([^"]*)"$`, aConfigFileWithPrereleaseTemplate)
 	sc.Step(`^a config file with:$`, aConfigFileWithDocString)
+	sc.Step(`^a committed config file with:$`, aCommittedConfigFileWithDocString)
 	sc.Step(`^a subdirectory "([^"]*)"$`, aSubdirectory)
 	sc.Step(`^a VERSION file with version "([^"]*)" in subdirectory "([^"]*)"$`, aVersionFileInSubdirectory)
 
@@ -109,6 +110,8 @@ func InitializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^the exit code should be (\d+)$`, theExitCodeShouldBe)
 	sc.Step(`^the exit code should not be (\d+)$`, theExitCodeShouldNotBe)
 	sc.Step(`^a git tag "([^"]*)" should exist$`, aGitTagShouldExist)
+	sc.Step(`^a git branch "([^"]*)" should exist$`, aGitBranchShouldExist)
+	sc.Step(`^a git branch "([^"]*)" should not exist$`, aGitBranchShouldNotExist)
 	sc.Step(`^the tag "([^"]*)" should point to HEAD$`, theTagShouldPointToHEAD)
 	sc.Step(`^the tag "([^"]*)" should have message "([^"]*)"$`, theTagShouldHaveMessage)
 	sc.Step(`^the tag "([^"]*)" should be (\d+) commits ahead of "([^"]*)"$`, theTagShouldBeCommitsAheadOf)
@@ -379,6 +382,19 @@ func aConfigFileWithDocString(doc *godog.DocString) error {
 	return os.WriteFile(".versionator.yaml", []byte(doc.Content), 0644)
 }
 
+// aCommittedConfigFileWithDocString writes the config file and commits it.
+// Release refuses to run when any file other than VERSION is dirty, so a
+// scenario that configures release behaviour must commit the config first.
+func aCommittedConfigFileWithDocString(doc *godog.DocString) error {
+	if err := aConfigFileWithDocString(doc); err != nil {
+		return err
+	}
+	if err := runCommand("git", "add", ".versionator.yaml"); err != nil {
+		return err
+	}
+	return runCommand("git", "commit", "-m", "Add .versionator.yaml")
+}
+
 func aSubdirectory(subdir string) error {
 	return os.MkdirAll(subdir, 0755)
 }
@@ -598,6 +614,41 @@ func aGitTagShouldExist(tag string) error {
 	}
 	if strings.TrimSpace(string(out)) != tag {
 		return fmt.Errorf("tag %q does not exist", tag)
+	}
+	return nil
+}
+
+// gitBranchExists reports whether a local branch of that name exists.
+func gitBranchExists(branch string) (bool, error) {
+	cmd := exec.Command("git", "branch", "--list", branch)
+	cmd.Dir = ctx.workDir
+	out, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to list branches: %w", err)
+	}
+	// git marks the checked-out branch with "* "; strip it before comparing.
+	name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(out)), "* "))
+	return name == branch, nil
+}
+
+func aGitBranchShouldExist(branch string) error {
+	exists, err := gitBranchExists(branch)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("branch %q does not exist", branch)
+	}
+	return nil
+}
+
+func aGitBranchShouldNotExist(branch string) error {
+	exists, err := gitBranchExists(branch)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("branch %q exists but should not", branch)
 	}
 	return nil
 }

@@ -91,3 +91,14 @@ Timestamps at build time.
 | `{{BuildMonth}}` | Build month (zero-padded) | `01` |
 | `{{BuildDay}}` | Build day (zero-padded) | `15` |
 
+## Release Templates
+
+Available only to the release tag, branch and message templates (`release.tagTemplate`, `release.branchTemplate`, `release.messageTemplate`).
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `{{ModulePath}}` | VERSION file's directory relative to the repository root, with a trailing slash; empty at the root | `internal/tools/` |
+| `{{ModuleName}}` | That directory's bare name; empty at the root | `tools` |
+| `{{Tag}}` | The rendered tag name; branch and message templates only | `v1.2.3` |
+| `{{BranchPrefix}}` | The release.branchPrefix setting | `release/` |
+

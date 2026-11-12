@@ -145,11 +145,48 @@ Git release configuration.
 release:
   createBranch: true        # Create release branch when tagging
   branchPrefix: "release/"  # Branch name prefix
+
+  # Mustache templates. Shown with their defaults.
+  tagTemplate: "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+  branchTemplate: "{{BranchPrefix}}{{Tag}}"
+  messageTemplate: "Release {{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}"
 ```
 
 When enabled, `versionator release` creates both:
 - A git tag (e.g., `v1.0.0`)
 - A release branch (e.g., `release/v1.0.0`)
+
+**Templates**: the tag, branch and message are rendered from Mustache templates,
+so tag shapes other than `<prefix><version>` are expressible. Every
+[template variable](/templates/variables) is available, plus four specific to
+release: `{{ModulePath}}`, `{{ModuleName}}`, `{{Tag}}` (branch and message
+templates only) and `{{BranchPrefix}}`.
+
+A Go submodule must be tagged with its directory path, which `{{ModulePath}}`
+supplies:
+
+```yaml
+release:
+  tagTemplate: "{{ModulePath}}{{Prefix}}{{MajorMinorPatch}}"
+  # internal/tools -> internal/tools/v1.2.3
+  # repository root -> v1.2.3
+```
+
+See [Monorepo Support](/concepts/monorepo) for the full treatment.
+
+**Build metadata**: the default tag template omits it, because Go module
+versions reject SemVer build metadata — `v1.2.3+build.5` cannot be resolved as
+a module version. The annotated tag message still records it. Add
+`{{MetadataWithPlus}}` to `tagTemplate` to put it in the tag anyway.
+
+**Validation**: templates are checked when the config is written and when a
+release runs. A tag that renders to a name git cannot store (an embedded space,
+a `..` sequence, a trailing `.lock`) is rejected before the release mutates the
+repository.
+
+**Precedence**: `--message` overrides `messageTemplate` for a single
+invocation. `--prefix` overrides `{{Prefix}}`; without it the prefix comes from
+the VERSION file, falling back to `v`.
 
 ### custom
 

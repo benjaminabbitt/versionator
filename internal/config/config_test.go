@@ -1545,3 +1545,90 @@ func containsAt(s, substr string) bool {
 	}
 	return false
 }
+
+// =============================================================================
+// RELEASE TEMPLATES
+// The release command renders its tag, branch and message from Mustache
+// templates so tag shapes other than "<prefix><version>" are expressible --
+// notably Go's submodule form, "internal/tools/v1.2.3".
+// =============================================================================
+
+// TestReadConfig_NoConfigFile_ReturnsDefaultReleaseTemplates validates the
+// default templates.
+//
+// Why: The tag default must reproduce the historical tag exactly except for
+// build metadata, which Go rejects in module versions. Branch and message
+// defaults must preserve existing behavior, including branchPrefix.
+func TestReadConfig_NoConfigFile_ReturnsDefaultReleaseTemplates(t *testing.T) {
+	tempDir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(tempDir)
+
+	// Action: Read config with no file present
+	cfg, err := ReadConfig()
+
+	// Expected: Documented defaults
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if cfg.Release.TagTemplate != DefaultTagTemplate {
+		t.Errorf("Expected tag template %q, got %q", DefaultTagTemplate, cfg.Release.TagTemplate)
+	}
+	if cfg.Release.BranchTemplate != DefaultBranchTemplate {
+		t.Errorf("Expected branch template %q, got %q", DefaultBranchTemplate, cfg.Release.BranchTemplate)
+	}
+	if cfg.Release.MessageTemplate != DefaultMessageTemplate {
+		t.Errorf("Expected message template %q, got %q", DefaultMessageTemplate, cfg.Release.MessageTemplate)
+	}
+}
+
+// TestValidate_InvalidReleaseTemplate_ReturnsError validates that malformed
+// release templates are rejected at config time rather than at tag time.
+//
+// Why: A broken template discovered during `release` leaves a repository in a
+// half-released state; catching it on write is cheaper.
+func TestValidate_InvalidReleaseTemplate_ReturnsError(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Config)
+	}{
+		{"tag", func(c *Config) { c.Release.TagTemplate = "{{unclosed" }},
+		{"branch", func(c *Config) { c.Release.BranchTemplate = "{{unclosed" }},
+		{"message", func(c *Config) { c.Release.MessageTemplate = "{{unclosed" }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Precondition: Config with one malformed release template
+			cfg := &Config{}
+			tt.mutate(cfg)
+
+			// Action: Validate
+			err := cfg.Validate()
+
+			// Expected: Rejected
+			if err == nil {
+				t.Errorf("Expected error for malformed %s template, got nil", tt.name)
+			}
+		})
+	}
+}
+
+// TestValidate_EmptyTagTemplate_ReturnsError validates that an explicitly empty
+// tag template is rejected.
+//
+// Why: An empty template renders an empty tag name, which git refuses with an
+// obscure error well after the release has begun mutating the repository.
+func TestValidate_EmptyTagTemplate_ReturnsError(t *testing.T) {
+	// Precondition: Config with an explicitly blank tag template
+	cfg := &Config{Release: ReleaseConfig{TagTemplate: "   "}}
+
+	// Action: Validate
+	err := cfg.Validate()
+
+	// Expected: Rejected
+	if err == nil {
+		t.Error("Expected error for blank tag template, got nil")
+	}
+}

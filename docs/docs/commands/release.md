@@ -7,6 +7,7 @@ description: Create git tag and release branch for current version
 
 Create git tag and release branch for current version
 
+```
 Create a git tag and release branch for the current version.
 
 This command will:
@@ -14,22 +15,42 @@ This command will:
 2. If only the VERSION file is dirty, commit it automatically
 3. Verify there are no other uncommitted changes
 4. Get the current version
-5. Create a git tag with the version (prefixed with 'v')
+5. Create a git tag from the release tag template (default: 'v1.2.3')
 6. Create a release branch (e.g., 'release/v1.2.3') if enabled
 
 This is the recommended workflow after bumping a version:
   versionator patch increment
   versionator release
 
-Release branch creation is enabled by default. Configure in .versionator.yaml:
+The tag, release branch and tag message are Mustache templates, so tag shapes
+other than "<prefix><version>" are expressible. Configure in .versionator.yaml:
   release:
     createBranch: true    # set to false to disable
     branchPrefix: "release/"
+    tagTemplate: "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+    branchTemplate: "{{BranchPrefix}}{{Tag}}"
+    messageTemplate: "Release {{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}"
 
-Use --no-branch to skip branch creation for a single invocation.
+Every template variable is available, plus three specific to release:
+  {{ModulePath}}    VERSION file's directory relative to the repository root,
+                    with a trailing slash; empty at the root
+  {{ModuleName}}    that directory's bare name; empty at the root
+  {{Tag}}           the rendered tag, for branch and message templates only
+
+Go requires a submodule's tag to be the module's directory path followed by the
+version, which {{ModulePath}} produces:
+  tagTemplate: "{{ModulePath}}{{Prefix}}{{MajorMinorPatch}}"
+    -> internal/tools/v1.2.3 in internal/tools, v1.2.3 at the repository root
+
+Build metadata is absent from the default tag because Go module versions reject
+it; add {{MetadataWithPlus}} to the tag template if your project wants it.
+
+Use --no-branch to skip branch creation for a single invocation, and --message
+to override the message template.
 
 The command will fail if there are uncommitted changes (other than VERSION)
 or if the tag already exists.
+```
 
 ## Usage
 

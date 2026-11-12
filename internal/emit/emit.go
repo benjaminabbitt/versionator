@@ -698,6 +698,12 @@ func BuildCompleteTemplateData(v *version.Version, prereleaseTemplate, metadataT
 				data.PreReleaseWithDash = "-" + prerelease
 			}
 		}
+	} else if v.PreRelease != "" {
+		// No template configured: the VERSION file holds the value (stable
+		// pre-release). Without this, {{PreRelease}} renders empty for a
+		// version the file already describes as "1.2.3-alpha.1".
+		data.PreRelease = v.PreRelease
+		data.PreReleaseWithDash = "-" + v.PreRelease
 	}
 
 	// Render Metadata from template
@@ -711,6 +717,10 @@ func BuildCompleteTemplateData(v *version.Version, prereleaseTemplate, metadataT
 				data.MetadataWithPlus = "+" + metadata
 			}
 		}
+	} else if v.BuildMetadata != "" {
+		// As above: stable metadata lives in the VERSION file.
+		data.Metadata = v.BuildMetadata
+		data.MetadataWithPlus = "+" + v.BuildMetadata
 	}
 
 	return data

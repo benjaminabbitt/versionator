@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/cbroglie/mustache"
 	"gopkg.in/yaml.v3"
@@ -40,6 +41,23 @@ type BranchVersioningConfig struct {
 	Mode string `yaml:"mode"`
 }
 
+// Release template defaults.
+//
+// The tag default reproduces the historical tag ("v1.2.3") with one deliberate
+// exception: build metadata is omitted. Go module versions reject SemVer build
+// metadata, so a tag carrying "+" cannot be resolved as a module version. The
+// metadata still reaches the tag message, and a project that wants it in the
+// tag can append {{MetadataWithPlus}} to its own template.
+//
+// The branch default is expressed in terms of {{BranchPrefix}} so that the
+// existing branchPrefix setting keeps working untouched; a project that sets
+// branchTemplate explicitly takes full control of the branch name.
+const (
+	DefaultTagTemplate     = "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+	DefaultBranchTemplate  = "{{BranchPrefix}}{{Tag}}"
+	DefaultMessageTemplate = "Release {{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}"
+)
+
 // ReleaseConfig holds release-related configuration
 type ReleaseConfig struct {
 	// CreateBranch controls whether a release branch is created when tagging
@@ -47,7 +65,33 @@ type ReleaseConfig struct {
 	CreateBranch bool `yaml:"createBranch"`
 	// BranchPrefix is prepended to the tag name to form the branch name
 	// Default: "release/" (e.g., tag "v1.2.3" -> branch "release/v1.2.3")
+	// Available to BranchTemplate as {{BranchPrefix}}.
 	BranchPrefix string `yaml:"branchPrefix"`
+	// TagTemplate is a Mustache template for the tag name.
+	// Default: DefaultTagTemplate.
+	//
+	// Beyond the usual template variables, {{ModulePath}} renders the VERSION
+	// file's directory relative to the repository root with a trailing slash
+	// (empty at the root), and {{ModuleName}} renders that directory's bare
+	// name. {{ModulePath}} is what Go's module system requires of a submodule
+	// tag:
+	//
+	//	tagTemplate: "{{ModulePath}}{{Prefix}}{{MajorMinorPatch}}"
+	//	  -> internal/tools/v1.2.3 in internal/tools, v1.2.3 at the root
+	//
+	// A literal path works equally well when the layout is fixed:
+	//
+	//	tagTemplate: "internal/tools/{{Prefix}}{{MajorMinorPatch}}"
+	TagTemplate string `yaml:"tagTemplate"`
+	// BranchTemplate is a Mustache template for the release branch name.
+	// Default: DefaultBranchTemplate. In addition to the usual variables,
+	// {{Tag}} holds the already-rendered tag name and {{BranchPrefix}} holds
+	// the BranchPrefix setting.
+	BranchTemplate string `yaml:"branchTemplate"`
+	// MessageTemplate is a Mustache template for the annotated tag message.
+	// Default: DefaultMessageTemplate. {{Tag}} is available here too.
+	// The --message flag overrides this for a single invocation.
+	MessageTemplate string `yaml:"messageTemplate"`
 }
 
 // PreReleaseConfig holds pre-release identifier configuration
@@ -126,8 +170,11 @@ func ReadConfig() (*Config, error) {
 			},
 		},
 		Release: ReleaseConfig{
-			CreateBranch: true,       // create release branches by default
-			BranchPrefix: "release/", // e.g., "release/v1.2.3"
+			CreateBranch:    true,       // create release branches by default
+			BranchPrefix:    "release/", // e.g., "release/v1.2.3"
+			TagTemplate:     DefaultTagTemplate,
+			BranchTemplate:  DefaultBranchTemplate,
+			MessageTemplate: DefaultMessageTemplate,
 		},
 		BranchVersioning: BranchVersioningConfig{
 			Enabled:            false, // opt-in
@@ -169,6 +216,36 @@ func ValidateTemplate(template string) error {
 	return nil
 }
 
+// validateReleaseTemplates checks the release tag, branch and message templates.
+//
+// Templates are validated on write rather than at tag time because release
+// mutates the repository — committing VERSION, creating a branch — before it
+// reaches the tag. A template that only fails then leaves a half-finished
+// release behind.
+func (c *Config) validateReleaseTemplates() error {
+	templates := []struct {
+		name  string
+		value string
+	}{
+		{"release tag template", c.Release.TagTemplate},
+		{"release branch template", c.Release.BranchTemplate},
+		{"release message template", c.Release.MessageTemplate},
+	}
+	for _, t := range templates {
+		if err := ValidateTemplate(t.value); err != nil {
+			return fmt.Errorf("%s: %w", t.name, err)
+		}
+	}
+
+	// An empty tag template renders an empty tag name, which git rejects well
+	// after the release is underway. An unset template is fine — the default
+	// applies — but one set to whitespace is a mistake worth naming.
+	if c.Release.TagTemplate != "" && strings.TrimSpace(c.Release.TagTemplate) == "" {
+		return fmt.Errorf("release tag template: must not be blank")
+	}
+	return nil
+}
+
 // Validate checks if the config is valid, including template syntax
 func (c *Config) Validate() error {
 	if c.PreRelease.Template != "" {
@@ -185,6 +262,9 @@ func (c *Config) Validate() error {
 		if err := ValidateTemplate(c.BranchVersioning.PrereleaseTemplate); err != nil {
 			return fmt.Errorf("branch versioning prerelease template: %w", err)
 		}
+	}
+	if err := c.validateReleaseTemplates(); err != nil {
+		return err
 	}
 	if c.BranchVersioning.Mode != "" && c.BranchVersioning.Mode != "replace" && c.BranchVersioning.Mode != "append" {
 		return fmt.Errorf("branch versioning mode must be 'replace' or 'append', got '%s'", c.BranchVersioning.Mode)
@@ -378,7 +458,34 @@ release:
 
   # Branch name prefix (default: "release/")
   # Tag "v1.2.3" -> Branch "release/v1.2.3"
+  # Available to branchTemplate as {{BranchPrefix}}
   branchPrefix: "release/"
+
+  # Mustache template for the tag name.
+  # Build metadata is deliberately absent: Go module versions reject SemVer
+  # build metadata, so "v1.2.3+build.5" cannot be resolved as a module version.
+  # Add {{MetadataWithPlus}} if your project wants it in the tag anyway.
+  tagTemplate: "{{Prefix}}{{MajorMinorPatch}}{{PreReleaseWithDash}}"
+
+  # Mustache template for the release branch name.
+  # {{Tag}} holds the already-rendered tag name.
+  branchTemplate: "{{BranchPrefix}}{{Tag}}"
+
+  # Mustache template for the annotated tag message.
+  # The --message flag overrides this for a single invocation.
+  messageTemplate: "Release {{MajorMinorPatch}}{{PreReleaseWithDash}}{{MetadataWithPlus}}"
+
+  # Go requires a submodule's tag to be the module's directory path relative to
+  # the repository root, followed by the version. {{ModulePath}} produces it,
+  # and is empty at the repository root, so one template serves both:
+  #
+  #   tagTemplate: "{{ModulePath}}{{Prefix}}{{MajorMinorPatch}}"
+  #     internal/tools -> internal/tools/v1.2.3
+  #     repository root -> v1.2.3
+  #
+  # A literal path works too when the layout is fixed:
+  #
+  #   tagTemplate: "internal/tools/{{Prefix}}{{MajorMinorPatch}}"
 
 # Logging configuration
 logging:
@@ -388,6 +495,15 @@ logging:
 # =============================================================================
 # AVAILABLE TEMPLATE VARIABLES
 # =============================================================================
+#
+# Release-only Variables (tag, branch and message templates):
+#   {{ModulePath}}                   - VERSION file's directory relative to the
+#                                      repository root, with a trailing slash;
+#                                      empty at the root (internal/tools/)
+#   {{ModuleName}}                   - That directory's bare name (tools)
+#   {{Tag}}                          - The rendered tag name; available to the
+#                                      branch and message templates
+#   {{BranchPrefix}}                 - The release.branchPrefix setting
 #
 # Version Components:
 #   {{Major}}, {{Minor}}, {{Patch}}  - Version numbers

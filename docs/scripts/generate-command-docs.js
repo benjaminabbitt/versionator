@@ -209,6 +209,7 @@ function generateVariablesDoc(templateVars) {
     { key: 'vcs', title: 'VCS / Git Information', description: 'Version control information' },
     { key: 'commitInfo', title: 'Commit Information', description: 'Details about the current commit' },
     { key: 'buildTimestamps', title: 'Build Timestamps', description: 'Timestamps at build time' },
+    { key: 'release', title: 'Release Templates', description: 'Available only to the release tag, branch and message templates (`release.tagTemplate`, `release.branchTemplate`, `release.messageTemplate`)' },
   ];
 
   for (const cat of categories) {
