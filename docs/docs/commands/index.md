@@ -17,6 +17,7 @@ Versionator provides commands for managing semantic versions.
 | [`init`](./init) | Initialize versionator in this directory |
 | [`output`](./output) | Output version in various formats |
 | [`release`](./release) | Create git tag and release branch for current version |
+| [`set`](./set) | Set version to an arbitrary value |
 | [`support`](./support) | Shell completion and tooling support |
 
 ## Global Flags

@@ -86,6 +86,7 @@ Timestamps at build time.
 |----------|-------------|--------|
 | `{{BuildDateTimeUTC}}` | ISO 8601 build time | `2024-01-15T10:30:00Z` |
 | `{{BuildDateTimeCompact}}` | Compact build time | `20240115103045` |
+| `{{DateTimeDirty}}` | '.{BuildDateTimeCompact}' if uncommitted, empty otherwise | `.20240115103045` |
 | `{{BuildDateUTC}}` | Build date only | `2024-01-15` |
 | `{{BuildYear}}` | Build year | `2024` |
 | `{{BuildMonth}}` | Build month (zero-padded) | `01` |

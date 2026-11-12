@@ -77,7 +77,7 @@ Emit version in various formats
 ```
 Emit the current version in various programming language formats.
 
-Supported formats: python, json, yaml, go, c, c-header, cpp, cpp-header, js, ts, java, kotlin, csharp, php, swift, ruby, rust
+Supported formats: python, json, yaml, go, c, c-header, cpp, cpp-header, js, ts, java, kotlin, csharp, php, swift, ruby, rust, dart
 
 FLAGS WITH OPTIONAL VALUES (use = syntax for values, e.g., --prefix=value):
   --prefix, -p            Enable prefix (default "v" if no value given)
@@ -140,6 +140,7 @@ TEMPLATE VARIABLES (Mustache syntax):
     {{BuildYear}}            - Year: 2024
     {{BuildMonth}}           - Month: 01 (zero-padded)
     {{BuildDay}}             - Day: 15 (zero-padded)
+    {{DateTimeDirty}}        - ".{BuildDateTimeCompact}" if uncommitted, empty otherwise
 
 Use 'versionator vars' to see all template variables and their current values.
 
@@ -241,6 +242,7 @@ TEMPLATE VARIABLES:
   Build Timestamps:
     {{BuildDateTimeCompact}} - Compact: 20241211103045
     {{BuildDateUTC}}         - Date only: 2024-12-11
+    {{DateTimeDirty}}        - ".{BuildDateTimeCompact}" if uncommitted, empty otherwise
 
   Custom Variables:
     Use --set key=value to inject custom variables

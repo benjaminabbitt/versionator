@@ -12,8 +12,8 @@ metadata, and custom variables.
 
 Use subcommands to configure specific aspects:
   config prefix      - Manage version prefix (v, V)
-  config prerelease  - Manage pre-release identifiers and stability
-  config metadata    - Manage build metadata and stability
+  config prerelease  - Manage pre-release identifiers (includes stability setting)
+  config metadata    - Manage build metadata (includes stability setting)
   config custom      - Manage custom key-value pairs
   config vars        - Show all available template variables
 
@@ -28,9 +28,9 @@ versionator config [command]
 | Command | Description |
 |---------|-------------|
 | `custom` | Manage custom key-value pairs in config |
-| `metadata` | Manage build metadata and stability |
+| `metadata` | Manage build metadata |
 | `prefix` | Manage version prefix |
-| `prerelease` | Manage pre-release identifier and stability |
+| `prerelease` | Manage pre-release identifier |
 | `vars` | Show all template variables and their current values |
 
 ### custom
@@ -62,38 +62,22 @@ versionator config custom
 
 ### metadata
 
-Manage build metadata and stability
+Manage build metadata
 
-Commands to manage build metadata configuration including stability settings.
+Commands to manage build metadata.
 
 Build metadata follows SemVer 2.0.0 specification:
 - Appended with a plus sign (+) - added automatically
 - Multiple identifiers separated by DOTS (.)
 - Each identifier: alphanumerics and hyphens only [0-9A-Za-z-]
 
-Example: 1.2.3+20241211103045.abc1234
-         └─────────────────┘ └──────┘
-          identifier 1       identifier 2
+Stability controls where the metadata value lives:
+  stable: true  - Value is written to VERSION file
+  stable: false - Value is generated from template at output time (default)
 
-**Stability**: Controls whether metadata is stored in VERSION file or generated from template.
-
-| Stability | Default | Behavior |
-|-----------|---------|----------|
-| `false` | Yes | Generated from template at output time |
-| `true` | No | Stored directly in VERSION file |
-
-**Examples:**
-
-```bash
-versionator config metadata                    # Show current status
-versionator config metadata template           # Get current template
-versionator config metadata template "{{ShortHash}}"  # Set template
-versionator config metadata stable             # Get stability setting
-versionator config metadata stable true        # Enable stable mode
-versionator config metadata stable false       # Disable stable mode (use template)
-versionator config metadata set "build123"     # Set literal (requires stable:true)
-versionator config metadata set "build123" --force  # Force set template
-```
+Example: 1.2.3+abc1234
+         └─────┘
+          metadata
 
 ```bash
 versionator config metadata
@@ -113,36 +97,20 @@ versionator config prefix
 
 ### prerelease
 
-Manage pre-release identifier and stability
+Manage pre-release identifier
 
-Commands to manage pre-release configuration including stability settings.
+Commands to manage pre-release identifiers.
 
 Pre-release follows SemVer 2.0.0 specification:
 - Appended with a dash (-) - this is added automatically
 - Use DASHES (-) to separate identifiers in your template
 - Must contain only alphanumerics and hyphens [0-9A-Za-z-]
 
-Example output: 1.2.3-alpha-5
+Stability controls where the pre-release value lives:
+  stable: true  - Value is written to VERSION file (traditional release workflow)
+  stable: false - Value is generated from template at output time (default, CD workflow)
 
-**Stability**: Controls whether pre-release is stored in VERSION file or generated from template.
-
-| Stability | Default | Behavior |
-|-----------|---------|----------|
-| `false` | Yes | Generated from template at output time |
-| `true` | No | Stored directly in VERSION file |
-
-**Examples:**
-
-```bash
-versionator config prerelease                    # Show current status
-versionator config prerelease template           # Get current template
-versionator config prerelease template "build-{{CommitsSinceTag}}"  # Set template
-versionator config prerelease stable             # Get stability setting
-versionator config prerelease stable true        # Enable stable mode
-versionator config prerelease stable false       # Disable stable mode (use template)
-versionator config prerelease set "alpha"        # Set literal (requires stable:true)
-versionator config prerelease set "alpha" --force  # Force set template
-```
+Example output: 1.2.3-build-5
 
 ```bash
 versionator config prerelease
